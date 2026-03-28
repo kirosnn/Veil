@@ -1,0 +1,18 @@
+<Window
+    x:Class="Veil.Windows.SystemStatsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Background="Transparent">
+        <Border
+            x:Name="PanelBorder"
+            Padding="0"
+            Background="Transparent"
+            CornerRadius="14">
+            <StackPanel
+                x:Name="StatsPanel"
+                Margin="14,12,14,12"
+                Spacing="10" />
+        </Border>
+    </Grid>
+</Window>

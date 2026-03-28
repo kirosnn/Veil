@@ -1,0 +1,17 @@
+<Application
+    x:Class="Veil.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <FontFamily x:Key="SfTextRegular">ms-appx:///Assets/Fonts/SF-Pro-Text-Regular.otf#SF Pro Text</FontFamily>
+            <FontFamily x:Key="SfTextMedium">ms-appx:///Assets/Fonts/SF-Pro-Text-Medium.otf#SF Pro Text</FontFamily>
+            <FontFamily x:Key="SfTextSemibold">ms-appx:///Assets/Fonts/SF-Pro-Text-Semibold.otf#SF Pro Text</FontFamily>
+            <FontFamily x:Key="SfDisplaySemibold">ms-appx:///Assets/Fonts/SF-Pro-Display-Semibold.otf#SF Pro Display</FontFamily>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

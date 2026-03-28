@@ -1,0 +1,236 @@
+<Window
+    x:Class="Veil.Windows.TopBarWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid x:Name="RootPanel" Background="Transparent" IsTabStop="False">
+        <TextBlock x:Name="ClockText"
+                   Text="12:00"
+                   FontSize="13"
+                   FontWeight="Medium"
+                   FontFamily="{StaticResource SfTextMedium}"
+                   Foreground="White"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   IsHitTestVisible="False" />
+
+        <StackPanel x:Name="RightButtonsPanel"
+                    Orientation="Horizontal"
+                    Spacing="4"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Margin="0,0,8,0">
+            <Button x:Name="WeatherButton"
+                    VerticalAlignment="Center"
+                    Padding="8,2"
+                    MinWidth="0"
+                    MinHeight="0"
+                    CornerRadius="10"
+                    BorderThickness="0"
+                    Background="Transparent"
+                    Foreground="#FFFFFFFF"
+                    IsTabStop="False"
+                    Click="OnWeatherButtonClick">
+                <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#0CFFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#08FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
+                </Button.Resources>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Grid x:Name="WeatherIconHost"
+                          Width="14"
+                          Height="14"
+                          VerticalAlignment="Center" />
+                    <TextBlock x:Name="WeatherButtonText"
+                               Text="--°"
+                               FontSize="12"
+                               FontFamily="{StaticResource SfTextSemibold}"
+                               Foreground="#FFFFFFFF"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="DiscordButton"
+                    VerticalAlignment="Center"
+                    Padding="2,2"
+                    MinWidth="0"
+                    MinHeight="0"
+                    CornerRadius="4"
+                    BorderThickness="0"
+                    Background="Transparent"
+                    IsTabStop="False"
+                    Visibility="Collapsed"
+                    Click="OnDiscordButtonClick">
+                <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#0CFFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#08FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
+                </Button.Resources>
+                <Grid Width="16" Height="16">
+                    <Image x:Name="DiscordIcon"
+                           Width="14"
+                           Height="14"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           IsHitTestVisible="False" />
+                    <Border x:Name="DiscordBadge"
+                            MinWidth="8"
+                            Height="8"
+                            Padding="0"
+                            CornerRadius="5"
+                            Background="#ED4245"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top"
+                            Margin="0,-2,-2,0"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="DiscordBadgeText"
+                                   FontSize="7"
+                                   FontFamily="{StaticResource SfTextSemibold}"
+                                   Foreground="White"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Visibility="Collapsed" />
+                    </Border>
+                </Grid>
+            </Button>
+            <Button x:Name="MusicButton"
+                    VerticalAlignment="Center"
+                    Padding="4,2"
+                    MinWidth="0"
+                    MinHeight="0"
+                    CornerRadius="4"
+                    BorderThickness="0"
+                    Background="Transparent"
+                    IsTabStop="False"
+                    Visibility="Collapsed"
+                    Click="OnMusicButtonClick">
+                <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#0CFFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#08FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
+                </Button.Resources>
+                <Grid Width="18" Height="18">
+                    <Image x:Name="MusicAlbumArt"
+                           Width="18"
+                           Height="18"
+                           Stretch="UniformToFill"
+                           Visibility="Collapsed" />
+                    <TextBlock x:Name="MusicIcon"
+                               Text="&#xE8D6;"
+                               FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                               FontSize="14"
+                               Foreground="#CCFFFFFF"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+            <Button x:Name="RunCatButton"
+                    VerticalAlignment="Center"
+                    Padding="4,2"
+                    MinWidth="0"
+                    MinHeight="0"
+                    CornerRadius="4"
+                    BorderThickness="0"
+                    Background="Transparent"
+                    IsTabStop="False"
+                    Visibility="Collapsed"
+                    Click="OnRunCatButtonClick">
+                <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#0CFFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#08FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
+                </Button.Resources>
+                <Image x:Name="RunCatImage"
+                       Width="20"
+                       Height="20"
+                       IsHitTestVisible="False" />
+            </Button>
+            <Button x:Name="PanelThemeButton"
+                    VerticalAlignment="Center"
+                    Padding="4,2"
+                    MinWidth="0"
+                    MinHeight="0"
+                    CornerRadius="4"
+                    BorderThickness="0"
+                    Background="Transparent"
+                    IsTabStop="False"
+                    Click="OnPanelThemeButtonClick">
+                <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#0CFFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#08FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
+                </Button.Resources>
+                <Image x:Name="PanelThemeIcon"
+                       Width="16"
+                       Height="16"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       IsHitTestVisible="False" />
+            </Button>
+        </StackPanel>
+
+        <StackPanel x:Name="LeftButtonsPanel"
+                    Orientation="Horizontal"
+                    Spacing="2"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Stretch"
+                    Margin="10,0,0,0">
+            <Button x:Name="MenuButton"
+                    Width="11"
+                    Height="11"
+                    MinWidth="0"
+                    MinHeight="0"
+                    CornerRadius="6"
+                    Padding="0"
+                    BorderThickness="0"
+                    Background="#AAFFFFFF"
+                    IsTabStop="False"
+                    VerticalAlignment="Center"
+                    Click="OnMenuButtonClick">
+                <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">White</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#77FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
+                </Button.Resources>
+            </Button>
+
+            <Button x:Name="FinderButton"
+                    MinWidth="0"
+                    Height="22"
+                    MaxWidth="180"
+                    Padding="10,0"
+                    CornerRadius="10"
+                    BorderThickness="0"
+                    Background="#18FFFFFF"
+                    Foreground="#E6FFFFFF"
+                    FontSize="13"
+                    FontFamily="{StaticResource SfDisplaySemibold}"
+                    IsTabStop="False"
+                    VerticalAlignment="Center"
+                    Click="OnFinderButtonClick">
+                <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#30FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#20FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
+                </Button.Resources>
+                <TextBlock x:Name="FinderButtonText"
+                           MaxWidth="160"
+                           Text="Finder"
+                           FontSize="13"
+                           FontFamily="{StaticResource SfDisplaySemibold}"
+                           TextTrimming="CharacterEllipsis" />
+            </Button>
+
+            <StackPanel x:Name="ShortcutButtonsPanel"
+                        Orientation="Horizontal"
+                        Spacing="2"
+                        VerticalAlignment="Center" />
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,1152 @@
+<Window
+    x:Class="Veil.Windows.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Background="Transparent" IsTabStop="False">
+        <Border
+            x:Name="PanelBorder"
+            Padding="0"
+            Background="#18000000"
+            CornerRadius="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="36" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border
+                    x:Name="TitleBarDragRegion"
+                    Grid.Row="0"
+                    Background="#18000000" />
+
+                <ScrollViewer
+                    Grid.Row="1"
+                    Margin="22,10,22,22"
+                    HorizontalScrollBarVisibility="Disabled"
+                    HorizontalScrollMode="Disabled"
+                    VerticalScrollBarVisibility="Auto"
+                    VerticalScrollMode="Enabled">
+                    <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock
+                        Text="Settings"
+                        FontSize="26"
+                        FontWeight="SemiBold"
+                        FontFamily="{StaticResource SfDisplaySemibold}"
+                        Foreground="White"
+                        Opacity="1" />
+
+                    <TextBlock
+                        Grid.Row="1"
+                        Margin="0,8,0,0"
+                        Text="Adjust the look and feel of Veil."
+                        FontSize="13"
+                        FontFamily="{StaticResource SfTextRegular}"
+                        Foreground="#D6FFFFFF"
+                        Opacity="1" />
+
+                    <Grid Grid.Row="2" Margin="0,22,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="28" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border
+                            Grid.Column="0"
+                            Background="#22000000"
+                            CornerRadius="18"
+                            Padding="12">
+                            <StackPanel Spacing="6">
+                                <StackPanel Spacing="6">
+                                    <Button
+                                        x:Name="TopBarSectionButton"
+                                        Height="40"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,0"
+                                        CornerRadius="14"
+                                        BorderThickness="0"
+                                        Background="#30FFFFFF"
+                                        Foreground="White"
+                                        IsTabStop="False"
+                                        Tag="TopBar"
+                                        Click="OnSectionButtonClick">
+                                        <TextBlock
+                                            Text="Topbar"
+                                            FontSize="13"
+                                            FontFamily="{StaticResource SfTextSemibold}"
+                                            Foreground="White"
+                                            VerticalAlignment="Center" />
+                                    </Button>
+
+                                    <Button
+                                        x:Name="MenuSectionButton"
+                                        Height="40"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,0"
+                                        CornerRadius="14"
+                                        BorderThickness="0"
+                                        Background="Transparent"
+                                        Foreground="#D6FFFFFF"
+                                        IsTabStop="False"
+                                        Tag="Menu"
+                                        Click="OnSectionButtonClick">
+                                        <TextBlock
+                                            Text="Menu"
+                                            FontSize="13"
+                                            FontFamily="{StaticResource SfTextSemibold}"
+                                            Foreground="White"
+                                            VerticalAlignment="Center" />
+                                    </Button>
+
+                                    <Button
+                                        x:Name="DiscordSectionButton"
+                                        Height="40"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,0"
+                                        CornerRadius="14"
+                                        BorderThickness="0"
+                                        Background="Transparent"
+                                        Foreground="#D6FFFFFF"
+                                        IsTabStop="False"
+                                        Tag="Discord"
+                                        Click="OnSectionButtonClick">
+                                        <TextBlock
+                                            Text="Discord"
+                                            FontSize="13"
+                                            FontFamily="{StaticResource SfTextSemibold}"
+                                            Foreground="White"
+                                            VerticalAlignment="Center" />
+                                    </Button>
+
+                                    <Button
+                                        x:Name="MusicSectionButton"
+                                        Height="40"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,0"
+                                        CornerRadius="14"
+                                        BorderThickness="0"
+                                        Background="Transparent"
+                                        Foreground="#D6FFFFFF"
+                                        IsTabStop="False"
+                                        Tag="Music"
+                                        Click="OnSectionButtonClick">
+                                        <TextBlock
+                                            Text="Music"
+                                            FontSize="13"
+                                            FontFamily="{StaticResource SfTextSemibold}"
+                                            Foreground="White"
+                                            VerticalAlignment="Center" />
+                                    </Button>
+
+                                    <Button
+                                        x:Name="WeatherSectionButton"
+                                        Height="40"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,0"
+                                        CornerRadius="14"
+                                        BorderThickness="0"
+                                        Background="Transparent"
+                                        Foreground="#D6FFFFFF"
+                                        IsTabStop="False"
+                                        Tag="Weather"
+                                        Click="OnSectionButtonClick">
+                                        <TextBlock
+                                            Text="Weather"
+                                            FontSize="13"
+                                            FontFamily="{StaticResource SfTextSemibold}"
+                                            Foreground="White"
+                                            VerticalAlignment="Center" />
+                                    </Button>
+
+                                    <Button
+                                        x:Name="GamesSectionButton"
+                                        Height="40"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,0"
+                                        CornerRadius="14"
+                                        BorderThickness="0"
+                                        Background="Transparent"
+                                        Foreground="#D6FFFFFF"
+                                        IsTabStop="False"
+                                        Tag="Games"
+                                        Click="OnSectionButtonClick">
+                                        <TextBlock
+                                            Text="Games"
+                                            FontSize="13"
+                                            FontFamily="{StaticResource SfTextSemibold}"
+                                            Foreground="White"
+                                            VerticalAlignment="Center" />
+                                    </Button>
+
+                                    <Button
+                                        x:Name="RunCatSectionButton"
+                                        Height="40"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Stretch"
+                                        Padding="12,0"
+                                        CornerRadius="14"
+                                        BorderThickness="0"
+                                        Background="Transparent"
+                                        Foreground="#D6FFFFFF"
+                                        IsTabStop="False"
+                                        Tag="RunCat"
+                                        Click="OnSectionButtonClick">
+                                        <TextBlock
+                                            Text="RunCat"
+                                            FontSize="13"
+                                            FontFamily="{StaticResource SfTextSemibold}"
+                                            Foreground="White"
+                                            VerticalAlignment="Center" />
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid Grid.Column="2">
+                            <Grid x:Name="TopBarSectionPanel">
+                                <StackPanel Spacing="16">
+                                    <TextBlock
+                                        Text="Topbar"
+                                        FontSize="22"
+                                        FontFamily="{StaticResource SfDisplaySemibold}"
+                                        Foreground="White" />
+                                    <TextBlock
+                                        Text="Tune the visibility and alignment of the bar that stays pinned at the top of the screen."
+                                        TextWrapping="WrapWholeWords"
+                                        FontSize="12"
+                                        FontFamily="{StaticResource SfTextRegular}"
+                                        Foreground="#C8FFFFFF" />
+
+                                    <Border Background="#18000000" CornerRadius="16" Padding="16">
+                                        <StackPanel Spacing="18">
+                                            <TextBlock
+                                                Text="SCREEN PLACEMENT"
+                                                FontSize="11"
+                                                FontFamily="{StaticResource SfTextSemibold}"
+                                                Foreground="#99FFFFFF"
+                                                CharacterSpacing="60" />
+
+                                            <StackPanel Spacing="8">
+                                                <Grid>
+                                                    <TextBlock Text="Visible On" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                    <TextBlock x:Name="TopBarDisplayModeValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#CCFFFFFF" />
+                                                </Grid>
+                                                <Grid ColumnSpacing="6">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Button
+                                                        x:Name="TopBarDisplayModePrimaryButton"
+                                                        Grid.Column="0"
+                                                        Height="36"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        Background="#24FFFFFF"
+                                                        Foreground="White"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Tag="Primary"
+                                                        Click="OnTopBarDisplayModeButtonClick"
+                                                        Content="Primary" />
+
+                                                    <Button
+                                                        x:Name="TopBarDisplayModeAllButton"
+                                                        Grid.Column="1"
+                                                        Height="36"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        Background="Transparent"
+                                                        Foreground="#D6FFFFFF"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Tag="All"
+                                                        Click="OnTopBarDisplayModeButtonClick"
+                                                        Content="All" />
+
+                                                    <Button
+                                                        x:Name="TopBarDisplayModeCustomButton"
+                                                        Grid.Column="2"
+                                                        Height="36"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        Background="Transparent"
+                                                        Foreground="#D6FFFFFF"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Tag="Custom"
+                                                        Click="OnTopBarDisplayModeButtonClick"
+                                                        Content="Custom" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel x:Name="TopBarMonitorSelectionPanel" Spacing="8" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="#18000000" CornerRadius="16" Padding="16">
+                                        <StackPanel Spacing="18">
+                                            <TextBlock
+                                                Text="BAR APPEARANCE"
+                                                FontSize="11"
+                                                FontFamily="{StaticResource SfTextSemibold}"
+                                                Foreground="#99FFFFFF"
+                                                CharacterSpacing="60" />
+
+                                            <StackPanel Spacing="8">
+                                                <Grid>
+                                                    <TextBlock Text="Topbar Style" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                    <TextBlock x:Name="TopBarStyleValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#CCFFFFFF" />
+                                                </Grid>
+                                                <Grid ColumnSpacing="6">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Button
+                                                        x:Name="TopBarStyleSolidButton"
+                                                        Grid.Column="0"
+                                                        Height="36"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        Background="#24FFFFFF"
+                                                        Foreground="White"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Tag="Solid"
+                                                        Click="OnTopBarStyleButtonClick"
+                                                        Content="Solid" />
+
+                                                    <Button
+                                                        x:Name="TopBarStyleBlurButton"
+                                                        Grid.Column="1"
+                                                        Height="36"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        Background="Transparent"
+                                                        Foreground="#D6FFFFFF"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Tag="Blur"
+                                                        Click="OnTopBarStyleButtonClick"
+                                                        Content="Blur" />
+
+                                                    <Button
+                                                        x:Name="TopBarStyleAdaptiveButton"
+                                                        Grid.Column="2"
+                                                        Height="36"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        Background="Transparent"
+                                                        Foreground="#D6FFFFFF"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Tag="Adaptive"
+                                                        Click="OnTopBarStyleButtonClick"
+                                                        Content="Adaptive" />
+
+                                                    <Button
+                                                        x:Name="TopBarStyleTransparentButton"
+                                                        Grid.Column="3"
+                                                        Height="36"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        Background="Transparent"
+                                                        Foreground="#D6FFFFFF"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        FontSize="12"
+                                                        IsTabStop="False"
+                                                        Tag="Transparent"
+                                                        Click="OnTopBarStyleButtonClick"
+                                                        Content="Clear" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel x:Name="SolidColorPanel" Spacing="6">
+                                                <TextBlock Text="Solid Color" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border x:Name="SolidColorPreview"
+                                                            Width="32" Height="32"
+                                                            CornerRadius="8"
+                                                            Background="Black"
+                                                            BorderBrush="#44FFFFFF"
+                                                            BorderThickness="1" />
+                                                    <TextBox x:Name="SolidColorTextBox"
+                                                             Grid.Column="1"
+                                                             PlaceholderText="#000000"
+                                                             MaxLength="7"
+                                                             FontFamily="{StaticResource SfTextMedium}"
+                                                             TextChanged="OnSolidColorChanged" />
+                                                </Grid>
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Height="26" CornerRadius="8" BorderThickness="0" Background="#FF000000" Tag="#000000" Click="OnSolidColorPresetClick" />
+                                                    <Button Grid.Column="1" Height="26" CornerRadius="8" BorderThickness="0" Background="#FFFFFFFF" Tag="#FFFFFF" Click="OnSolidColorPresetClick" />
+                                                    <Button Grid.Column="2" Height="26" CornerRadius="8" BorderThickness="0" Background="#FF1F2937" Tag="#1F2937" Click="OnSolidColorPresetClick" />
+                                                    <Button Grid.Column="3" Height="26" CornerRadius="8" BorderThickness="0" Background="#FF0F766E" Tag="#0F766E" Click="OnSolidColorPresetClick" />
+                                                    <Button Grid.Column="4" Height="26" CornerRadius="8" BorderThickness="0" Background="#FF7C2D12" Tag="#7C2D12" Click="OnSolidColorPresetClick" />
+                                                    <Button Grid.Column="5" Height="26" CornerRadius="8" BorderThickness="0" Background="#FF312E81" Tag="#312E81" Click="OnSolidColorPresetClick" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="Topbar Icon and Text Color" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border x:Name="TopBarForegroundColorPreview"
+                                                            Width="32" Height="32"
+                                                            CornerRadius="8"
+                                                            Background="White"
+                                                            BorderBrush="#44FFFFFF"
+                                                            BorderThickness="1" />
+                                                    <TextBox x:Name="TopBarForegroundColorTextBox"
+                                                             Grid.Column="1"
+                                                             PlaceholderText="#FFFFFF"
+                                                             MaxLength="7"
+                                                             FontFamily="{StaticResource SfTextMedium}"
+                                                             TextChanged="OnTopBarForegroundColorChanged" />
+                                                </Grid>
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Height="26" CornerRadius="8" BorderThickness="0" Background="#FFFFFFFF" Tag="#FFFFFF" Click="OnTopBarForegroundColorPresetClick" />
+                                                    <Button Grid.Column="1" Height="26" CornerRadius="8" BorderThickness="0" Background="#FF000000" Tag="#000000" Click="OnTopBarForegroundColorPresetClick" />
+                                                    <Button Grid.Column="2" Height="26" CornerRadius="8" BorderThickness="0" Background="#FFFDE047" Tag="#FDE047" Click="OnTopBarForegroundColorPresetClick" />
+                                                    <Button Grid.Column="3" Height="26" CornerRadius="8" BorderThickness="0" Background="#FF60A5FA" Tag="#60A5FA" Click="OnTopBarForegroundColorPresetClick" />
+                                                    <Button Grid.Column="4" Height="26" CornerRadius="8" BorderThickness="0" Background="#FFFCA5A5" Tag="#FCA5A5" Click="OnTopBarForegroundColorPresetClick" />
+                                                    <Button Grid.Column="5" Height="26" CornerRadius="8" BorderThickness="0" Background="#FF86EFAC" Tag="#86EFAC" Click="OnTopBarForegroundColorPresetClick" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel x:Name="BlurIntensityPanel" Spacing="6">
+                                                <Grid>
+                                                    <TextBlock Text="Blur Intensity" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                    <TextBlock x:Name="BlurIntensityValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#CCFFFFFF" />
+                                                </Grid>
+                                                <Slider x:Name="BlurIntensitySlider" IsTabStop="False" ValueChanged="OnBlurIntensityChanged" />
+                                            </StackPanel>
+
+                                            <StackPanel x:Name="TopBarOpacityPanel" Spacing="6">
+                                                <Grid>
+                                                    <TextBlock Text="Topbar Opacity" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                    <TextBlock x:Name="TopBarOpacityValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#CCFFFFFF" />
+                                                </Grid>
+                                                <Slider x:Name="TopBarOpacitySlider" IsTabStop="False" ValueChanged="OnTopBarOpacityChanged" />
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <TextBlock Text="Clock Center Offset" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                    <TextBlock x:Name="ClockOffsetValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#CCFFFFFF" />
+                                                </Grid>
+                                                <Slider x:Name="ClockOffsetSlider" IsTabStop="False" ValueChanged="OnClockOffsetChanged" />
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <TextBlock Text="Clock Balance" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                    <TextBlock x:Name="ClockBalanceValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#CCFFFFFF" />
+                                                </Grid>
+                                                <Slider x:Name="ClockBalanceSlider" IsTabStop="False" ValueChanged="OnClockBalanceChanged" />
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="Show Finder Bubble" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                        <TextBlock Text="Display the capsule behind the application name." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" />
+                                                    </StackPanel>
+                                                    <Button
+                                                        x:Name="ShowFinderBubbleButton"
+                                                        Grid.Column="1"
+                                                        Width="92"
+                                                        Height="32"
+                                                        VerticalAlignment="Center"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Click="OnShowFinderBubbleButtonClick"
+                                                        Content="Enabled" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="Finder Shortcut" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                        <TextBlock Text="Open Finder with Ctrl+Space." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" />
+                                                    </StackPanel>
+                                                    <Button
+                                                        x:Name="FinderHotkeyButton"
+                                                        Grid.Column="1"
+                                                        Width="92"
+                                                        Height="32"
+                                                        VerticalAlignment="Center"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Click="OnFinderHotkeyButtonClick"
+                                                        Content="Enabled" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <TextBlock Text="Finder Bubble Strength" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                    <TextBlock x:Name="FinderBubbleValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#CCFFFFFF" />
+                                                </Grid>
+                                                <Slider x:Name="FinderBubbleSlider" IsTabStop="False" ValueChanged="OnFinderBubbleChanged" />
+                                            </StackPanel>
+
+                                            <Border Background="#14000000" CornerRadius="14" Padding="14">
+                                                <StackPanel Spacing="12">
+                                                    <TextBlock
+                                                        Text="APP BUTTONS"
+                                                        FontSize="11"
+                                                        FontFamily="{StaticResource SfTextSemibold}"
+                                                        Foreground="#99FFFFFF"
+                                                        CharacterSpacing="60" />
+
+                                                    <TextBlock
+                                                        Text="Configure up to four buttons shown after Finder."
+                                                        TextWrapping="WrapWholeWords"
+                                                        FontSize="12"
+                                                        FontFamily="{StaticResource SfTextRegular}"
+                                                        Foreground="#C8FFFFFF" />
+
+                                                    <Grid RowSpacing="10">
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                        </Grid.RowDefinitions>
+
+                                                        <StackPanel Grid.Row="0" Spacing="8">
+                                                            <ComboBox x:Name="ShortcutSlot1ComboBox"
+                                                                      Header="Button 1 App"
+                                                                      DisplayMemberPath="Name"
+                                                                      SelectionChanged="OnShortcutSelectionChanged"
+                                                                      Tag="0" />
+                                                            <TextBox x:Name="ShortcutSlot1NameTextBox"
+                                                                     Header="Button 1 Label"
+                                                                     PlaceholderText="Finder-style label"
+                                                                     TextChanged="OnShortcutNameChanged"
+                                                                     Tag="0" />
+                                                        </StackPanel>
+
+                                                        <StackPanel Grid.Row="1" Spacing="8">
+                                                            <ComboBox x:Name="ShortcutSlot2ComboBox"
+                                                                      Header="Button 2 App"
+                                                                      DisplayMemberPath="Name"
+                                                                      SelectionChanged="OnShortcutSelectionChanged"
+                                                                      Tag="1" />
+                                                            <TextBox x:Name="ShortcutSlot2NameTextBox"
+                                                                     Header="Button 2 Label"
+                                                                     PlaceholderText="Finder-style label"
+                                                                     TextChanged="OnShortcutNameChanged"
+                                                                     Tag="1" />
+                                                        </StackPanel>
+
+                                                        <StackPanel Grid.Row="2" Spacing="8">
+                                                            <ComboBox x:Name="ShortcutSlot3ComboBox"
+                                                                      Header="Button 3 App"
+                                                                      DisplayMemberPath="Name"
+                                                                      SelectionChanged="OnShortcutSelectionChanged"
+                                                                      Tag="2" />
+                                                            <TextBox x:Name="ShortcutSlot3NameTextBox"
+                                                                     Header="Button 3 Label"
+                                                                     PlaceholderText="Finder-style label"
+                                                                     TextChanged="OnShortcutNameChanged"
+                                                                     Tag="2" />
+                                                        </StackPanel>
+
+                                                        <StackPanel Grid.Row="3" Spacing="8">
+                                                            <ComboBox x:Name="ShortcutSlot4ComboBox"
+                                                                      Header="Button 4 App"
+                                                                      DisplayMemberPath="Name"
+                                                                      SelectionChanged="OnShortcutSelectionChanged"
+                                                                      Tag="3" />
+                                                            <TextBox x:Name="ShortcutSlot4NameTextBox"
+                                                                     Header="Button 4 Label"
+                                                                     PlaceholderText="Finder-style label"
+                                                                     TextChanged="OnShortcutNameChanged"
+                                                                     Tag="3" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </StackPanel>
+                                            </Border>
+
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid x:Name="GamesSectionPanel" Visibility="Collapsed">
+                                <StackPanel Spacing="16">
+                                    <TextBlock
+                                        Text="Games"
+                                        FontSize="22"
+                                        FontFamily="{StaticResource SfDisplaySemibold}"
+                                        Foreground="White" />
+                                    <TextBlock
+                                        Text="Control how Veil detects games and which ones should force the app into its lightest, pressure-aware mode."
+                                        TextWrapping="WrapWholeWords"
+                                        FontSize="12"
+                                        FontFamily="{StaticResource SfTextRegular}"
+                                        Foreground="#C8FFFFFF" />
+
+                                    <Border Background="#18000000" CornerRadius="16" Padding="16">
+                                        <StackPanel Spacing="18">
+                                            <TextBlock
+                                                Text="GAME MODE"
+                                                FontSize="11"
+                                                FontFamily="{StaticResource SfTextSemibold}"
+                                                Foreground="#99FFFFFF"
+                                                CharacterSpacing="60" />
+
+                                            <TextBlock
+                                                Text="Veil uses a hybrid game detection mode. It checks the Windows and Xbox game catalog first, then falls back to your spared games list and a conservative fullscreen heuristic."
+                                                TextWrapping="WrapWholeWords"
+                                                FontSize="12"
+                                                FontFamily="{StaticResource SfTextRegular}"
+                                                Foreground="#C8FFFFFF" />
+
+                                            <TextBlock
+                                                Text="When a game is active, Veil lowers its own cost, can gently boost the game plus useful voice or streaming apps, and if CPU or RAM pressure rises it can trim background memory, close safe helper or updater processes, and clean older temp files more aggressively."
+                                                TextWrapping="WrapWholeWords"
+                                                FontSize="12"
+                                                FontFamily="{StaticResource SfTextRegular}"
+                                                Foreground="#B8FFFFFF" />
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="Background system care" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                        <TextBlock Text="Keep a gentler optimization pass active even outside games so Veil stays light and can still trim memory pressure, clean temp files, and calm low-value helpers while it runs in the background." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" TextWrapping="WrapWholeWords" />
+                                                    </StackPanel>
+                                                    <Button
+                                                        x:Name="BackgroundOptimizationEnabledButton"
+                                                        Grid.Column="1"
+                                                        Width="92"
+                                                        Height="32"
+                                                        VerticalAlignment="Center"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Click="OnBackgroundOptimizationEnabledButtonClick"
+                                                        Content="Enabled" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <Grid>
+                                                <TextBlock Text="Detection mode" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock x:Name="GameDetectionModeValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#CCFFFFFF" />
+                                            </Grid>
+
+                                            <TextBlock
+                                                Text="Auto-detected games from Windows and Xbox"
+                                                FontSize="13"
+                                                FontFamily="{StaticResource SfTextMedium}"
+                                                Foreground="White" />
+
+                                            <TextBox x:Name="DetectedGamesTextBox"
+                                                     IsReadOnly="True"
+                                                     AcceptsReturn="True"
+                                                     TextWrapping="Wrap"
+                                                     MinHeight="120"
+                                                     PlaceholderText="No auto-detected games yet." />
+
+                                            <TextBlock
+                                                Text="Spared games list"
+                                                FontSize="13"
+                                                FontFamily="{StaticResource SfTextMedium}"
+                                                Foreground="White" />
+
+                                            <TextBlock
+                                                Text="Add one process name per line to force Veil into its lightest game mode even if the game is not in the Windows catalog. Example: valorant, eldenring, cs2."
+                                                TextWrapping="WrapWholeWords"
+                                                FontSize="12"
+                                                FontFamily="{StaticResource SfTextRegular}"
+                                                Foreground="#B8FFFFFF" />
+
+                                            <TextBox x:Name="GameProcessesTextBox"
+                                                     Header="Spared game process list"
+                                                     AcceptsReturn="True"
+                                                     TextWrapping="Wrap"
+                                                     MinHeight="110"
+                                                     PlaceholderText="valorant&#10;eldenring&#10;cs2"
+                                                     TextChanged="OnGameProcessesChanged" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid x:Name="DiscordSectionPanel" Visibility="Collapsed">
+                                <StackPanel Spacing="16">
+                                    <TextBlock
+                                        Text="Discord"
+                                        FontSize="22"
+                                        FontFamily="{StaticResource SfDisplaySemibold}"
+                                        Foreground="White" />
+                                    <TextBlock
+                                        Text="Use the Discord topbar button as a lightweight inbox so Discord can stay in the background longer."
+                                        TextWrapping="WrapWholeWords"
+                                        FontSize="12"
+                                        FontFamily="{StaticResource SfTextRegular}"
+                                        Foreground="#C8FFFFFF" />
+
+                                    <Border Background="#18000000" CornerRadius="16" Padding="16">
+                                        <StackPanel Spacing="18">
+                                            <TextBlock
+                                                Text="TOPBAR"
+                                                FontSize="11"
+                                                FontFamily="{StaticResource SfTextSemibold}"
+                                                Foreground="#99FFFFFF"
+                                                CharacterSpacing="60" />
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="Enable Discord Button" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                        <TextBlock Text="Show the Discord button when Discord is running or when recent Discord notifications are still available." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" />
+                                                    </StackPanel>
+                                                    <Button
+                                                        x:Name="DiscordButtonEnabledButton"
+                                                        Grid.Column="1"
+                                                        Width="92"
+                                                        Height="32"
+                                                        VerticalAlignment="Center"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Click="OnDiscordButtonEnabledButtonClick"
+                                                        Content="Enabled" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid x:Name="MusicSectionPanel" Visibility="Collapsed">
+                                <StackPanel Spacing="16">
+                                    <TextBlock
+                                        Text="Music"
+                                        FontSize="22"
+                                        FontFamily="{StaticResource SfDisplaySemibold}"
+                                        Foreground="White" />
+                                    <TextBlock
+                                        Text="Choose how the Music button behaves in the topbar and what the popup shows."
+                                        TextWrapping="WrapWholeWords"
+                                        FontSize="12"
+                                        FontFamily="{StaticResource SfTextRegular}"
+                                        Foreground="#C8FFFFFF" />
+
+                                    <Border Background="#18000000" CornerRadius="16" Padding="16">
+                                        <StackPanel Spacing="18">
+                                            <TextBlock
+                                                Text="TOPBAR"
+                                                FontSize="11"
+                                                FontFamily="{StaticResource SfTextSemibold}"
+                                                Foreground="#99FFFFFF"
+                                                CharacterSpacing="60" />
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="Enable Music Button" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                        <TextBlock Text="Show the Music button in the topbar when a supported player is active." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" />
+                                                    </StackPanel>
+                                                    <Button
+                                                        x:Name="MusicButtonEnabledButton"
+                                                        Grid.Column="1"
+                                                        Width="92"
+                                                        Height="32"
+                                                        VerticalAlignment="Center"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Click="OnMusicButtonEnabledButtonClick"
+                                                        Content="Enabled" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="#18000000" CornerRadius="16" Padding="16">
+                                        <StackPanel Spacing="18">
+                                            <TextBlock
+                                                Text="POPUP"
+                                                FontSize="11"
+                                                FontFamily="{StaticResource SfTextSemibold}"
+                                                Foreground="#99FFFFFF"
+                                                CharacterSpacing="60" />
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="Show Volume Control" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                        <TextBlock Text="Display the volume slider inside the Music popup." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" />
+                                                    </StackPanel>
+                                                    <Button
+                                                        x:Name="MusicShowVolumeButton"
+                                                        Grid.Column="1"
+                                                        Width="92"
+                                                        Height="32"
+                                                        VerticalAlignment="Center"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Click="OnMusicShowVolumeButtonClick"
+                                                        Content="Enabled" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="Show Hide or Reopen Action" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                        <TextBlock Text="Keep the source app action at the bottom of the Music popup." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" />
+                                                    </StackPanel>
+                                                    <Button
+                                                        x:Name="MusicShowSourceToggleButton"
+                                                        Grid.Column="1"
+                                                        Width="92"
+                                                        Height="32"
+                                                        VerticalAlignment="Center"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Click="OnMusicShowSourceToggleButtonClick"
+                                                        Content="Enabled" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid x:Name="WeatherSectionPanel" Visibility="Collapsed">
+                                <StackPanel Spacing="16">
+                                    <TextBlock
+                                        Text="Weather"
+                                        FontSize="22"
+                                        FontFamily="{StaticResource SfDisplaySemibold}"
+                                        Foreground="White" />
+                                    <TextBlock
+                                        Text="Choose which cities the weather panel shows and how strong the frosted glass effect should be."
+                                        TextWrapping="WrapWholeWords"
+                                        FontSize="12"
+                                        FontFamily="{StaticResource SfTextRegular}"
+                                        Foreground="#C8FFFFFF" />
+
+                                    <Border Background="#18000000" CornerRadius="16" Padding="16">
+                                        <StackPanel Spacing="18">
+                                            <TextBlock
+                                                Text="TOPBAR"
+                                                FontSize="11"
+                                                FontFamily="{StaticResource SfTextSemibold}"
+                                                Foreground="#99FFFFFF"
+                                                CharacterSpacing="60" />
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="Enable Weather Button" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                        <TextBlock Text="Show the weather button in the topbar." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" />
+                                                    </StackPanel>
+                                                    <Button
+                                                        x:Name="WeatherButtonEnabledButton"
+                                                        Grid.Column="1"
+                                                        Width="92"
+                                                        Height="32"
+                                                        VerticalAlignment="Center"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Click="OnWeatherButtonEnabledButtonClick"
+                                                        Content="Enabled" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="#18000000" CornerRadius="16" Padding="16">
+                                        <StackPanel Spacing="18">
+                                            <TextBlock
+                                                Text="FORECAST"
+                                                FontSize="11"
+                                                FontFamily="{StaticResource SfTextSemibold}"
+                                                Foreground="#99FFFFFF"
+                                                CharacterSpacing="60" />
+
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="Primary City" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBox x:Name="WeatherPrimaryCityTextBox"
+                                                         PlaceholderText="Paris"
+                                                         TextChanged="OnWeatherPrimaryCityChanged" />
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="Secondary Cities" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock Text="One city per line. Up to four cities are shown in the lower list." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" />
+                                                <TextBox x:Name="WeatherSecondaryCitiesTextBox"
+                                                         AcceptsReturn="True"
+                                                         TextWrapping="Wrap"
+                                                         MinHeight="100"
+                                                         PlaceholderText="Cupertino&#10;New York&#10;London&#10;Beijing"
+                                                         TextChanged="OnWeatherSecondaryCitiesChanged" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid x:Name="MenuSectionPanel" Visibility="Collapsed">
+                                <StackPanel Spacing="16">
+                                    <TextBlock
+                                        Text="Menu"
+                                        FontSize="22"
+                                        FontFamily="{StaticResource SfDisplaySemibold}"
+                                        Foreground="White" />
+                                    <TextBlock
+                                        Text="Control the floating dropdown appearance and how much of the desktop shows through it."
+                                        TextWrapping="WrapWholeWords"
+                                        FontSize="12"
+                                        FontFamily="{StaticResource SfTextRegular}"
+                                        Foreground="#C8FFFFFF" />
+
+                                    <Border Background="#18000000" CornerRadius="16" Padding="16">
+                                        <StackPanel Spacing="18">
+                                            <TextBlock
+                                                Text="MENU APPEARANCE"
+                                                FontSize="11"
+                                                FontFamily="{StaticResource SfTextSemibold}"
+                                                Foreground="#99FFFFFF"
+                                                CharacterSpacing="60" />
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <TextBlock Text="Menu Acrylic Strength" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                    <TextBlock x:Name="MenuTintValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#CCFFFFFF" />
+                                                </Grid>
+                                                <Slider x:Name="MenuTintSlider" IsTabStop="False" ValueChanged="OnMenuTintChanged" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid x:Name="RunCatSectionPanel" Visibility="Collapsed">
+                                <StackPanel Spacing="16">
+                                    <TextBlock
+                                        Text="RunCat"
+                                        FontSize="22"
+                                        FontFamily="{StaticResource SfDisplaySemibold}"
+                                        Foreground="White" />
+                                    <TextBlock
+                                        Text="Show a running character in the topbar whose speed reflects free system memory and free GPU or iGPU memory."
+                                        TextWrapping="WrapWholeWords"
+                                        FontSize="12"
+                                        FontFamily="{StaticResource SfTextRegular}"
+                                        Foreground="#C8FFFFFF" />
+                                    <TextBlock
+                                        Text="Lower free RAM or lower free GPU memory makes it run faster. Faster means memory pressure is higher, not that performance is better."
+                                        TextWrapping="WrapWholeWords"
+                                        FontSize="12"
+                                        FontFamily="{StaticResource SfTextRegular}"
+                                        Foreground="#B8FFFFFF" />
+
+                                    <Border Background="#18000000" CornerRadius="16" Padding="16">
+                                        <StackPanel Spacing="18">
+                                            <TextBlock
+                                                Text="RUNCAT"
+                                                FontSize="11"
+                                                FontFamily="{StaticResource SfTextSemibold}"
+                                                Foreground="#99FFFFFF"
+                                                CharacterSpacing="60" />
+
+                                            <StackPanel Spacing="6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Spacing="2">
+                                                        <TextBlock Text="Enable RunCat" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                        <TextBlock Text="Animated character driven by RAM and GPU memory pressure. Less free memory means faster animation." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" />
+                                                    </StackPanel>
+                                                    <Button
+                                                        x:Name="RunCatEnabledButton"
+                                                        Grid.Column="1"
+                                                        Width="92"
+                                                        Height="32"
+                                                        VerticalAlignment="Center"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Click="OnRunCatEnabledButtonClick"
+                                                        Content="Disabled" />
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <StackPanel Spacing="8">
+                                                <Grid>
+                                                    <TextBlock Text="Runner" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                    <TextBlock x:Name="RunCatRunnerValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#CCFFFFFF" />
+                                                </Grid>
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Button
+                                                        x:Name="RunCatCatButton"
+                                                        Grid.Column="0"
+                                                        Height="36"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        Background="#24FFFFFF"
+                                                        Foreground="White"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Tag="Cat"
+                                                        Click="OnRunCatRunnerButtonClick"
+                                                        Content="Cat" />
+
+                                                    <Button
+                                                        x:Name="RunCatParrotButton"
+                                                        Grid.Column="1"
+                                                        Height="36"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        Background="Transparent"
+                                                        Foreground="#D6FFFFFF"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Tag="Parrot"
+                                                        Click="OnRunCatRunnerButtonClick"
+                                                        Content="Parrot" />
+
+                                                    <Button
+                                                        x:Name="RunCatHorseButton"
+                                                        Grid.Column="2"
+                                                        Height="36"
+                                                        CornerRadius="10"
+                                                        BorderThickness="0"
+                                                        Background="Transparent"
+                                                        Foreground="#D6FFFFFF"
+                                                        FontFamily="{StaticResource SfTextMedium}"
+                                                        IsTabStop="False"
+                                                        Tag="Horse"
+                                                        Click="OnRunCatRunnerButtonClick"
+                                                        Content="Horse" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+
+                    <Grid Grid.Row="3" Margin="0,20,0,0">
+                        <Button
+                            x:Name="CloseButton"
+                            Width="92"
+                            Height="34"
+                            HorizontalAlignment="Right"
+                            IsTabStop="False"
+                            FontFamily="{StaticResource SfTextMedium}"
+                            Content="Done"
+                            Click="OnDoneClick" />
+                    </Grid>
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

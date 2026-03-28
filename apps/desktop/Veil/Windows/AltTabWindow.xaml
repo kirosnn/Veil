@@ -1,0 +1,119 @@
+<Window
+    x:Class="Veil.Windows.AltTabWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Background="Transparent">
+        <Border
+            x:Name="PanelBorder"
+            Width="980"
+            Padding="20"
+            Background="Transparent"
+            BorderThickness="1"
+            CornerRadius="24">
+            <StackPanel Spacing="16">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Spacing="2">
+                        <TextBlock
+                            x:Name="TitleText"
+                            Text="Window Switcher"
+                            FontSize="14"
+                            FontFamily="{StaticResource SfDisplaySemibold}"
+                            Foreground="#E6FFFFFF" />
+                        <TextBlock
+                            x:Name="HintText"
+                            FontSize="11"
+                            FontFamily="{StaticResource SfTextMedium}"
+                            Foreground="#88FFFFFF"
+                            Text="Tab to switch  •  release Alt to open" />
+                    </StackPanel>
+
+                    <Border
+                        x:Name="CountBadge"
+                        Grid.Column="1"
+                        Padding="10,5"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Background="#18FFFFFF"
+                        CornerRadius="999">
+                        <TextBlock
+                            x:Name="WindowCountText"
+                            FontSize="11"
+                            FontFamily="{StaticResource SfTextSemibold}"
+                            Foreground="#D9FFFFFF" />
+                    </Border>
+                </Grid>
+                <Border
+                    x:Name="PreviewFrame"
+                    Height="332"
+                    Background="#12000000"
+                    BorderThickness="1"
+                    CornerRadius="18">
+                    <Grid>
+                        <TextBlock
+                            x:Name="PreviewUnavailableText"
+                            Text="Preview unavailable"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontSize="13"
+                            FontFamily="{StaticResource SfTextMedium}"
+                            Foreground="#A6FFFFFF" />
+                    </Grid>
+                </Border>
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel
+                        x:Name="SelectedMetaPanel"
+                        Spacing="4">
+                        <TextBlock
+                            x:Name="SelectedWindowTitleText"
+                            FontSize="24"
+                            FontFamily="{StaticResource SfDisplaySemibold}"
+                            Foreground="#F2FFFFFF"
+                            TextTrimming="CharacterEllipsis" />
+                        <TextBlock
+                            x:Name="SelectedWindowSubtitleText"
+                            FontSize="13"
+                            FontFamily="{StaticResource SfTextRegular}"
+                            Foreground="#B8FFFFFF"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <Border
+                        Grid.Column="1"
+                        Padding="12,7"
+                        VerticalAlignment="Center"
+                        Background="#14FFFFFF"
+                        CornerRadius="999">
+                        <TextBlock
+                            x:Name="SelectionText"
+                            FontSize="11"
+                            FontFamily="{StaticResource SfTextSemibold}"
+                            Foreground="#CCFFFFFF" />
+                    </Border>
+                </Grid>
+                <ScrollViewer
+                    x:Name="ItemsScrollViewer"
+                    HorizontalScrollBarVisibility="Hidden"
+                    HorizontalScrollMode="Enabled"
+                    VerticalScrollBarVisibility="Disabled"
+                    VerticalScrollMode="Disabled"
+                    ZoomMode="Disabled">
+                    <StackPanel
+                        x:Name="ItemsPanel"
+                        Orientation="Horizontal"
+                        Spacing="12" />
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
