@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Veil", "apps\desktop\Veil\Veil.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Veil.Tests", "tests\Veil.Tests\Veil.Tests.csproj", "{B6A1F93D-8F38-4B3B-9E5A-08FEAE06E1D7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -15,5 +17,9 @@ Global
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Debug|x64.Build.0 = Debug|x64
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x64.ActiveCfg = Release|x64
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Release|x64.Build.0 = Release|x64
+		{B6A1F93D-8F38-4B3B-9E5A-08FEAE06E1D7}.Debug|x64.ActiveCfg = Debug|x64
+		{B6A1F93D-8F38-4B3B-9E5A-08FEAE06E1D7}.Debug|x64.Build.0 = Debug|x64
+		{B6A1F93D-8F38-4B3B-9E5A-08FEAE06E1D7}.Release|x64.ActiveCfg = Release|x64
+		{B6A1F93D-8F38-4B3B-9E5A-08FEAE06E1D7}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal

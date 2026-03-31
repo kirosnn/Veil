@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Composition.SystemBackdrops;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Graphics.Imaging;
@@ -22,24 +23,34 @@ public sealed partial class TopBarWindow : Window
     private const double MinimumClockClearance = 164;
     private const double DefaultRenderedTopBarOpacity = 0.92;
     private const double MinimumRenderedTopBarOpacity = 0.04;
-    private const double DefaultRenderedBlurIntensity = 0.15;
-    private const double MinimumRenderedBlurIntensity = 0.05;
-    private static readonly TimeSpan NormalModeCheckInterval = TimeSpan.FromMilliseconds(400);
-    private static readonly TimeSpan MinimalModeCheckInterval = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan AdaptiveVisualRefreshInterval = TimeSpan.FromMilliseconds(50);
+    private const double DefaultRenderedBlurIntensity = 0.55;
+    private const double MinimumRenderedBlurIntensity = 0.20;
+    private static readonly TimeSpan AdaptiveVisualWarmRefreshInterval = TimeSpan.FromMilliseconds(350);
+    private static readonly TimeSpan AdaptiveVisualRefreshInterval = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan AdaptiveVisualHotHoldDuration = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan AdaptiveVisualWarmHoldDuration = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan DiscordHotHoldDuration = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan DiscordWarmHoldDuration = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan BackgroundMaintenanceInterval = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan BackgroundMaintenanceWarmInterval = TimeSpan.FromMinutes(6);
+    private static readonly TimeSpan BackgroundMaintenanceHotHoldDuration = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan BackgroundMaintenanceWarmHoldDuration = TimeSpan.FromMinutes(4);
     private static readonly ImageSource YouTubeLightIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/youtube.svg"));
     private static readonly ImageSource YouTubeDarkIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/youtube-dark.svg"));
     private static readonly ImageSource DiscordLightIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/discord.svg"));
     private static readonly ImageSource DiscordDarkIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/discord-dark.svg"));
     private static readonly ImageSource PanelThemeLightIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/theme-adjustments.svg"));
     private static readonly ImageSource PanelThemeDarkIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/theme-adjustments-dark.svg"));
+    private static readonly DiscordNotificationService SharedDiscordNotificationService = new();
     private readonly DispatcherTimer _clockTimer;
-    private readonly DispatcherTimer _fullscreenTimer;
     private readonly DispatcherTimer _visualTimer;
+    private readonly DemandDrivenModule _adaptiveVisualModule;
+    private readonly DemandDrivenModule _discordModule;
+    private readonly DemandDrivenModule _backgroundMaintenanceModule;
     private readonly string _monitorId;
     private readonly ScreenBounds _screen;
     private readonly AppSettings _settings;
+    private readonly string _discordDemandOwnerId;
     private bool _ownsGlobalHotkeys;
     private bool _isHidden;
     private bool _isGameMinimalMode;
@@ -56,11 +67,10 @@ public sealed partial class TopBarWindow : Window
     private PanelThemeWindow? _panelThemeWindow;
     private MusicControlWindow? _musicControlWindow;
     private DiscordNotificationWindow? _discordNotificationWindow;
-    private readonly DiscordNotificationService _discordNotificationService = new();
+    private readonly DiscordNotificationService _discordNotificationService;
     private readonly MediaControlService _mediaControlService = new();
     private readonly WeatherService _weatherService = new();
     private RunCatService? _runCatService;
-    private readonly GameDetectionService _gameDetectionService = new();
     private readonly GamePerformanceService _gamePerformanceService = new();
     private ImageSource?[]? _runCatFrames;
     private int _runCatLoadVersion;
@@ -70,6 +80,10 @@ public sealed partial class TopBarWindow : Window
     private readonly DispatcherTimer _backgroundMaintenanceTimer;
     private int _backgroundMaintenanceInFlight;
     private string _lastWindowRegionSignature = string.Empty;
+    private string _lastClockText = string.Empty;
+    private DateTime _lastAdaptiveVisualBoostUtc = DateTime.MinValue;
+    private DateTime _lastDiscordBoostUtc = DateTime.MinValue;
+    private DateTime _lastBackgroundMaintenanceBoostUtc = DateTime.MinValue;
 
     private readonly record struct WindowRegionSegment(int Left, int Top, int Right, int Bottom);
 
@@ -79,6 +93,8 @@ public sealed partial class TopBarWindow : Window
         _screen = screen;
         _settings = AppSettings.Current;
         _ownsGlobalHotkeys = ownsGlobalHotkeys;
+        _discordDemandOwnerId = $"topbar:{monitorId}";
+        _discordNotificationService = SharedDiscordNotificationService;
 
         InitializeComponent();
         Title = "Veil TopBar";
@@ -91,13 +107,6 @@ public sealed partial class TopBarWindow : Window
         _clockTimer.Tick += OnClockTick;
         _clockTimer.Start();
         UpdateClock();
-
-        _fullscreenTimer = new DispatcherTimer
-        {
-            Interval = NormalModeCheckInterval
-        };
-        _fullscreenTimer.Tick += OnFullscreenCheck;
-        _fullscreenTimer.Start();
 
         _visualTimer = new DispatcherTimer
         {
@@ -116,6 +125,19 @@ public sealed partial class TopBarWindow : Window
             Interval = BackgroundMaintenanceInterval
         };
         _backgroundMaintenanceTimer.Tick += OnBackgroundMaintenanceTick;
+
+        _adaptiveVisualModule = new DemandDrivenModule(
+            AdaptiveVisualWarmHoldDuration,
+            AdaptiveVisualHotHoldDuration,
+            OnAdaptiveVisualTemperatureChanged);
+        _discordModule = new DemandDrivenModule(
+            DiscordWarmHoldDuration,
+            DiscordHotHoldDuration,
+            OnDiscordTemperatureChanged);
+        _backgroundMaintenanceModule = new DemandDrivenModule(
+            BackgroundMaintenanceWarmHoldDuration,
+            BackgroundMaintenanceHotHoldDuration,
+            OnBackgroundMaintenanceTemperatureChanged);
 
         Activated += OnActivated;
         Closed += OnClosed;
@@ -144,8 +166,6 @@ public sealed partial class TopBarWindow : Window
         _appBarRegistered = true;
         ApplySettings();
 
-        _gameDetectionService.WarmUp();
-        UpdateForegroundAppName();
         RebuildShortcutButtons();
         _ = InstalledAppService.PreloadAsync();
         _ = InitWeatherAsync();
@@ -153,25 +173,30 @@ public sealed partial class TopBarWindow : Window
         _ = InitMediaControlAsync();
         _ = InitDiscordNotificationsAsync();
         ApplyHotkeyOwnership();
-        UpdateBackgroundMaintenanceState();
+        UpdateVisualRefreshState(boost: true);
+        UpdateDiscordDemand(boost: true);
+        UpdateBackgroundMaintenanceState(boost: true);
     }
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
         _clockTimer.Stop();
-        _fullscreenTimer.Stop();
         _visualTimer.Stop();
         _weatherRefreshTimer.Stop();
         _backgroundMaintenanceTimer.Stop();
         _settings.Changed -= OnSettingsChanged;
         _weatherService.StateChanged -= OnWeatherStateChanged;
+        _mediaControlService.StateChanged -= OnMediaStateChanged;
+        _discordNotificationService.NotificationsChanged -= OnDiscordNotificationsChanged;
+        _discordNotificationService.ReleaseDemand(_discordDemandOwnerId);
         SizeChanged -= OnTopBarSizeChanged;
         LeftButtonsPanel.SizeChanged -= OnLeftButtonsPanelSizeChanged;
         RightButtonsPanel.SizeChanged -= OnRightButtonsPanelSizeChanged;
         _acrylicController?.Dispose();
+        _finderWindow?.Destroy();
+        _finderWindow = null;
         DisposeFinderHotkey();
         _runCatService?.Dispose();
-        _discordNotificationService.Dispose();
         _gamePerformanceService.RestoreNormalOptimizations();
         _gamePerformanceService.Dispose();
         _runCatService = null;
@@ -181,16 +206,18 @@ public sealed partial class TopBarWindow : Window
         }
     }
 
-    private void OnFullscreenCheck(object? sender, object e)
+    internal ScreenBounds ScreenBounds => _screen;
+
+    internal IntPtr WindowHandle => _hwnd;
+
+    internal bool IsMinimalModeActive => _isGameMinimalMode;
+
+    internal void ApplyActivityState(bool gameRunning, bool shouldHideForForegroundWindow, int? activeGameProcessId)
     {
-        bool gameRunning = _gameDetectionService.IsGameRunning(
-            _settings.GameDetectionMode,
-            _settings.GameProcessNames,
-            _screen,
-            _hwnd);
+        bool visibilityChanged = false;
         if (gameRunning)
         {
-            EnterMinimalMode();
+            EnterMinimalMode(activeGameProcessId);
             return;
         }
 
@@ -199,11 +226,12 @@ public sealed partial class TopBarWindow : Window
             ExitMinimalMode();
         }
 
-        bool shouldHideForForegroundWindow = WindowHelper.IsForegroundFullscreen(_screen, _hwnd);
+        bool shouldHideWindow = shouldHideForForegroundWindow;
 
-        if (shouldHideForForegroundWindow && !_isHidden)
+        if (shouldHideWindow && !_isHidden)
         {
             _isHidden = true;
+            visibilityChanged = true;
             if (_appBarRegistered)
             {
                 WindowHelper.UnregisterAppBar(this);
@@ -211,9 +239,10 @@ public sealed partial class TopBarWindow : Window
             }
             WindowHelper.HideWindow(this);
         }
-        else if (!shouldHideForForegroundWindow && _isHidden)
+        else if (!shouldHideWindow && _isHidden)
         {
             _isHidden = false;
+            visibilityChanged = true;
             WindowHelper.ShowWindow(this);
 
             int width = _screen.Right - _screen.Left;
@@ -222,10 +251,18 @@ public sealed partial class TopBarWindow : Window
             WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, BarHeight);
             _appBarRegistered = true;
         }
+
+        if (visibilityChanged)
+        {
+            UpdateVisualRefreshState(boost: !_isHidden);
+            UpdateDiscordDemand(boost: !_isHidden);
+            UpdateBackgroundMaintenanceState(boost: !_isHidden);
+        }
     }
 
     private void OnBackgroundMaintenanceTick(object? sender, object e)
     {
+        UpdateBackgroundMaintenanceState();
         QueueBackgroundMaintenance();
     }
 
@@ -333,34 +370,23 @@ public sealed partial class TopBarWindow : Window
         });
     }
 
+    private void EnsureFinderWindowCreated()
+    {
+        if (_finderWindow != null) return;
+
+        _finderWindow = new FinderWindow(_screen);
+    }
+
     private void OpenFinderWindow()
     {
         try
         {
-            if (_finderWindow != null)
-            {
-                _finderWindow.Close();
-            }
-
-            _finderWindow = new FinderWindow(_screen);
-            _finderWindow.Closed += OnFinderWindowClosed;
-            _finderWindow.ShowCentered();
+            EnsureFinderWindowCreated();
+            _finderWindow!.ShowCentered();
         }
         catch (Exception ex)
         {
             AppLogger.Error("Failed to open finder window.", ex);
-        }
-    }
-
-    private void OnFinderWindowClosed(object sender, WindowEventArgs args)
-    {
-        if (sender is FinderWindow window)
-        {
-            window.Closed -= OnFinderWindowClosed;
-            if (ReferenceEquals(_finderWindow, window))
-            {
-                _finderWindow = null;
-            }
         }
     }
 
@@ -534,44 +560,21 @@ public sealed partial class TopBarWindow : Window
 
     private async Task UpdateMusicAlbumArtAsync()
     {
+        long startTimestamp = Stopwatch.GetTimestamp();
         int loadVersion = ++_musicAlbumArtLoadVersion;
-
-        if (_mediaControlService.IsYouTubeSource)
-        {
-            if (loadVersion != _musicAlbumArtLoadVersion)
-            {
-                return;
-            }
-
-            MusicAlbumArt.Source = UseDarkTopBarForeground(GetTopBarForegroundColor())
-                ? YouTubeDarkIconSource
-                : YouTubeLightIconSource;
-            MusicAlbumArt.Visibility = Visibility.Visible;
-            MusicIcon.Visibility = Visibility.Collapsed;
-            MusicButton.Resources["ButtonBackgroundPointerOver"] =
-                new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
-            MusicButton.Resources["ButtonBackgroundPressed"] =
-                new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
-            return;
-        }
 
         try
         {
-            var imageSource = await MediaArtworkLoader.LoadAsync(
-                _mediaControlService.ThumbnailRef,
-                _mediaControlService.SourceAppId,
-                _mediaControlService.TrackTitle,
-                _mediaControlService.TrackArtist,
-                _mediaControlService.AlbumTitle,
-                _mediaControlService.Subtitle);
-            if (loadVersion != _musicAlbumArtLoadVersion)
+            if (_mediaControlService.IsYouTubeSource)
             {
-                return;
-            }
+                if (loadVersion != _musicAlbumArtLoadVersion)
+                {
+                    return;
+                }
 
-            if (imageSource is not null)
-            {
-                MusicAlbumArt.Source = imageSource;
+                MusicAlbumArt.Source = UseDarkTopBarForeground(GetTopBarForegroundColor())
+                    ? YouTubeDarkIconSource
+                    : YouTubeLightIconSource;
                 MusicAlbumArt.Visibility = Visibility.Visible;
                 MusicIcon.Visibility = Visibility.Collapsed;
                 MusicButton.Resources["ButtonBackgroundPointerOver"] =
@@ -580,24 +583,56 @@ public sealed partial class TopBarWindow : Window
                     new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
                 return;
             }
-        }
-        catch
-        {
-        }
 
-        if (loadVersion != _musicAlbumArtLoadVersion)
-        {
-            return;
-        }
+            try
+            {
+                var imageSource = await MediaArtworkLoader.LoadAsync(
+                    _mediaControlService.ThumbnailRef,
+                    _mediaControlService.SourceAppId,
+                    _mediaControlService.TrackTitle,
+                    _mediaControlService.TrackArtist,
+                    _mediaControlService.AlbumTitle,
+                    _mediaControlService.Subtitle);
+                if (loadVersion != _musicAlbumArtLoadVersion)
+                {
+                    return;
+                }
 
-        MusicAlbumArt.Source = null;
-        MusicAlbumArt.Visibility = Visibility.Collapsed;
-        MusicIcon.Visibility = Visibility.Visible;
-        var foregroundColor = GetTopBarForegroundColor();
-        MusicButton.Resources["ButtonBackgroundPointerOver"] =
-            new SolidColorBrush(global::Windows.UI.Color.FromArgb(12, foregroundColor.R, foregroundColor.G, foregroundColor.B));
-        MusicButton.Resources["ButtonBackgroundPressed"] =
-            new SolidColorBrush(global::Windows.UI.Color.FromArgb(8, foregroundColor.R, foregroundColor.G, foregroundColor.B));
+                if (imageSource is not null)
+                {
+                    MusicAlbumArt.Source = imageSource;
+                    MusicAlbumArt.Visibility = Visibility.Visible;
+                    MusicIcon.Visibility = Visibility.Collapsed;
+                    MusicButton.Resources["ButtonBackgroundPointerOver"] =
+                        new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
+                    MusicButton.Resources["ButtonBackgroundPressed"] =
+                        new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
+                    return;
+                }
+            }
+            catch
+            {
+            }
+
+            if (loadVersion != _musicAlbumArtLoadVersion)
+            {
+                return;
+            }
+
+            MusicAlbumArt.Source = null;
+            MusicAlbumArt.Visibility = Visibility.Collapsed;
+            MusicIcon.Visibility = Visibility.Visible;
+            var foregroundColor = GetTopBarForegroundColor();
+            MusicButton.Resources["ButtonBackgroundPointerOver"] =
+                new SolidColorBrush(global::Windows.UI.Color.FromArgb(12, foregroundColor.R, foregroundColor.G, foregroundColor.B));
+            MusicButton.Resources["ButtonBackgroundPressed"] =
+                new SolidColorBrush(global::Windows.UI.Color.FromArgb(8, foregroundColor.R, foregroundColor.G, foregroundColor.B));
+        }
+        finally
+        {
+            double elapsedMs = (Stopwatch.GetTimestamp() - startTimestamp) * 1000d / Stopwatch.Frequency;
+            PerformanceLogger.RecordMilliseconds("TopBar.UpdateMusicAlbumArtAsync", elapsedMs, 8.0);
+        }
     }
 
     private void OnMusicButtonClick(object sender, RoutedEventArgs e)
@@ -633,8 +668,9 @@ public sealed partial class TopBarWindow : Window
     {
         try
         {
-            await _discordNotificationService.InitializeAsync();
+            await _discordNotificationService.EnsureInitializedAsync();
             _discordNotificationService.NotificationsChanged += OnDiscordNotificationsChanged;
+            UpdateDiscordDemand(boost: true);
             DispatcherQueue.TryEnqueue(UpdateDiscordButtonVisibility);
         }
         catch
@@ -644,12 +680,16 @@ public sealed partial class TopBarWindow : Window
 
     private void OnDiscordNotificationsChanged()
     {
-        DispatcherQueue.TryEnqueue(UpdateDiscordButtonVisibility);
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            UpdateDiscordButtonVisibility();
+            UpdateDiscordDemand(boost: true);
+        });
     }
 
     private void UpdateDiscordButtonVisibility()
     {
-        bool isDiscordRunning = _discordNotificationService.IsDiscordRunning || DiscordAppController.IsRunning();
+        bool isDiscordRunning = _discordNotificationService.IsDiscordRunning;
         bool isVisible = _settings.DiscordButtonEnabled
             && (isDiscordRunning
                 || _discordNotificationService.UnreadCount > 0
@@ -689,6 +729,8 @@ public sealed partial class TopBarWindow : Window
 
     private void OnDiscordButtonClick(object sender, RoutedEventArgs e)
     {
+        UpdateDiscordDemand(boost: true);
+
         if (_isGameMinimalMode)
         {
             return;
@@ -730,18 +772,20 @@ public sealed partial class TopBarWindow : Window
 
     private void OnClockTick(object? sender, object e)
     {
+        using var perfScope = PerformanceLogger.Measure("TopBar.OnClockTick", 1.5);
         UpdateClock();
-        UpdateDiscordButtonVisibility();
+        UpdateVisualRefreshState();
+        UpdateDiscordDemand();
+        UpdateBackgroundMaintenanceState();
     }
 
     private void OnVisualTick(object? sender, object e)
     {
-        if (_isGameMinimalMode)
+        using var perfScope = PerformanceLogger.Measure("TopBar.OnVisualTick", 2.0);
+        if (_isGameMinimalMode || _isHidden)
         {
             return;
         }
-
-        UpdateForegroundAppName();
 
         if (_settings.TopBarStyle == "Adaptive")
         {
@@ -749,16 +793,14 @@ public sealed partial class TopBarWindow : Window
         }
     }
 
-    private void UpdateVisualRefreshState()
+    private void UpdateVisualRefreshState(bool boost = false)
     {
-        if (_isGameMinimalMode || _settings.TopBarStyle != "Adaptive")
+        if (boost)
         {
-            _visualTimer.Stop();
-            return;
+            _lastAdaptiveVisualBoostUtc = DateTime.UtcNow;
         }
 
-        _visualTimer.Interval = AdaptiveVisualRefreshInterval;
-        _visualTimer.Start();
+        _adaptiveVisualModule.Update(EvaluateAdaptiveVisualDemand());
     }
 
     private void UpdateClock()
@@ -770,7 +812,14 @@ public sealed partial class TopBarWindow : Window
 
         var now = DateTime.Now;
         var text = now.ToString("dddd d MMMM  HH:mm");
-        ClockText.Text = char.ToUpper(text[0]) + text[1..];
+        string formatted = char.ToUpper(text[0]) + text[1..];
+        if (string.Equals(formatted, _lastClockText, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastClockText = formatted;
+        ClockText.Text = formatted;
         UpdateTopBarLayout();
     }
 
@@ -787,6 +836,7 @@ public sealed partial class TopBarWindow : Window
             _systemStatsWindow?.RefreshAppearance();
             UpdateMusicButtonVisibility();
             UpdateDiscordButtonVisibility();
+            UpdateDiscordDemand(boost: true);
             UpdateWeatherButton();
             _ = _weatherService.RefreshAsync(true);
             _ = ApplyRunCatSettingsAsync();
@@ -795,6 +845,7 @@ public sealed partial class TopBarWindow : Window
 
     private void ApplySettings()
     {
+        using var perfScope = PerformanceLogger.Measure("TopBar.ApplySettings", 4.0);
         UpdateTopBarLayout();
         double effectiveTopBarOpacity = GetEffectiveTopBarOpacity();
 
@@ -824,7 +875,10 @@ public sealed partial class TopBarWindow : Window
                 break;
         }
 
-        UpdateVisualRefreshState();
+        bool showGlassPanels = _settings.TopBarStyle is "Transparent" or "Blur";
+        UpdateGlassPanels(showGlassPanels);
+
+        UpdateVisualRefreshState(boost: true);
         UpdateWindowRegion();
 
         double buttonOpacity = _settings.TopBarStyle == "Solid" ? 1 : 0.92;
@@ -873,35 +927,24 @@ public sealed partial class TopBarWindow : Window
             bubbleAlpha, foregroundColor.R, foregroundColor.G, foregroundColor.B));
         FinderButton.Resources["ButtonBackgroundPointerOver"] = new SolidColorBrush(global::Windows.UI.Color.FromArgb(48, foregroundColor.R, foregroundColor.G, foregroundColor.B));
         FinderButton.Resources["ButtonBackgroundPressed"] = new SolidColorBrush(global::Windows.UI.Color.FromArgb(28, foregroundColor.R, foregroundColor.G, foregroundColor.B));
-        UpdateBackgroundMaintenanceState();
+
+        FinderButton.CornerRadius = new CornerRadius(11);
+        foreach (Button shortcutButton in ShortcutButtonsPanel.Children.OfType<Button>())
+        {
+            shortcutButton.CornerRadius = new CornerRadius(9);
+        }
+
+        UpdateBackgroundMaintenanceState(boost: true);
     }
 
-    private void UpdateBackgroundMaintenanceState()
+    private void UpdateBackgroundMaintenanceState(bool boost = false)
     {
-        if (_isGameMinimalMode)
+        if (boost)
         {
-            _backgroundMaintenanceTimer.Stop();
-            return;
+            _lastBackgroundMaintenanceBoostUtc = DateTime.UtcNow;
         }
 
-        if (_settings.BackgroundOptimizationEnabled)
-        {
-            if (!_backgroundMaintenanceTimer.IsEnabled)
-            {
-                _backgroundMaintenanceTimer.Start();
-            }
-
-            QueueBackgroundMaintenance();
-            return;
-        }
-
-        _backgroundMaintenanceTimer.Stop();
-        if (Interlocked.CompareExchange(ref _backgroundMaintenanceInFlight, 0, 0) != 0)
-        {
-            return;
-        }
-
-        _ = Task.Run(_gamePerformanceService.RestoreNormalOptimizations);
+        _backgroundMaintenanceModule.Update(EvaluateBackgroundMaintenanceDemand());
     }
 
     private void QueueBackgroundMaintenance()
@@ -960,6 +1003,8 @@ public sealed partial class TopBarWindow : Window
             ShortcutButtonsPanel.Children.Add(CreateShortcutButton(shortcut));
         }
 
+        bool showGlass = _settings.TopBarStyle is "Transparent" or "Blur";
+        UpdateGlassPanels(showGlass);
         UpdateTopBarLayout();
     }
 
@@ -968,10 +1013,9 @@ public sealed partial class TopBarWindow : Window
         var button = new Button
         {
             MinWidth = 0,
-            Height = 22,
             MaxWidth = 130,
-            Padding = new Thickness(9, 0, 9, 0),
-            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(9, 1, 9, 1),
+            CornerRadius = new CornerRadius(9),
             BorderThickness = new Thickness(0),
             Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(
                 _settings.ShowFinderBubble ? (byte)Math.Round(_settings.FinderBubbleOpacity * 215) : (byte)0,
@@ -1016,11 +1060,6 @@ public sealed partial class TopBarWindow : Window
             shortcut.AppId,
             shortcut.AppName,
             shortcut.AppName));
-    }
-
-    private void UpdateForegroundAppName()
-    {
-        FinderButtonText.Text = "Finder";
     }
 
     private void UpdateTopBarLayout()
@@ -1099,16 +1138,16 @@ public sealed partial class TopBarWindow : Window
         _acrylicController = null;
         _backdropConfig = null;
 
-        float tintOpacity = (float)(intensity * 0.50);
-        float luminosity = (float)(intensity * 0.35);
-        byte tintAlpha = (byte)(intensity * 140);
+        float tintOpacity = (float)(intensity * 0.18);
+        float luminosity = (float)Math.Min(intensity * 0.85, 0.90);
+        byte tintAlpha = (byte)(intensity * 50);
 
         _acrylicController = new DesktopAcrylicController
         {
-            TintColor = global::Windows.UI.Color.FromArgb(tintAlpha, 20, 20, 22),
+            TintColor = global::Windows.UI.Color.FromArgb(tintAlpha, 245, 245, 250),
             TintOpacity = tintOpacity,
             LuminosityOpacity = luminosity,
-            FallbackColor = global::Windows.UI.Color.FromArgb(36, 20, 20, 22)
+            FallbackColor = global::Windows.UI.Color.FromArgb(20, 240, 240, 245)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
@@ -1253,32 +1292,22 @@ public sealed partial class TopBarWindow : Window
         _runCatService.FrameChanged += OnRunCatFrameChanged;
     }
 
-    private void EnterMinimalMode()
+    private void EnterMinimalMode(int? activeGameProcessId)
     {
-        int? activeGameProcessId = _gameDetectionService.TryGetActiveGameProcessId(
-            _settings.GameDetectionMode,
-            _settings.GameProcessNames,
-            _screen,
-            _hwnd);
         _gamePerformanceService.ApplyGameOptimizations(activeGameProcessId);
 
         if (_isGameMinimalMode)
         {
-            _fullscreenTimer.Interval = MinimalModeCheckInterval;
             return;
         }
 
         _isGameMinimalMode = true;
-        _fullscreenTimer.Interval = MinimalModeCheckInterval;
         _clockTimer.Stop();
-        _visualTimer.Stop();
         UpdateBackgroundMaintenanceState();
+        UpdateVisualRefreshState();
+        UpdateDiscordDemand();
 
-        if (_finderWindow != null)
-        {
-            _finderWindow.Close();
-            _finderWindow = null;
-        }
+        _finderWindow?.HideWindow();
 
         if (_settingsWindow != null)
         {
@@ -1304,12 +1333,123 @@ public sealed partial class TopBarWindow : Window
     private void ExitMinimalMode()
     {
         _isGameMinimalMode = false;
-        _fullscreenTimer.Interval = NormalModeCheckInterval;
         _clockTimer.Start();
-        UpdateVisualRefreshState();
+        UpdateVisualRefreshState(boost: true);
         UpdateClock();
         _ = ApplyRunCatSettingsAsync();
-        UpdateBackgroundMaintenanceState();
+        UpdateDiscordDemand(boost: true);
+        UpdateBackgroundMaintenanceState(boost: true);
+    }
+
+    private ModuleDemand EvaluateAdaptiveVisualDemand()
+    {
+        if (_isGameMinimalMode || _isHidden || _settings.TopBarStyle != "Adaptive")
+        {
+            return ModuleDemand.Cold("adaptive-disabled");
+        }
+
+        if (DateTime.UtcNow - _lastAdaptiveVisualBoostUtc <= AdaptiveVisualHotHoldDuration)
+        {
+            return ModuleDemand.Hot("adaptive-boost");
+        }
+
+        return ModuleDemand.Warm("adaptive-visible");
+    }
+
+    private void OnAdaptiveVisualTemperatureChanged(ModuleTemperature previousTemperature, ModuleTemperature nextTemperature, string reason)
+    {
+        if (nextTemperature == ModuleTemperature.Cold)
+        {
+            _visualTimer.Stop();
+            return;
+        }
+
+        _visualTimer.Interval = nextTemperature == ModuleTemperature.Hot
+            ? AdaptiveVisualRefreshInterval
+            : AdaptiveVisualWarmRefreshInterval;
+        _visualTimer.Start();
+
+        if (previousTemperature == ModuleTemperature.Cold || nextTemperature == ModuleTemperature.Hot)
+        {
+            UpdateAdaptiveBackground(GetEffectiveTopBarOpacity(), true);
+        }
+    }
+
+    private void UpdateDiscordDemand(bool boost = false)
+    {
+        if (boost)
+        {
+            _lastDiscordBoostUtc = DateTime.UtcNow;
+        }
+
+        _discordModule.Update(EvaluateDiscordDemand());
+    }
+
+    private ModuleDemand EvaluateDiscordDemand()
+    {
+        if (_isGameMinimalMode || _isHidden || !_settings.DiscordButtonEnabled)
+        {
+            return ModuleDemand.Cold("discord-hidden");
+        }
+
+        if (_discordNotificationService.HasActiveCall ||
+            _discordNotificationService.UnreadCount > 0 ||
+            (_discordNotificationWindow?.IsMenuVisible ?? false) ||
+            DateTime.UtcNow - _lastDiscordBoostUtc <= DiscordHotHoldDuration)
+        {
+            return ModuleDemand.Hot("discord-engaged");
+        }
+
+        return ModuleDemand.Warm("discord-visible");
+    }
+
+    private void OnDiscordTemperatureChanged(ModuleTemperature previousTemperature, ModuleTemperature nextTemperature, string reason)
+    {
+        _discordNotificationService.SetDemand(_discordDemandOwnerId, nextTemperature);
+    }
+
+    private ModuleDemand EvaluateBackgroundMaintenanceDemand()
+    {
+        if (_isGameMinimalMode || !_settings.BackgroundOptimizationEnabled)
+        {
+            return ModuleDemand.Cold("background-disabled");
+        }
+
+        if (DateTime.UtcNow - _lastBackgroundMaintenanceBoostUtc <= BackgroundMaintenanceHotHoldDuration)
+        {
+            return ModuleDemand.Hot("background-boost");
+        }
+
+        return ModuleDemand.Warm("background-idle");
+    }
+
+    private void OnBackgroundMaintenanceTemperatureChanged(ModuleTemperature previousTemperature, ModuleTemperature nextTemperature, string reason)
+    {
+        if (nextTemperature == ModuleTemperature.Cold)
+        {
+            _backgroundMaintenanceTimer.Stop();
+
+            if (Interlocked.CompareExchange(ref _backgroundMaintenanceInFlight, 0, 0) == 0)
+            {
+                _ = Task.Run(_gamePerformanceService.RestoreNormalOptimizations);
+            }
+
+            return;
+        }
+
+        _backgroundMaintenanceTimer.Interval = nextTemperature == ModuleTemperature.Hot
+            ? BackgroundMaintenanceInterval
+            : BackgroundMaintenanceWarmInterval;
+
+        if (!_backgroundMaintenanceTimer.IsEnabled)
+        {
+            _backgroundMaintenanceTimer.Start();
+        }
+
+        if (nextTemperature == ModuleTemperature.Hot || previousTemperature == ModuleTemperature.Cold)
+        {
+            QueueBackgroundMaintenance();
+        }
     }
 
     private void OnRunCatFrameChanged(int frame)
@@ -1478,12 +1618,7 @@ public sealed partial class TopBarWindow : Window
         List<WindowRegionSegment> regions = [];
 
         AddContentRegion(regions, MenuButton, useElementBounds: true, paddingX: 1, paddingY: 1);
-        AddContentRegion(
-            regions,
-            FinderButton,
-            useElementBounds: _settings.ShowFinderBubble,
-            paddingX: _settings.ShowFinderBubble ? 8 : 1,
-            paddingY: _settings.ShowFinderBubble ? 5 : 1);
+        AddContentRegion(regions, FinderButton, useElementBounds: true, paddingX: 8, paddingY: 5);
         AddContentRegion(regions, WeatherButton, useElementBounds: false, paddingX: 1, paddingY: 1);
         AddContentRegion(regions, DiscordButton, useElementBounds: false, paddingX: 1, paddingY: 1);
         AddContentRegion(regions, MusicButton, useElementBounds: false, paddingX: 1, paddingY: 1);
@@ -1493,12 +1628,7 @@ public sealed partial class TopBarWindow : Window
 
         foreach (Button shortcutButton in ShortcutButtonsPanel.Children.OfType<Button>())
         {
-            AddContentRegion(
-                regions,
-                shortcutButton,
-                useElementBounds: _settings.ShowFinderBubble,
-                paddingX: _settings.ShowFinderBubble ? 8 : 1,
-                paddingY: _settings.ShowFinderBubble ? 5 : 1);
+            AddContentRegion(regions, shortcutButton, useElementBounds: true, paddingX: 8, paddingY: 5);
         }
 
         return regions;
@@ -1585,7 +1715,25 @@ public sealed partial class TopBarWindow : Window
     private SolidColorBrush CreateBlurBackgroundBrush()
     {
         return new SolidColorBrush(global::Windows.UI.Color.FromArgb(
-            (byte)Math.Round(GetEffectiveTopBarOpacity() * 64), 255, 255, 255));
+            (byte)Math.Round(GetEffectiveTopBarOpacity() * 28), 255, 255, 255));
+    }
+
+    private void UpdateGlassPanels(bool visible)
+    {
+        if (visible && ShortcutButtonsPanel.Children.Count > 0)
+        {
+            ShortcutGlass.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, 255, 255, 255));
+            ShortcutGlass.BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(30, 255, 255, 255));
+            ShortcutGlass.BorderThickness = new Thickness(0.8);
+            ShortcutGlass.Padding = new Thickness(3, 2, 3, 2);
+        }
+        else
+        {
+            ShortcutGlass.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
+            ShortcutGlass.BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
+            ShortcutGlass.BorderThickness = new Thickness(0);
+            ShortcutGlass.Padding = new Thickness(0);
+        }
     }
 
     private global::Windows.UI.Color GetTopBarForegroundColor(byte alpha = 255)
@@ -1608,6 +1756,7 @@ public sealed partial class TopBarWindow : Window
 
     private void UpdateAdaptiveBackground(double effectiveTopBarOpacity, bool force = false)
     {
+        using var perfScope = PerformanceLogger.Measure("TopBar.UpdateAdaptiveBackground", 1.5);
         var adaptiveColor = SampleScreenColorBelowTopBar();
 
         if (!force && AreColorsClose(adaptiveColor, _lastAdaptiveColor))
@@ -1643,6 +1792,7 @@ public sealed partial class TopBarWindow : Window
 
     private global::Windows.UI.Color SampleScreenColorBelowTopBar()
     {
+        using var perfScope = PerformanceLogger.Measure("TopBar.SampleScreenColorBelowTopBar", 1.0);
         IntPtr screenDc = GetDC(IntPtr.Zero);
         if (screenDc == IntPtr.Zero)
         {

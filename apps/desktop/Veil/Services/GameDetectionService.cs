@@ -12,7 +12,6 @@ internal sealed class GameDetectionService
     internal const string HybridMode = "Hybrid";
     internal const string XboxFallbackMode = "XboxFallback";
 
-    private static readonly TimeSpan EvaluationCacheDuration = TimeSpan.FromMilliseconds(900);
     private static readonly TimeSpan CatalogRefreshInterval = TimeSpan.FromMinutes(10);
     private static readonly string[] GameDirectoryMarkers =
     [
@@ -62,8 +61,6 @@ internal sealed class GameDetectionService
     ];
 
     private readonly object _sync = new();
-    private DateTime _lastEvaluationUtc;
-    private bool _lastEvaluationResult;
     private DateTime _lastCatalogRefreshUtc = DateTime.MinValue;
     private bool _catalogRefreshPending;
     private HashSet<string> _catalogExecutablePaths = new(StringComparer.OrdinalIgnoreCase);
@@ -93,32 +90,8 @@ internal sealed class GameDetectionService
         }
     }
 
-    internal bool IsGameRunning(string detectionMode, IReadOnlyList<string> configuredProcessNames, ScreenBounds screen, IntPtr veilWindowHandle)
-    {
-        detectionMode = NormalizeDetectionMode(detectionMode);
-
-        lock (_sync)
-        {
-            if (DateTime.UtcNow - _lastEvaluationUtc <= EvaluationCacheDuration)
-            {
-                return _lastEvaluationResult;
-            }
-        }
-
-        bool result = detectionMode switch
-        {
-            HybridMode => EvaluateHybrid(configuredProcessNames, screen, veilWindowHandle),
-            _ => GameProcessMonitor.IsAnyConfiguredGameRunning(configuredProcessNames)
-        };
-
-        lock (_sync)
-        {
-            _lastEvaluationUtc = DateTime.UtcNow;
-            _lastEvaluationResult = result;
-        }
-
-        return result;
-    }
+    internal bool IsConfiguredGameRunning(IReadOnlyList<string> configuredProcessNames)
+        => GameProcessMonitor.IsAnyConfiguredGameRunning(configuredProcessNames);
 
     internal int? TryGetActiveGameProcessId(string detectionMode, IReadOnlyList<string> configuredProcessNames, ScreenBounds screen, IntPtr veilWindowHandle)
     {
@@ -131,14 +104,12 @@ internal sealed class GameDetectionService
 
         EnsureCatalogRefreshScheduled(force: false);
 
-        if (!TryGetForegroundProcessInfo(screen, veilWindowHandle, out ForegroundProcessInfo processInfo))
+        if (!TryGetForegroundProcessInfo([veilWindowHandle], out ForegroundProcessInfo processInfo, out _))
         {
             return null;
         }
 
-        if (MatchesConfiguredList(processInfo.ProcessName, configuredProcessNames) ||
-            IsCatalogMatch(processInfo) ||
-            IsLikelyGameForeground(processInfo))
+        if (IsGameForegroundForScreen(processInfo, screen, configuredProcessNames))
         {
             return processInfo.ProcessId;
         }
@@ -162,27 +133,66 @@ internal sealed class GameDetectionService
         return ManualListMode;
     }
 
-    private bool EvaluateHybrid(IReadOnlyList<string> configuredProcessNames, ScreenBounds screen, IntPtr veilWindowHandle)
+    internal bool TryGetForegroundProcessInfo(IReadOnlyCollection<IntPtr> ignoredWindowHandles, out ForegroundProcessInfo processInfo, out IntPtr foregroundWindow)
     {
-        if (GameProcessMonitor.IsAnyConfiguredGameRunning(configuredProcessNames))
-        {
-            return true;
-        }
-
-        EnsureCatalogRefreshScheduled(force: false);
-
-        if (!TryGetForegroundProcessInfo(screen, veilWindowHandle, out ForegroundProcessInfo processInfo))
+        processInfo = default;
+        foregroundWindow = GetForegroundWindow();
+        if (foregroundWindow == IntPtr.Zero || ignoredWindowHandles.Contains(foregroundWindow))
         {
             return false;
         }
 
-        if (IsCatalogMatch(processInfo))
+        if (!GetWindowRect(foregroundWindow, out Rect rect))
         {
-            return true;
+            return false;
         }
 
-        return IsLikelyGameForeground(processInfo);
+        GetWindowThreadProcessId(foregroundWindow, out uint processId);
+        if (processId == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            using Process process = Process.GetProcessById((int)processId);
+            string processName = GameProcessMonitor.NormalizeProcessName(process.ProcessName);
+            string executablePath = string.Empty;
+
+            try
+            {
+                executablePath = process.MainModule?.FileName ?? string.Empty;
+            }
+            catch
+            {
+                executablePath = string.Empty;
+            }
+
+            processInfo = new ForegroundProcessInfo(process.Id, processName, executablePath, rect);
+            return !string.IsNullOrWhiteSpace(processInfo.ProcessName);
+        }
+        catch
+        {
+            return false;
+        }
     }
+
+    internal bool IsGameForegroundForScreen(ForegroundProcessInfo processInfo, ScreenBounds screen, IReadOnlyList<string> configuredProcessNames)
+    {
+        if (!IsWindowFullscreenLike(processInfo.WindowRect, screen))
+        {
+            return false;
+        }
+
+        return MatchesConfiguredList(processInfo.ProcessName, configuredProcessNames) ||
+            IsCatalogMatch(processInfo) ||
+            IsLikelyGameForeground(processInfo);
+    }
+
+    internal int? TryGetForegroundGameProcessIdForScreen(ForegroundProcessInfo processInfo, ScreenBounds screen, IReadOnlyList<string> configuredProcessNames)
+        => IsGameForegroundForScreen(processInfo, screen, configuredProcessNames)
+            ? processInfo.ProcessId
+            : null;
 
     private static bool MatchesConfiguredList(string processName, IReadOnlyList<string> configuredProcessNames)
     {
@@ -282,57 +292,6 @@ internal sealed class GameDetectionService
         }
     }
 
-    private static bool TryGetForegroundProcessInfo(ScreenBounds screen, IntPtr veilWindowHandle, out ForegroundProcessInfo processInfo)
-    {
-        processInfo = default;
-
-        IntPtr foregroundWindow = GetForegroundWindow();
-        if (foregroundWindow == IntPtr.Zero || foregroundWindow == veilWindowHandle)
-        {
-            return false;
-        }
-
-        if (!GetWindowRect(foregroundWindow, out Rect rect))
-        {
-            return false;
-        }
-
-        bool isFullscreen = IsWindowFullscreenLike(rect, screen);
-        if (!isFullscreen)
-        {
-            return false;
-        }
-
-        GetWindowThreadProcessId(foregroundWindow, out uint processId);
-        if (processId == 0)
-        {
-            return false;
-        }
-
-        try
-        {
-            using Process process = Process.GetProcessById((int)processId);
-            string processName = GameProcessMonitor.NormalizeProcessName(process.ProcessName);
-            string executablePath = string.Empty;
-
-            try
-            {
-                executablePath = process.MainModule?.FileName ?? string.Empty;
-            }
-            catch
-            {
-                executablePath = string.Empty;
-            }
-
-            processInfo = new ForegroundProcessInfo(process.Id, processName, executablePath, rect);
-            return !string.IsNullOrWhiteSpace(processInfo.ProcessName);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     private static bool IsLikelyGameForeground(ForegroundProcessInfo processInfo)
     {
         if (ForegroundFallbackDenyList.Contains(processInfo.ProcessName))
@@ -349,7 +308,7 @@ internal sealed class GameDetectionService
         return GameDirectoryMarkers.Any(marker => normalizedPath.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool IsWindowFullscreenLike(Rect rect, ScreenBounds screen)
+    internal static bool IsWindowFullscreenLike(Rect rect, ScreenBounds screen)
     {
         const int tolerance = 10;
         int screenWidth = screen.Right - screen.Left;
@@ -387,5 +346,5 @@ internal sealed class GameDetectionService
         return entry.TitleId ?? string.Empty;
     }
 
-    private readonly record struct ForegroundProcessInfo(int ProcessId, string ProcessName, string ExecutablePath, Rect WindowRect);
+    internal readonly record struct ForegroundProcessInfo(int ProcessId, string ProcessName, string ExecutablePath, Rect WindowRect);
 }

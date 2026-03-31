@@ -6,14 +6,19 @@ namespace Veil.Services;
 
 internal sealed class DiscordNotificationService : IDisposable
 {
-    private static readonly TimeSpan ActivePollInterval = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan IdlePollInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan HotPollInterval = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan WarmPollInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ColdPollInterval = TimeSpan.FromSeconds(15);
     private UserNotificationListener? _listener;
     private readonly System.Threading.Timer _pollTimer;
+    private readonly Lock _sync = new();
+    private readonly Dictionary<string, ModuleTemperature> _demandByOwner = [];
     private uint _lastNotificationId;
     private bool _disposed;
+    private bool _initialized;
     private bool _notificationsAccessAllowed;
-    private TimeSpan _currentPollInterval = ActivePollInterval;
+    private Task? _initializationTask;
+    private TimeSpan _currentPollInterval = ColdPollInterval;
 
     public event Action? NotificationsChanged;
 
@@ -30,24 +35,45 @@ internal sealed class DiscordNotificationService : IDisposable
         _pollTimer = new System.Threading.Timer(OnPoll, null, System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
     }
 
-    public async Task InitializeAsync()
+    public Task EnsureInitializedAsync()
     {
-        try
+        lock (_sync)
         {
-            _listener = UserNotificationListener.Current;
-            var access = await _listener.RequestAccessAsync();
-            _notificationsAccessAllowed = access == UserNotificationListenerAccessStatus.Allowed;
-
-            if (!_notificationsAccessAllowed)
+            if (_initializationTask is not null)
             {
-                AppLogger.Error("Notification access denied.", null);
+                return _initializationTask;
             }
 
-            _pollTimer.Change(TimeSpan.Zero, ActivePollInterval);
+            _initializationTask = InitializeCoreAsync();
+            return _initializationTask;
         }
-        catch (Exception ex)
+    }
+
+    public void SetDemand(string ownerId, ModuleTemperature temperature)
+    {
+        if (string.IsNullOrWhiteSpace(ownerId))
         {
-            AppLogger.Error("Failed to initialize notification listener.", ex);
+            return;
+        }
+
+        lock (_sync)
+        {
+            _demandByOwner[ownerId] = temperature;
+            UpdatePollCadenceLocked();
+        }
+    }
+
+    public void ReleaseDemand(string ownerId)
+    {
+        if (string.IsNullOrWhiteSpace(ownerId))
+        {
+            return;
+        }
+
+        lock (_sync)
+        {
+            _demandByOwner.Remove(ownerId);
+            UpdatePollCadenceLocked();
         }
     }
 
@@ -134,7 +160,10 @@ internal sealed class DiscordNotificationService : IDisposable
             NotificationsChanged?.Invoke();
         }
 
-        ChangePollCadence(isRunning || discordNotifs.Count > 0 || hasActiveCall);
+        lock (_sync)
+        {
+            UpdatePollCadenceLocked();
+        }
     }
 
     private static bool IsDiscordApp(string appId)
@@ -166,16 +195,74 @@ internal sealed class DiscordNotificationService : IDisposable
         await PollNotificationsAsync();
     }
 
-    private void ChangePollCadence(bool isActive)
+    private async Task InitializeCoreAsync()
     {
-        TimeSpan nextInterval = isActive ? ActivePollInterval : IdlePollInterval;
-        if (_currentPollInterval == nextInterval)
+        try
+        {
+            _listener = UserNotificationListener.Current;
+            var access = await _listener.RequestAccessAsync();
+            _notificationsAccessAllowed = access == UserNotificationListenerAccessStatus.Allowed;
+
+            if (!_notificationsAccessAllowed)
+            {
+                AppLogger.Error("Notification access denied.", null);
+            }
+
+            lock (_sync)
+            {
+                _initialized = true;
+                UpdatePollCadenceLocked(runImmediately: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to initialize notification listener.", ex);
+        }
+    }
+
+    private void UpdatePollCadenceLocked(bool runImmediately = false)
+    {
+        if (_disposed || !_initialized)
+        {
+            return;
+        }
+
+        ModuleTemperature requestedTemperature = ResolveRequestedTemperatureLocked();
+        ModuleTemperature effectiveTemperature = ResolveEffectiveTemperature(requestedTemperature);
+        TimeSpan nextInterval = effectiveTemperature switch
+        {
+            ModuleTemperature.Hot => HotPollInterval,
+            ModuleTemperature.Warm => WarmPollInterval,
+            _ => ColdPollInterval
+        };
+
+        if (_currentPollInterval == nextInterval && !runImmediately)
         {
             return;
         }
 
         _currentPollInterval = nextInterval;
-        _pollTimer.Change(nextInterval, nextInterval);
+        _pollTimer.Change(runImmediately ? TimeSpan.Zero : nextInterval, nextInterval);
+    }
+
+    private ModuleTemperature ResolveRequestedTemperatureLocked()
+    {
+        if (_demandByOwner.Count == 0)
+        {
+            return ModuleTemperature.Cold;
+        }
+
+        return _demandByOwner.Values.Max();
+    }
+
+    private ModuleTemperature ResolveEffectiveTemperature(ModuleTemperature requestedTemperature)
+    {
+        if (HasActiveCall || Notifications.Count > 0)
+        {
+            return ModuleTemperature.Hot;
+        }
+
+        return requestedTemperature;
     }
 
     public void Dispose()

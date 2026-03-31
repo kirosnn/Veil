@@ -120,7 +120,7 @@
                     <ScrollViewer
                         x:Name="ResultsScrollViewer"
                         Padding="0,2,0,2"
-                        VerticalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Hidden"
                         VerticalScrollMode="Auto">
                         <StackPanel x:Name="ResultsPanel" Spacing="0" />
                     </ScrollViewer>

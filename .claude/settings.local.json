@@ -69,7 +69,14 @@
       "Bash(gh api:*)",
       "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(t[''''path'''']\\) for t in data.get\\(''''tree'''',[]\\)]\")",
       "WebFetch(domain:deepwiki.com)",
-      "WebFetch(domain:gist.github.com)"
+      "WebFetch(domain:gist.github.com)",
+      "Bash(ls -la /c/Users/Nassim/Projects/Veil/apps/desktop/Veil/Windows/*.xaml)",
+      "Bash(powershell -ExecutionPolicy Bypass -NoProfile -Command \"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Host ''UTF-8 test: accents eee, box ╔══╗'' -ForegroundColor Cyan\")",
+      "Bash(powershell -ExecutionPolicy Bypass -NoProfile -Command \"[System.Management.Automation.Language.Parser]::ParseFile\\(''scripts\\\\dev.ps1'', [ref]$null, [ref]$errors\\); if \\($errors.Count -gt 0\\) { $errors | ForEach-Object { Write-Host $_.ToString\\(\\) } } else { Write-Host ''OK - no parse errors'' }\")",
+      "Bash(xxd scripts/dev.ps1)",
+      "Bash(python3 -c \":*)",
+      "Bash(powershell -ExecutionPolicy Bypass -NoProfile -Command \"$errors = @\\(\\); [System.Management.Automation.Language.Parser]::ParseFile\\(\\(Resolve-Path ''scripts\\\\dev.ps1''\\).Path, [ref]$null, [ref]$errors\\) | Out-Null; if \\($errors.Count -gt 0\\) { $errors | ForEach-Object { Write-Host $_ToString\\(\\) } } else { Write-Host ''OK - no parse errors'' }\")",
+      "Bash(powershell -ExecutionPolicy Bypass -NoProfile -File scripts/dev.ps1)"
     ]
   }
 }

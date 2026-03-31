@@ -1,0 +1,90 @@
+<h2>Direction visuelle pour l'Alt Tab</h2>
+<p class="subtitle">Objectif: se rapprocher du switcher macOS du screen, avec une sensation plus flottante, plus légère et plus centrée sur les miniatures.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:linear-gradient(135deg,#7bb7ff 0%,#6c7cff 48%,#f3b36f 100%);border-radius:24px;padding:18px;height:300px;display:flex;align-items:center;justify-content:center;">
+        <div style="width:100%;height:100%;border-radius:22px;background:rgba(245,248,255,.28);backdrop-filter:blur(24px);box-shadow:inset 0 1px 0 rgba(255,255,255,.25);padding:18px;display:flex;flex-direction:column;gap:14px;">
+          <div style="display:flex;gap:12px;justify-content:space-between;">
+            <div style="width:170px;height:96px;border-radius:16px;background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.35);"></div>
+            <div style="width:170px;height:96px;border-radius:16px;background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.35);"></div>
+            <div style="width:170px;height:96px;border-radius:16px;background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.35);"></div>
+          </div>
+          <div style="display:flex;gap:12px;">
+            <div style="width:170px;height:96px;border-radius:16px;background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.35);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. MacOS proche du screen</h3>
+      <p>Grand panneau translucide, miniatures prioritaires, peu de texte, hiérarchie visuelle douce et flottante.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:linear-gradient(135deg,#131722 0%,#1f2637 52%,#2d3550 100%);border-radius:24px;padding:18px;height:300px;display:flex;align-items:center;justify-content:center;">
+        <div style="width:100%;height:100%;border-radius:22px;background:rgba(16,20,29,.82);border:1px solid rgba(255,255,255,.08);padding:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+          <div style="border-radius:15px;background:#2f374c;"></div>
+          <div style="border-radius:15px;background:#56607b;outline:2px solid #d4dcff;"></div>
+          <div style="border-radius:15px;background:#2f374c;"></div>
+          <div style="border-radius:15px;background:#2f374c;"></div>
+          <div style="border-radius:15px;background:#2f374c;"></div>
+          <div style="border-radius:15px;background:#2f374c;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. MacOS sombre plus dense</h3>
+      <p>On garde la logique macOS mais avec plus de contraste, une sélection plus nette et un look moins aérien.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:linear-gradient(135deg,#89c0ff 0%,#8ca0ff 44%,#ffd4a0 100%);border-radius:24px;padding:18px;height:300px;display:flex;align-items:center;justify-content:center;">
+        <div style="width:100%;height:100%;border-radius:22px;background:rgba(255,255,255,.22);backdrop-filter:blur(18px);padding:18px;display:flex;gap:16px;">
+          <div style="width:68%;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+            <div style="border-radius:16px;background:rgba(255,255,255,.46);"></div>
+            <div style="border-radius:16px;background:rgba(255,255,255,.46);"></div>
+            <div style="border-radius:16px;background:rgba(255,255,255,.46);"></div>
+            <div style="border-radius:16px;background:rgba(255,255,255,.46);"></div>
+          </div>
+          <div style="flex:1;border-radius:18px;background:rgba(255,255,255,.40);border:1px solid rgba(255,255,255,.32);padding:12px;display:flex;flex-direction:column;justify-content:space-between;">
+            <div style="height:20px;width:70%;border-radius:999px;background:rgba(255,255,255,.55);"></div>
+            <div style="height:132px;border-radius:14px;background:rgba(255,255,255,.55);"></div>
+            <div style="height:16px;width:52%;border-radius:999px;background:rgba(255,255,255,.45);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Hybride macOS + preview détaillée</h3>
+      <p>Le panneau reste flottant, mais on conserve à droite une zone d’information plus riche sur la fenêtre sélectionnée.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">Ce qui changera dans tous les cas</p>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>Vers le screen macOS</h4>
+      <ul>
+        <li>Conteneur plus large et plus transparent</li>
+        <li>Miniatures en grille ou en rangée, au centre de l'expérience</li>
+        <li>Texte secondaire réduit</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Ce qu'on abandonne</h4>
+      <ul>
+        <li>La grosse preview dominante actuelle</li>
+        <li>La structure très verticale de la fenêtre</li>
+        <li>Les cartes type liste trop proches d'un switcher Windows</li>
+      </ul>
+    </div>
+  </div>
+</div>

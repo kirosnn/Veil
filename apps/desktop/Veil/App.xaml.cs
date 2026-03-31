@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Veil.Configuration;
 using Veil.Diagnostics;
@@ -9,7 +10,9 @@ namespace Veil;
 
 public partial class App : Application
 {
+    private static readonly TimeSpan TopBarActivityInterval = TimeSpan.FromMilliseconds(400);
     private readonly AppSettings _settings;
+    private readonly GameDetectionService _gameDetectionService = new();
     private readonly Dictionary<string, TopBarWindow> _topBarWindows = new(StringComparer.OrdinalIgnoreCase);
     private TrayIconService? _trayIcon;
     private AltTabHookService? _altTabHookService;
@@ -17,6 +20,7 @@ public partial class App : Application
     private IReadOnlyList<WindowSwitchEntry> _windowSwitchEntries = [];
     private int _windowSwitchSelectedIndex = -1;
     private DispatcherTimer? _monitorRefreshTimer;
+    private DispatcherTimer? _topBarActivityTimer;
     private string _lastTopologySignature = string.Empty;
     private bool _isSyncingTopBars;
 
@@ -33,6 +37,8 @@ public partial class App : Application
     {
         try
         {
+            KillOtherInstances();
+            PerformanceLogger.Start();
             AppLogger.Info("Application launch started.");
             try
             {
@@ -62,8 +68,10 @@ public partial class App : Application
             _trayIcon.Initialize();
 
             InitializeAltTabSwitcher();
+            _gameDetectionService.WarmUp();
             SyncTopBarWindows(true);
             StartMonitorRefresh();
+            StartTopBarActivityRefresh();
 
             if (_settings.IsFirstLaunch)
             {
@@ -74,6 +82,32 @@ public partial class App : Application
         {
             AppLogger.Error("Fatal error during launch.", ex);
             throw;
+        }
+    }
+
+    private static void KillOtherInstances()
+    {
+        int currentPid = Environment.ProcessId;
+        string currentName = Process.GetCurrentProcess().ProcessName;
+
+        foreach (var process in Process.GetProcessesByName(currentName))
+        {
+            try
+            {
+                if (process.Id != currentPid)
+                {
+                    AppLogger.Info($"Killing previous instance (pid {process.Id}).");
+                    process.Kill();
+                    process.WaitForExit(3000);
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                process.Dispose();
+            }
         }
     }
 
@@ -104,10 +138,13 @@ public partial class App : Application
     {
         _monitorRefreshTimer?.Stop();
         _monitorRefreshTimer = null;
+        _topBarActivityTimer?.Stop();
+        _topBarActivityTimer = null;
         DisposeAltTabSwitcher();
         _trayIcon?.Dispose();
         _trayIcon = null;
         CloseAllTopBarWindows();
+        PerformanceLogger.Stop();
     }
 
     private void OnSettingsChanged()
@@ -129,6 +166,66 @@ public partial class App : Application
     private void OnMonitorRefreshTick(object? sender, object e)
     {
         SyncTopBarWindows();
+    }
+
+    private void StartTopBarActivityRefresh()
+    {
+        _topBarActivityTimer?.Stop();
+        _topBarActivityTimer = new DispatcherTimer
+        {
+            Interval = TopBarActivityInterval
+        };
+        _topBarActivityTimer.Tick += OnTopBarActivityTick;
+        _topBarActivityTimer.Start();
+        RefreshTopBarActivityState();
+    }
+
+    private void OnTopBarActivityTick(object? sender, object e)
+    {
+        RefreshTopBarActivityState();
+    }
+
+    private void RefreshTopBarActivityState()
+    {
+        if (_topBarWindows.Count == 0)
+        {
+            return;
+        }
+
+        string detectionMode = GameDetectionService.NormalizeDetectionMode(_settings.GameDetectionMode);
+        IReadOnlyList<string> configuredProcessNames = _settings.GameProcessNames;
+        bool configuredGameRunning = _gameDetectionService.IsConfiguredGameRunning(configuredProcessNames);
+        IntPtr[] ignoredWindows = _topBarWindows.Values
+            .Select(static window => window.WindowHandle)
+            .Where(static handle => handle != IntPtr.Zero)
+            .ToArray();
+        GameDetectionService.ForegroundProcessInfo foregroundProcessInfo = default;
+
+        bool hasForegroundProcess = detectionMode == GameDetectionService.HybridMode &&
+            _gameDetectionService.TryGetForegroundProcessInfo(ignoredWindows, out foregroundProcessInfo, out _);
+
+        foreach (TopBarWindow topBarWindow in _topBarWindows.Values)
+        {
+            bool gameRunning = configuredGameRunning;
+            int? activeGameProcessId = null;
+            bool shouldHideForForegroundWindow = false;
+
+            if (hasForegroundProcess)
+            {
+                shouldHideForForegroundWindow = GameDetectionService.IsWindowFullscreenLike(foregroundProcessInfo.WindowRect, topBarWindow.ScreenBounds);
+
+                if (!gameRunning)
+                {
+                    activeGameProcessId = _gameDetectionService.TryGetForegroundGameProcessIdForScreen(
+                        foregroundProcessInfo,
+                        topBarWindow.ScreenBounds,
+                        configuredProcessNames);
+                    gameRunning = activeGameProcessId.HasValue;
+                }
+            }
+
+            topBarWindow.ApplyActivityState(gameRunning, shouldHideForForegroundWindow, activeGameProcessId);
+        }
     }
 
     private void SyncTopBarWindows(bool force = false)
@@ -198,6 +295,8 @@ public partial class App : Application
         {
             _isSyncingTopBars = false;
         }
+        
+        RefreshTopBarActivityState();
     }
 
     private TopBarWindow? GetPreferredTopBarWindow()

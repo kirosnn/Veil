@@ -39,6 +39,7 @@ internal static partial class NativeMethods
     internal const int MONITOR_DEFAULTTOPRIMARY = 1;
 
     internal const int SW_HIDE = 0;
+    internal const int SW_SHOW = 5;
     internal const int SW_SHOWNOACTIVATE = 4;
     internal const int SW_MINIMIZE = 6;
     internal const int SW_RESTORE = 9;

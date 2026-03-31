@@ -8,7 +8,8 @@
                    Text="12:00"
                    FontSize="13"
                    FontWeight="Medium"
-                   FontFamily="{StaticResource SfTextMedium}"
+                   FontFamily="{StaticResource SfTextSemibold}"
+                   CharacterSpacing="8"
                    Foreground="White"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
@@ -25,7 +26,7 @@
                     Padding="8,2"
                     MinWidth="0"
                     MinHeight="0"
-                    CornerRadius="10"
+                    CornerRadius="11"
                     BorderThickness="0"
                     Background="Transparent"
                     Foreground="#FFFFFFFF"
@@ -177,7 +178,7 @@
                     Orientation="Horizontal"
                     Spacing="2"
                     HorizontalAlignment="Left"
-                    VerticalAlignment="Stretch"
+                    VerticalAlignment="Center"
                     Margin="10,0,0,0">
             <Button x:Name="MenuButton"
                     Width="11"
@@ -204,9 +205,9 @@
                     Height="22"
                     MaxWidth="180"
                     Padding="10,0"
-                    CornerRadius="10"
+                    CornerRadius="11"
                     BorderThickness="0"
-                    Background="#18FFFFFF"
+                    Background="#10FFFFFF"
                     Foreground="#E6FFFFFF"
                     FontSize="13"
                     FontFamily="{StaticResource SfDisplaySemibold}"
@@ -214,8 +215,8 @@
                     VerticalAlignment="Center"
                     Click="OnFinderButtonClick">
                 <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#30FFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#20FFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#1AFFFFFF</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#12FFFFFF</SolidColorBrush>
                     <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
                     <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
                 </Button.Resources>
@@ -227,10 +228,18 @@
                            TextTrimming="CharacterEllipsis" />
             </Button>
 
-            <StackPanel x:Name="ShortcutButtonsPanel"
-                        Orientation="Horizontal"
-                        Spacing="2"
-                        VerticalAlignment="Center" />
+            <Border x:Name="ShortcutGlass"
+                    CornerRadius="12"
+                    Padding="3,2"
+                    Background="#14FFFFFF"
+                    BorderBrush="#1EFFFFFF"
+                    BorderThickness="0.8"
+                    VerticalAlignment="Center">
+                <StackPanel x:Name="ShortcutButtonsPanel"
+                            Orientation="Horizontal"
+                            Spacing="2"
+                            VerticalAlignment="Center" />
+            </Border>
         </StackPanel>
     </Grid>
 </Window>
