@@ -84,8 +84,6 @@ internal sealed class GamePerformanceService : IDisposable
         "taskmgr",
         "terminal",
         "textinputhost",
-        "widgets",
-        "widgetservice",
         "windowsterminal",
         "wininit",
         "winlogon",

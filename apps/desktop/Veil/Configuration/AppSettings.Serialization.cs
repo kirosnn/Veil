@@ -1,0 +1,226 @@
+using System.Text.Json;
+using Veil.Diagnostics;
+using Veil.Services;
+
+namespace Veil.Configuration;
+
+internal sealed partial class AppSettings
+{
+    internal void Save()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_settingsPath)!);
+        var payload = new AppSettingsDto
+        {
+            TopBarOpacity = _topBarOpacity,
+            ClockOffset = _clockOffset,
+            ClockBalance = _clockBalance,
+            MenuTintOpacity = _menuTintOpacity,
+            FinderBubbleOpacity = _finderBubbleOpacity,
+            ShowFinderBubble = _showFinderBubble,
+            FinderHotkeyEnabled = _finderHotkeyEnabled,
+            DiscordButtonEnabled = _discordButtonEnabled,
+            MusicButtonEnabled = _musicButtonEnabled,
+            MusicShowVolume = _musicShowVolume,
+            MusicShowSourceToggle = _musicShowSourceToggle,
+            WeatherButtonEnabled = _weatherButtonEnabled,
+            WeatherPrimaryCity = _weatherPrimaryCity,
+            WeatherSecondaryCities = _weatherSecondaryCities,
+            WeatherBlurIntensity = _weatherBlurIntensity,
+            TopBarPanelTheme = _topBarPanelTheme,
+            MusicPanelTheme = _musicPanelTheme,
+            RunCatPanelTheme = _runCatPanelTheme,
+            WeatherPanelTheme = _weatherPanelTheme,
+            TopBarStyle = _topBarStyle,
+            SolidColor = _solidColor,
+            TopBarForegroundColor = _topBarForegroundColor,
+            BlurIntensity = _blurIntensity,
+            RunCatEnabled = _runCatEnabled,
+            RunCatRunner = _runCatRunner,
+            TopBarDisplayMode = _topBarDisplayMode,
+            TopBarMonitorIds = _topBarMonitorIds,
+            GameDetectionMode = _gameDetectionMode,
+            GameProcessNames = _gameProcessNames,
+            BackgroundOptimizationEnabled = _backgroundOptimizationEnabled,
+            DesktopWidgetSnapToGrid = _desktopWidgetSnapToGrid,
+            DesktopWidgetGridSize = _desktopWidgetGridSize,
+            ShortcutButtons = _shortcutButtons
+                .Select(setting => setting is null
+                    ? null
+                    : new AppShortcutDto
+                    {
+                        Name = setting.AppName,
+                        AppId = setting.AppId,
+                        DisplayName = setting.DisplayName
+                    })
+                .ToArray(),
+            DesktopWidgets = _desktopWidgets
+                .Select(setting => new DesktopWidgetDto
+                {
+                    Id = setting.Id,
+                    Kind = setting.Kind,
+                    Title = setting.Title,
+                    MonitorId = setting.MonitorId,
+                    X = setting.X,
+                    Y = setting.Y,
+                    Width = setting.Width,
+                    Height = setting.Height,
+                    Opacity = setting.Opacity,
+                    CornerRadius = setting.CornerRadius,
+                    Scale = setting.Scale,
+                    Theme = setting.Theme,
+                    BackgroundColor = setting.BackgroundColor,
+                    ForegroundColor = setting.ForegroundColor,
+                    AccentColor = setting.AccentColor,
+                    RefreshSeconds = setting.RefreshSeconds,
+                    ShowSeconds = setting.ShowSeconds
+                })
+                .ToArray()
+        };
+
+        File.WriteAllText(_settingsPath, JsonSerializer.Serialize(payload, _jsonOptions));
+    }
+
+    private static AppSettings LoadOrCreate()
+    {
+        var directoryPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Veil");
+        var settingsPath = Path.Combine(directoryPath, "settings.json");
+        var settings = new AppSettings(settingsPath);
+
+        if (!File.Exists(settingsPath))
+        {
+            settings._isFirstLaunch = true;
+            settings.Save();
+            return settings;
+        }
+
+        try
+        {
+            var dto = JsonSerializer.Deserialize<AppSettingsDto>(File.ReadAllText(settingsPath));
+            if (dto != null)
+            {
+                bool requiresSave = false;
+                string normalizedTopBarStyle = NormalizeTopBarStyle(dto.TopBarStyle);
+                double normalizedTopBarOpacity = NormalizeTopBarOpacityForStyle(dto.TopBarOpacity, normalizedTopBarStyle, useDefaultWhenInvisible: true);
+                double normalizedBlurIntensity = NormalizeBlurIntensityForStyle(dto.BlurIntensity, normalizedTopBarStyle, useDefaultWhenInvisible: true);
+
+                requiresSave |= !string.Equals(dto.TopBarStyle, normalizedTopBarStyle, StringComparison.Ordinal);
+                requiresSave |= Math.Abs(Math.Clamp(dto.TopBarOpacity, 0.0, 1.0) - normalizedTopBarOpacity) >= 0.001;
+                requiresSave |= Math.Abs(Math.Clamp(dto.BlurIntensity, 0.0, 1.0) - normalizedBlurIntensity) >= 0.001;
+
+                settings._topBarOpacity = normalizedTopBarOpacity;
+                settings._clockOffset = Math.Clamp(dto.ClockOffset, -40, 40);
+                settings._clockBalance = Math.Clamp(dto.ClockBalance, 0.0, 1.0);
+                settings._menuTintOpacity = Math.Clamp(dto.MenuTintOpacity, 0.04, 0.3);
+                settings._finderBubbleOpacity = Math.Clamp(dto.FinderBubbleOpacity, 0.04, 0.3);
+                settings._showFinderBubble = dto.ShowFinderBubble;
+                settings._finderHotkeyEnabled = dto.FinderHotkeyEnabled;
+                settings._discordButtonEnabled = dto.DiscordButtonEnabled;
+                settings._musicButtonEnabled = dto.MusicButtonEnabled;
+                settings._musicShowVolume = dto.MusicShowVolume;
+                settings._musicShowSourceToggle = dto.MusicShowSourceToggle;
+                settings._weatherButtonEnabled = dto.WeatherButtonEnabled;
+                settings._weatherPrimaryCity = string.IsNullOrWhiteSpace(dto.WeatherPrimaryCity) ? "Paris" : dto.WeatherPrimaryCity.Trim();
+                settings._weatherSecondaryCities = NormalizeWeatherCities(dto.WeatherSecondaryCities);
+                settings._weatherBlurIntensity = Math.Clamp(dto.WeatherBlurIntensity <= 0 ? 0.68 : dto.WeatherBlurIntensity, 0.2, 1.0);
+                settings._topBarPanelTheme = NormalizePanelTheme(dto.TopBarPanelTheme, InferGlobalPanelTheme(dto));
+                settings._musicPanelTheme = NormalizePanelTheme(dto.MusicPanelTheme, "Dark");
+                settings._runCatPanelTheme = NormalizePanelTheme(dto.RunCatPanelTheme, "Dark");
+                settings._weatherPanelTheme = NormalizePanelTheme(dto.WeatherPanelTheme, "Light");
+                settings._topBarStyle = normalizedTopBarStyle;
+                settings._solidColor = NormalizeHexColor(dto.SolidColor);
+                settings._topBarForegroundColor = NormalizeHexColor(dto.TopBarForegroundColor);
+                settings._blurIntensity = normalizedBlurIntensity;
+                settings._runCatEnabled = dto.RunCatEnabled;
+                settings._runCatRunner = dto.RunCatRunner is "Cat" or "Parrot" or "Horse" ? dto.RunCatRunner : "Cat";
+                settings._topBarDisplayMode = NormalizeTopBarDisplayMode(dto.TopBarDisplayMode);
+                settings._topBarMonitorIds = NormalizeTopBarMonitorIds(dto.TopBarMonitorIds);
+                settings._gameDetectionMode = GameDetectionService.NormalizeDetectionMode(dto.GameDetectionMode);
+                settings._gameProcessNames = NormalizeGameProcessNames(dto.GameProcessNames);
+                settings._backgroundOptimizationEnabled = dto.BackgroundOptimizationEnabled;
+                settings._desktopWidgetSnapToGrid = dto.DesktopWidgetSnapToGrid;
+                settings._desktopWidgetGridSize = Math.Clamp(dto.DesktopWidgetGridSize <= 0 ? 16 : dto.DesktopWidgetGridSize, 8, 64);
+                settings._shortcutButtons = NormalizeShortcutButtons(dto.ShortcutButtons);
+                settings._desktopWidgets = NormalizeDesktopWidgets(dto.DesktopWidgets);
+
+                if (requiresSave)
+                {
+                    settings.Save();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to load app settings. Defaults will be used.", ex);
+        }
+
+        return settings;
+    }
+
+    private sealed class AppSettingsDto
+    {
+        public double TopBarOpacity { get; set; } = 0.92;
+        public int ClockOffset { get; set; } = -10;
+        public double ClockBalance { get; set; } = 0.35;
+        public double MenuTintOpacity { get; set; } = 0.14;
+        public double FinderBubbleOpacity { get; set; } = 0.09;
+        public bool ShowFinderBubble { get; set; } = true;
+        public bool FinderHotkeyEnabled { get; set; } = true;
+        public bool DiscordButtonEnabled { get; set; } = true;
+        public bool MusicButtonEnabled { get; set; } = true;
+        public bool MusicShowVolume { get; set; } = true;
+        public bool MusicShowSourceToggle { get; set; } = true;
+        public bool WeatherButtonEnabled { get; set; } = true;
+        public string WeatherPrimaryCity { get; set; } = "Paris";
+        public string[]? WeatherSecondaryCities { get; set; }
+        public double WeatherBlurIntensity { get; set; } = 0.68;
+        public string TopBarPanelTheme { get; set; } = "Dark";
+        public string MusicPanelTheme { get; set; } = "Dark";
+        public string RunCatPanelTheme { get; set; } = "Dark";
+        public string WeatherPanelTheme { get; set; } = "Light";
+        public string TopBarStyle { get; set; } = "Solid";
+        public string SolidColor { get; set; } = "#000000";
+        public string TopBarForegroundColor { get; set; } = "#FFFFFF";
+        public double BlurIntensity { get; set; } = 0.15;
+        public bool RunCatEnabled { get; set; }
+        public string RunCatRunner { get; set; } = "Cat";
+        public string TopBarDisplayMode { get; set; } = "Primary";
+        public string[]? TopBarMonitorIds { get; set; }
+        public string GameDetectionMode { get; set; } = GameDetectionService.HybridMode;
+        public string[]? GameProcessNames { get; set; }
+        public bool BackgroundOptimizationEnabled { get; set; } = true;
+        public bool DesktopWidgetSnapToGrid { get; set; } = true;
+        public int DesktopWidgetGridSize { get; set; } = 16;
+        public AppShortcutDto?[]? ShortcutButtons { get; set; }
+        public DesktopWidgetDto[]? DesktopWidgets { get; set; }
+    }
+
+    private sealed class AppShortcutDto
+    {
+        public string Name { get; set; } = string.Empty;
+        public string AppId { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+    }
+
+    private sealed class DesktopWidgetDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Kind { get; set; } = "Clock";
+        public string Title { get; set; } = string.Empty;
+        public string MonitorId { get; set; } = string.Empty;
+        public int X { get; set; } = 56;
+        public int Y { get; set; } = 56;
+        public int Width { get; set; } = 260;
+        public int Height { get; set; } = 118;
+        public double Opacity { get; set; } = 0.90;
+        public int CornerRadius { get; set; } = 22;
+        public double Scale { get; set; } = 1.0;
+        public string Theme { get; set; } = "Dark";
+        public string BackgroundColor { get; set; } = "#101114";
+        public string ForegroundColor { get; set; } = "#F4F4F5";
+        public string AccentColor { get; set; } = "#7EC7FF";
+        public int RefreshSeconds { get; set; } = 6;
+        public bool ShowSeconds { get; set; } = true;
+    }
+}

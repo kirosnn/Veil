@@ -11,10 +11,130 @@ $platform = "x64"
 $restartQuietPeriodMs = 700
 
 $global:veilProcess = $null
+$global:veilJobHandle = [IntPtr]::Zero
 $global:pendingRestart = $false
 $global:lastRelevantChangeAt = [DateTime]::MinValue
 $global:lastQueuedPath = $null
 $global:devMutex = $null
+$global:stopRequested = $false
+
+Add-Type -TypeDefinition @"
+using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
+public static class VeilDevJobNative
+{
+    [StructLayout(LayoutKind.Sequential)]
+    public struct JOBOBJECT_BASIC_LIMIT_INFORMATION
+    {
+        public long PerProcessUserTimeLimit;
+        public long PerJobUserTimeLimit;
+        public uint LimitFlags;
+        public UIntPtr MinimumWorkingSetSize;
+        public UIntPtr MaximumWorkingSetSize;
+        public uint ActiveProcessLimit;
+        public UIntPtr Affinity;
+        public uint PriorityClass;
+        public uint SchedulingClass;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IO_COUNTERS
+    {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+    {
+        public JOBOBJECT_BASIC_LIMIT_INFORMATION BasicLimitInformation;
+        public IO_COUNTERS IoInfo;
+        public UIntPtr ProcessMemoryLimit;
+        public UIntPtr JobMemoryLimit;
+        public UIntPtr PeakProcessMemoryUsed;
+        public UIntPtr PeakJobMemoryUsed;
+    }
+
+    public const int JobObjectExtendedLimitInformation = 9;
+    public const uint JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern IntPtr CreateJobObject(IntPtr lpJobAttributes, string lpName);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool SetInformationJobObject(
+        IntPtr hJob,
+        int jobObjectInfoClass,
+        IntPtr lpJobObjectInfo,
+        uint cbJobObjectInfoLength);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool CloseHandle(IntPtr hObject);
+
+    public delegate bool ConsoleCtrlDelegate(uint ctrlType);
+
+    private static ConsoleCtrlDelegate _consoleHandler;
+    private static string _processName = "Veil";
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    public static extern bool SetConsoleCtrlHandler(ConsoleCtrlDelegate handler, bool add);
+
+    public static void RegisterConsoleKillHandler(string processName)
+    {
+        _processName = processName;
+        _consoleHandler = HandleConsoleControl;
+        SetConsoleCtrlHandler(_consoleHandler, true);
+    }
+
+    public static void UnregisterConsoleKillHandler()
+    {
+        if (_consoleHandler is null)
+        {
+            return;
+        }
+
+        SetConsoleCtrlHandler(_consoleHandler, false);
+        _consoleHandler = null;
+    }
+
+    private static bool HandleConsoleControl(uint ctrlType)
+    {
+        KillVeilProcesses();
+        return false;
+    }
+
+    private static void KillVeilProcesses()
+    {
+        foreach (Process process in Process.GetProcessesByName(_processName))
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(true);
+                    process.WaitForExit(2000);
+                }
+            }
+            catch
+            {
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+    }
+}
+"@
 
 # -- UI helpers --
 
@@ -257,6 +377,59 @@ function Stop-WorkspaceProcesses {
     Start-Sleep -Milliseconds 400
 }
 
+function Initialize-VeilJobObject {
+    if ($global:veilJobHandle -ne [IntPtr]::Zero) {
+        return
+    }
+
+    $jobName = "VeilDevJob_{0}" -f [Guid]::NewGuid().ToString("N")
+    $jobHandle = [VeilDevJobNative]::CreateJobObject([IntPtr]::Zero, $jobName)
+    if ($jobHandle -eq [IntPtr]::Zero) {
+        throw "Unable to create Windows job object for Veil dev process supervision."
+    }
+
+    $info = New-Object VeilDevJobNative+JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+    $info.BasicLimitInformation.LimitFlags = [VeilDevJobNative]::JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+    $length = [System.Runtime.InteropServices.Marshal]::SizeOf([type][VeilDevJobNative+JOBOBJECT_EXTENDED_LIMIT_INFORMATION])
+    $buffer = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($length)
+
+    try {
+        [System.Runtime.InteropServices.Marshal]::StructureToPtr($info, $buffer, $false)
+        $configured = [VeilDevJobNative]::SetInformationJobObject(
+            $jobHandle,
+            [VeilDevJobNative]::JobObjectExtendedLimitInformation,
+            $buffer,
+            [uint32]$length)
+
+        if (-not $configured) {
+            throw "Unable to configure Windows job object for Veil dev process supervision."
+        }
+    }
+    finally {
+        [System.Runtime.InteropServices.Marshal]::FreeHGlobal($buffer)
+    }
+
+    $global:veilJobHandle = $jobHandle
+}
+
+function Add-ProcessToVeilJob {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Diagnostics.Process]$Process
+    )
+
+    Initialize-VeilJobObject
+
+    if ($Process.HasExited) {
+        return
+    }
+
+    $assigned = [VeilDevJobNative]::AssignProcessToJobObject($global:veilJobHandle, $Process.Handle)
+    if (-not $assigned) {
+        throw "Unable to assign Veil process $($Process.Id) to the dev job object."
+    }
+}
+
 function Enter-SingleInstanceMode {
     $mutexName = "Local\VeilDev_{0}" -f (($projectRoot.ToLowerInvariant()) -replace "[^a-z0-9]+", "_")
     $createdNew = $false
@@ -442,6 +615,7 @@ function Start-Veil {
     $startInfo.CreateNoWindow = $true
 
     $global:veilProcess = [System.Diagnostics.Process]::Start($startInfo)
+    Add-ProcessToVeilJob -Process $global:veilProcess
     $global:lastRelevantChangeAt = [DateTime]::UtcNow
     Start-Sleep -Milliseconds 1200
 
@@ -544,6 +718,15 @@ $subscriptions = @(
     Register-ObjectEvent -InputObject $watcher -EventName Renamed
     Register-ObjectEvent -InputObject $watcher -EventName Deleted
 )
+[VeilDevJobNative]::RegisterConsoleKillHandler("Veil")
+$cancelHandler = [ConsoleCancelEventHandler]{
+    param($sender, $eventArgs)
+    $eventArgs.Cancel = $true
+    $global:stopRequested = $true
+    Stop-Veil
+}
+[Console]::TreatControlCAsInput = $false
+[Console]::add_CancelKeyPress($cancelHandler)
 
 try {
     Enter-SingleInstanceMode
@@ -558,6 +741,10 @@ try {
     Write-Host ""
 
     while ($true) {
+        if ($global:stopRequested) {
+            break
+        }
+
         while ([Console]::KeyAvailable) {
             $keyInfo = [Console]::ReadKey($true)
             Handle-DevKey -KeyInfo $keyInfo
@@ -608,8 +795,17 @@ finally {
         }
     }
 
+    if ($null -ne $cancelHandler) {
+        [Console]::remove_CancelKeyPress($cancelHandler)
+    }
+    [VeilDevJobNative]::UnregisterConsoleKillHandler()
+
     $watcher.Dispose()
     Stop-Veil
+    if ($global:veilJobHandle -ne [IntPtr]::Zero) {
+        [VeilDevJobNative]::CloseHandle($global:veilJobHandle) | Out-Null
+        $global:veilJobHandle = [IntPtr]::Zero
+    }
     if ($null -ne $global:devMutex) {
         try {
             $global:devMutex.ReleaseMutex()

@@ -41,7 +41,7 @@ public sealed partial class WeatherWindow : Window
         InitializeComponent();
         Title = "Weather";
 
-        _visibilityTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _visibilityTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _visibilityTimer.Tick += OnVisibilityTick;
 
         _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(15) };

@@ -49,9 +49,13 @@ internal static class DiscordAppController
     private static readonly string[] DiscordProcessNames = ["Discord", "DiscordCanary", "DiscordPTB"];
     private static readonly string[] BrowserProcessNames = ["chrome", "msedge", "firefox", "brave", "opera", "opera_gx", "vivaldi"];
 
+    private static IntPtr _cachedWindowHandle;
+    private static DateTime _cachedWindowHandleUtc = DateTime.MinValue;
+    private static readonly TimeSpan WindowHandleCacheTtl = TimeSpan.FromSeconds(5);
+
     public static bool IsRunning()
     {
-        if (FindBestWindow(includeMinimized: true) != IntPtr.Zero)
+        if (FindBestWindowCached(includeMinimized: true) != IntPtr.Zero)
         {
             return true;
         }
@@ -75,7 +79,7 @@ internal static class DiscordAppController
 
     public static DiscordCallSnapshot GetCallSnapshot()
     {
-        IntPtr window = FindBestWindow(includeMinimized: true);
+        IntPtr window = FindBestWindowCached(includeMinimized: true);
         if (window == IntPtr.Zero)
         {
             return DiscordCallSnapshot.Empty;
@@ -98,12 +102,9 @@ internal static class DiscordAppController
                 false);
         }
 
-        bool canToggleMute = FindActionElement(root, DiscordCallAction.ToggleMute) is not null;
-        bool canToggleDeafen = FindActionElement(root, DiscordCallAction.ToggleDeafen) is not null;
-        bool canToggleCamera = FindActionElement(root, DiscordCallAction.ToggleCamera) is not null;
-        bool canToggleScreenShare = FindActionElement(root, DiscordCallAction.ToggleScreenShare) is not null;
-        bool canDisconnect = FindActionElement(root, DiscordCallAction.Disconnect) is not null;
-        bool canAnswer = FindActionElement(root, DiscordCallAction.Answer) is not null;
+        // Single FindAll call instead of 6 separate traversals
+        var (canToggleMute, canToggleDeafen, canToggleCamera, canToggleScreenShare, canDisconnect, canAnswer)
+            = FindAllActionElements(root);
 
         bool hasVoiceConnection = canDisconnect || canToggleMute || canToggleDeafen || canToggleCamera || canToggleScreenShare;
         bool hasIncomingCall = canAnswer;
@@ -125,6 +126,64 @@ internal static class DiscordAppController
             canToggleScreenShare,
             canDisconnect,
             canAnswer);
+    }
+
+    private static IntPtr FindBestWindowCached(bool includeMinimized)
+    {
+        if (DateTime.UtcNow - _cachedWindowHandleUtc < WindowHandleCacheTtl
+            && _cachedWindowHandle != IntPtr.Zero
+            && IsWindow(_cachedWindowHandle))
+        {
+            return _cachedWindowHandle;
+        }
+
+        IntPtr handle = FindBestWindow(includeMinimized);
+        _cachedWindowHandle = handle;
+        _cachedWindowHandleUtc = DateTime.UtcNow;
+        return handle;
+    }
+
+    private static (bool Mute, bool Deafen, bool Camera, bool ScreenShare, bool Disconnect, bool Answer)
+        FindAllActionElements(AutomationElement root)
+    {
+        Condition condition = new OrCondition(
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button),
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.MenuItem));
+
+        AutomationElementCollection elements;
+        try
+        {
+            elements = root.FindAll(TreeScope.Descendants, condition);
+        }
+        catch
+        {
+            return default;
+        }
+
+        bool mute = false, deafen = false, camera = false, screenShare = false, disconnect = false, answer = false;
+
+        foreach (AutomationElement element in elements)
+        {
+            try
+            {
+                string name = Normalize(element.Current.Name);
+                string automationId = Normalize(element.Current.AutomationId);
+
+                if (!mute && MatchesAction(DiscordCallAction.ToggleMute, name, automationId)) mute = true;
+                else if (!deafen && MatchesAction(DiscordCallAction.ToggleDeafen, name, automationId)) deafen = true;
+                else if (!camera && MatchesAction(DiscordCallAction.ToggleCamera, name, automationId)) camera = true;
+                else if (!screenShare && MatchesAction(DiscordCallAction.ToggleScreenShare, name, automationId)) screenShare = true;
+                else if (!disconnect && MatchesAction(DiscordCallAction.Disconnect, name, automationId)) disconnect = true;
+                else if (!answer && MatchesAction(DiscordCallAction.Answer, name, automationId)) answer = true;
+
+                if (mute && deafen && camera && screenShare && disconnect && answer) break;
+            }
+            catch
+            {
+            }
+        }
+
+        return (mute, deafen, camera, screenShare, disconnect, answer);
     }
 
     public static bool LaunchOrActivate()
@@ -308,15 +367,6 @@ internal static class DiscordAppController
             else if (IsBrowserProcess(processName) && normalizedTitle.Contains("discord", StringComparison.Ordinal))
             {
                 score += 180;
-            }
-            else
-            {
-                string? description = process.MainModule?.FileVersionInfo?.FileDescription;
-                if (!string.IsNullOrWhiteSpace(description)
-                    && Normalize(description).Contains("discord", StringComparison.Ordinal))
-                {
-                    score += 160;
-                }
             }
 
             if (score == 0)

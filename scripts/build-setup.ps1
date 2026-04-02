@@ -145,6 +145,7 @@ internal static class Program
             File.Copy(Environment.ProcessPath!, setupExePath, true);
             CreateShortcut(shortcutPath, appExePath, installDir);
             RegisterUninstallEntry(installDir, appExePath, setupExePath);
+            RegisterWidgetShellNew(appExePath);
 
             Process.Start(new ProcessStartInfo
             {
@@ -193,6 +194,7 @@ internal static class Program
         }
 
         Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\Veil", false);
+        UnregisterWidgetShellNew();
         ScheduleDelete(installDir, parentDir);
 
         MessageBox.Show(
@@ -250,6 +252,40 @@ internal static class Program
         key.SetValue("NoModify", 1, RegistryValueKind.DWord);
         key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
         key.SetValue("UninstallString", "\"" + setupExePath + "\" --uninstall");
+    }
+
+    private static void RegisterWidgetShellNew(string appExePath)
+    {
+        const string extension = ".veilwidget";
+        const string progId = "Veil.Widget";
+
+        using RegistryKey extensionKey = Registry.CurrentUser.CreateSubKey($@"Software\Classes\{extension}")
+            ?? throw new InvalidOperationException("Failed to create widget extension key.");
+        extensionKey.SetValue(string.Empty, progId);
+
+        using RegistryKey shellNewKey = extensionKey.CreateSubKey("ShellNew")
+            ?? throw new InvalidOperationException("Failed to create widget ShellNew key.");
+        shellNewKey.SetValue("Command", "\"" + appExePath + "\" --widget");
+        shellNewKey.SetValue("ItemName", "Widget");
+
+        using RegistryKey progIdKey = Registry.CurrentUser.CreateSubKey($@"Software\Classes\{progId}")
+            ?? throw new InvalidOperationException("Failed to create widget ProgID key.");
+        progIdKey.SetValue(string.Empty, "Widget");
+        progIdKey.SetValue("FriendlyTypeName", "Widget");
+
+        using RegistryKey defaultIconKey = progIdKey.CreateSubKey("DefaultIcon")
+            ?? throw new InvalidOperationException("Failed to create widget icon key.");
+        defaultIconKey.SetValue(string.Empty, "\"" + appExePath + "\",0");
+
+        using RegistryKey openCommandKey = progIdKey.CreateSubKey(@"shell\open\command")
+            ?? throw new InvalidOperationException("Failed to create widget open command key.");
+        openCommandKey.SetValue(string.Empty, "\"" + appExePath + "\" --widget \"%1\"");
+    }
+
+    private static void UnregisterWidgetShellNew()
+    {
+        Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\.veilwidget", false);
+        Registry.CurrentUser.DeleteSubKeyTree(@"Software\Classes\Veil.Widget", false);
     }
 
     private static void ScheduleDelete(string installDir, string parentDir)

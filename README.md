@@ -2,16 +2,16 @@
 
 Veil is a Windows desktop overlay built with WinUI 3 and .NET 10.
 
-It provides a compact top bar with quick system controls, launcher-style search, media controls, weather, notifications, performance widgets, and game-aware behavior focused on staying lightweight while gaming.
+It provides a compact top bar with quick system controls, launcher-style search, media controls, weather, notifications, performance insights, and game-aware behavior focused on staying lightweight while gaming.
 
 ## Highlights
 
 - Multi-monitor top bar
 - Finder-style app and system action launcher
 - Media controls with album art and source-aware behavior
-- Weather widget and popup
+- Weather panel and popup
 - Discord notification surface
-- System stats and animated runner widget
+- System stats and animated runner panel
 - Game detection with adaptive optimization modes
 
 ## Stack

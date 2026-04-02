@@ -73,7 +73,7 @@ public sealed partial class MusicControlWindow : Window
         InitializeComponent();
         Title = "Music Control";
 
-        _visibilityTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _visibilityTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _visibilityTimer.Tick += OnVisibilityTick;
 
         _progressTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };

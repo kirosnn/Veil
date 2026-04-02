@@ -52,7 +52,7 @@ public sealed partial class MenuWindow : Window
 
         _visibilityTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(50)
+            Interval = TimeSpan.FromMilliseconds(100)
         };
         _visibilityTimer.Tick += OnVisibilityTick;
 

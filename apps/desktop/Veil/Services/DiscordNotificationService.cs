@@ -6,9 +6,9 @@ namespace Veil.Services;
 
 internal sealed class DiscordNotificationService : IDisposable
 {
-    private static readonly TimeSpan HotPollInterval = TimeSpan.FromSeconds(2);
-    private static readonly TimeSpan WarmPollInterval = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan ColdPollInterval = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan HotPollInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan WarmPollInterval = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan ColdPollInterval = TimeSpan.FromSeconds(30);
     private UserNotificationListener? _listener;
     private readonly System.Threading.Timer _pollTimer;
     private readonly Lock _sync = new();
@@ -17,6 +17,7 @@ internal sealed class DiscordNotificationService : IDisposable
     private bool _disposed;
     private bool _initialized;
     private bool _notificationsAccessAllowed;
+    private bool _discordCallInspectionDisabled;
     private Task? _initializationTask;
     private TimeSpan _currentPollInterval = ColdPollInterval;
 
@@ -92,8 +93,41 @@ internal sealed class DiscordNotificationService : IDisposable
 
     private async Task PollNotificationsAsync()
     {
-        DiscordCallSnapshot callSnapshot = DiscordAppController.GetCallSnapshot();
-        bool isRunning = callSnapshot.IsRunning || DiscordAppController.IsRunning();
+        DiscordCallSnapshot callSnapshot;
+        if (_discordCallInspectionDisabled)
+        {
+            callSnapshot = DiscordCallSnapshot.Empty with
+            {
+                IsRunning = DiscordAppController.IsRunning()
+            };
+        }
+        else
+        {
+            try
+            {
+                callSnapshot = DiscordAppController.GetCallSnapshot();
+            }
+            catch (BadImageFormatException ex)
+            {
+                _discordCallInspectionDisabled = true;
+                AppLogger.Error("Discord call inspection disabled because UI Automation could not be loaded.", ex);
+                callSnapshot = DiscordCallSnapshot.Empty with
+                {
+                    IsRunning = DiscordAppController.IsRunning()
+                };
+            }
+            catch (FileLoadException ex)
+            {
+                _discordCallInspectionDisabled = true;
+                AppLogger.Error("Discord call inspection disabled because UI Automation could not be loaded.", ex);
+                callSnapshot = DiscordCallSnapshot.Empty with
+                {
+                    IsRunning = DiscordAppController.IsRunning()
+                };
+            }
+        }
+
+        bool isRunning = callSnapshot.IsRunning;
         var discordNotifs = new List<DiscordNotification>();
         bool hasIncomingCall = false;
 

@@ -41,7 +41,7 @@ public sealed partial class SystemStatsWindow : Window
         _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1500) };
         _refreshTimer.Tick += OnRefreshTick;
 
-        _visibilityTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _visibilityTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _visibilityTimer.Tick += OnVisibilityTick;
 
         Activated += OnFirstActivated;

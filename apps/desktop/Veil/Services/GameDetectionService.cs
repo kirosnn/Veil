@@ -142,6 +142,11 @@ internal sealed class GameDetectionService
             return false;
         }
 
+        if (IsDesktopShellWindow(foregroundWindow))
+        {
+            return false;
+        }
+
         if (!GetWindowRect(foregroundWindow, out Rect rect))
         {
             return false;
@@ -321,6 +326,53 @@ internal sealed class GameDetectionService
         bool largeEnough = windowWidth >= (int)(screenWidth * 0.9) && windowHeight >= (int)(screenHeight * 0.88);
 
         return largeEnough && coversWidth && coversHeight;
+    }
+
+    internal static bool ShouldIgnoreForegroundWindowClassForGameDetection(string? className)
+    {
+        if (string.IsNullOrWhiteSpace(className))
+        {
+            return false;
+        }
+
+        return className is "Progman" or "WorkerW" or "SHELLDLL_DefView" or "SysListView32";
+    }
+
+    private static bool IsDesktopShellWindow(IntPtr hwnd)
+    {
+        if (hwnd == GetShellWindow())
+        {
+            return true;
+        }
+
+        string className = GetWindowClassName(hwnd);
+        if (ShouldIgnoreForegroundWindowClassForGameDetection(className))
+        {
+            return true;
+        }
+
+        return HasShellDesktopChild(hwnd);
+    }
+
+    private static bool HasShellDesktopChild(IntPtr hwnd)
+    {
+        IntPtr defView = FindWindowExW(hwnd, IntPtr.Zero, "SHELLDLL_DefView", null);
+        if (defView != IntPtr.Zero)
+        {
+            return true;
+        }
+
+        IntPtr listView = FindWindowExW(hwnd, IntPtr.Zero, "SysListView32", null);
+        return listView != IntPtr.Zero;
+    }
+
+    private static string GetWindowClassName(IntPtr hwnd)
+    {
+        var classNameBuffer = new char[256];
+        int classNameLength = GetClassNameW(hwnd, classNameBuffer, classNameBuffer.Length);
+        return classNameLength <= 0
+            ? string.Empty
+            : new string(classNameBuffer, 0, classNameLength);
     }
 
     private static string CreateDisplayName(GameListEntry entry)

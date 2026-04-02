@@ -22,6 +22,7 @@ internal static partial class NativeMethods
 
     internal const uint SWP_NOMOVE = 0x0002;
     internal const uint SWP_NOSIZE = 0x0001;
+    internal const uint SWP_NOZORDER = 0x0004;
     internal const uint SWP_NOACTIVATE = 0x0010;
     internal const uint SWP_SHOWWINDOW = 0x0040;
     internal const uint SWP_FRAMECHANGED = 0x0020;
@@ -286,6 +287,7 @@ internal static partial class NativeMethods
     internal const int WM_DESTROY = 0x0002;
     internal const int WM_COMMAND = 0x0111;
     internal const int WM_CLOSE = 0x0010;
+    internal const int WM_NCLBUTTONDOWN = 0x00A1;
     internal const int WM_HOTKEY = 0x0312;
     internal const int WM_KEYDOWN = 0x0100;
     internal const int WM_KEYUP = 0x0101;
@@ -306,6 +308,7 @@ internal static partial class NativeMethods
     internal const uint VK_MENU = 0x12;
     internal const uint VK_LMENU = 0xA4;
     internal const uint VK_RMENU = 0xA5;
+    internal const int HTCAPTION = 2;
 
     internal const int WH_KEYBOARD_LL = 13;
     internal const int HC_ACTION = 0;
@@ -319,16 +322,32 @@ internal static partial class NativeMethods
 
     internal const uint MF_STRING = 0x00000000;
     internal const uint MF_SEPARATOR = 0x00000800;
+    internal const uint MF_POPUP = 0x00000010;
     internal const uint TPM_RETURNCMD = 0x0100;
     internal const uint TPM_NONOTIFY = 0x0080;
     internal const uint TPM_BOTTOMALIGN = 0x0020;
+    internal const uint TPM_LEFTALIGN = 0x0000;
+    internal const uint TPM_TOPALIGN = 0x0000;
 
     internal const uint CS_HREDRAW = 0x0002;
     internal const uint CS_VREDRAW = 0x0001;
     internal const int RGN_OR = 2;
 
+    internal const int WH_MOUSE_LL = 14;
+
     internal delegate IntPtr WndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
     internal delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
+    internal delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MSLLHOOKSTRUCT
+    {
+        public Point pt;
+        public uint mouseData;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     internal struct NotifyIconData
@@ -454,6 +473,29 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool PostMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
+    internal static partial IntPtr SendMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool ReleaseCapture();
+
+    [LibraryImport("user32.dll", EntryPoint = "FindWindowW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial IntPtr FindWindowW(string? lpClassName, string? lpWindowName);
+
+    [LibraryImport("user32.dll", EntryPoint = "SetParent")]
+    internal static partial IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
+
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageTimeoutW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial IntPtr SendMessageTimeoutW(
+        IntPtr hWnd,
+        uint msg,
+        IntPtr wParam,
+        IntPtr lParam,
+        uint fuFlags,
+        uint uTimeout,
+        out IntPtr lpdwResult);
+
     [LibraryImport("user32.dll", EntryPoint = "RegisterHotKey")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
@@ -468,6 +510,15 @@ internal static partial class NativeMethods
 
     [DllImport("user32.dll", EntryPoint = "SetWindowsHookExW", CharSet = CharSet.Unicode, SetLastError = true)]
     internal static extern IntPtr SetWindowsHookExW(int idHook, LowLevelKeyboardProc lpfn, IntPtr hmod, uint dwThreadId);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowsHookExW", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern IntPtr SetWindowsHookExW(int idHook, LowLevelMouseProc lpfn, IntPtr hmod, uint dwThreadId);
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr WindowFromPoint(Point point);
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr GetParent(IntPtr hWnd);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

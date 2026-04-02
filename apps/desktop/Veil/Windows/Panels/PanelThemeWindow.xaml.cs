@@ -35,7 +35,7 @@ public sealed partial class PanelThemeWindow : Window
         InitializeComponent();
         Title = "Panel Theme";
 
-        _visibilityTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _visibilityTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _visibilityTimer.Tick += OnVisibilityTick;
 
         Activated += OnFirstActivated;

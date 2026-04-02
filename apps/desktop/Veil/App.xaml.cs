@@ -10,10 +10,15 @@ namespace Veil;
 
 public partial class App : Application
 {
-    private static readonly TimeSpan TopBarActivityInterval = TimeSpan.FromMilliseconds(400);
+    private static readonly TimeSpan TopBarActivityInterval = TimeSpan.FromMilliseconds(1000);
+    private const string OpenWidgetEventName = @"Local\Veil.OpenWidget";
     private readonly AppSettings _settings;
     private readonly GameDetectionService _gameDetectionService = new();
     private readonly Dictionary<string, TopBarWindow> _topBarWindows = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, DockWindow> _dockWindows = new(StringComparer.OrdinalIgnoreCase);
+    private DesktopShellService? _desktopShellService;
+    private DesktopWidgetManager? _desktopWidgetManager;
+    private DesktopContextMenuService? _desktopContextMenu;
     private TrayIconService? _trayIcon;
     private AltTabHookService? _altTabHookService;
     private AltTabWindow? _altTabWindow;
@@ -21,8 +26,13 @@ public partial class App : Application
     private int _windowSwitchSelectedIndex = -1;
     private DispatcherTimer? _monitorRefreshTimer;
     private DispatcherTimer? _topBarActivityTimer;
+    private WidgetWindow? _widgetWindow;
+    private EventWaitHandle? _openWidgetEvent;
+    private RegisteredWaitHandle? _openWidgetRegistration;
     private string _lastTopologySignature = string.Empty;
     private bool _isSyncingTopBars;
+    private bool _openWidgetOnStartup;
+    private int _emptyMonitorRefreshCount;
 
     public App()
     {
@@ -37,6 +47,13 @@ public partial class App : Application
     {
         try
         {
+            _openWidgetOnStartup = IsWidgetLaunchRequested(args.Arguments);
+            if (_openWidgetOnStartup && TrySignalRunningInstanceToOpenWidget())
+            {
+                Exit();
+                return;
+            }
+
             KillOtherInstances();
             PerformanceLogger.Start();
             AppLogger.Info("Application launch started.");
@@ -61,25 +78,49 @@ public partial class App : Application
                 }
             }
 
+            _desktopShellService = new DesktopShellService(new WindowsDesktopShellBridge());
+            if (!_desktopShellService.TryApplyLaunchState())
+            {
+                AppLogger.Error("Desktop shell launch state could not be fully applied.");
+            }
+
             _trayIcon = new TrayIconService();
             _trayIcon.ShowRequested += OnTrayShowRequested;
             _trayIcon.SettingsRequested += OnTraySettingsRequested;
             _trayIcon.QuitRequested += OnTrayQuitRequested;
             _trayIcon.Initialize();
+            _desktopWidgetManager = new DesktopWidgetManager(_settings);
+            _ = _desktopWidgetManager.InitializeAsync();
 
+            InitializeDesktopContextMenu();
             InitializeAltTabSwitcher();
             _gameDetectionService.WarmUp();
             SyncTopBarWindows(true);
+            SyncDockWindows(true);
+            InitializeWidgetLaunchBridge();
             StartMonitorRefresh();
             StartTopBarActivityRefresh();
 
-            if (_settings.IsFirstLaunch)
+            if (_openWidgetOnStartup)
+            {
+                OpenWidgetWindow();
+            }
+            else if (_settings.IsFirstLaunch)
             {
                 GetPreferredTopBarWindow()?.OpenSettings();
             }
         }
         catch (Exception ex)
         {
+            try
+            {
+                _desktopShellService?.RestoreLaunchState();
+            }
+            catch (Exception restoreEx)
+            {
+                AppLogger.Error("Failed to restore desktop shell state after launch error.", restoreEx);
+            }
+
             AppLogger.Error("Fatal error during launch.", ex);
             throw;
         }
@@ -111,6 +152,107 @@ public partial class App : Application
         }
     }
 
+    private static bool IsWidgetLaunchRequested(string? arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments))
+        {
+            return false;
+        }
+
+        return arguments
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(argument => string.Equals(argument, "--widget", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool TrySignalRunningInstanceToOpenWidget()
+    {
+        try
+        {
+            using EventWaitHandle openWidgetEvent = EventWaitHandle.OpenExisting(OpenWidgetEventName);
+            return openWidgetEvent.Set();
+        }
+        catch (WaitHandleCannotBeOpenedException)
+        {
+            return false;
+        }
+    }
+
+    private void InitializeWidgetLaunchBridge()
+    {
+        var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        if (dispatcherQueue is null)
+        {
+            return;
+        }
+
+        _openWidgetEvent = new EventWaitHandle(false, EventResetMode.AutoReset, OpenWidgetEventName);
+        _openWidgetRegistration = ThreadPool.RegisterWaitForSingleObject(
+            _openWidgetEvent,
+            (_, _) => dispatcherQueue.TryEnqueue(OpenWidgetWindow),
+            null,
+            Timeout.Infinite,
+            false);
+    }
+
+    private void OpenWidgetWindow()
+    {
+        if (_widgetWindow is not null)
+        {
+            _widgetWindow.ShowCentered();
+            return;
+        }
+
+        ScreenBounds screen = GetPreferredScreenBounds();
+        string preferredMonitorId = GetPreferredMonitorId();
+        _widgetWindow = new WidgetWindow(screen, preferredMonitorId);
+        _widgetWindow.Closed += OnWidgetWindowClosed;
+        _widgetWindow.ShowCentered();
+    }
+
+    private void OnWidgetWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (sender is WidgetWindow widgetWindow)
+        {
+            widgetWindow.Closed -= OnWidgetWindowClosed;
+        }
+
+        _widgetWindow = null;
+    }
+
+    private string GetPreferredMonitorId()
+    {
+        if (_topBarWindows.Count > 0)
+        {
+            List<MonitorInfo2> monitors = MonitorService.GetAllMonitors();
+            IReadOnlyList<string> enabledMonitorIds = _settings.ResolveTopBarMonitorIds(monitors);
+            string? preferredMonitorId = monitors
+                .FirstOrDefault(monitor => monitor.IsPrimary && enabledMonitorIds.Contains(monitor.Id, StringComparer.OrdinalIgnoreCase))?.Id
+                ?? enabledMonitorIds.FirstOrDefault();
+
+            if (!string.IsNullOrWhiteSpace(preferredMonitorId))
+            {
+                return preferredMonitorId;
+            }
+        }
+
+        return MonitorService.GetAllMonitors().FirstOrDefault(static monitor => monitor.IsPrimary)?.Id
+            ?? string.Empty;
+    }
+
+    private ScreenBounds GetPreferredScreenBounds()
+    {
+        TopBarWindow? preferredTopBarWindow = GetPreferredTopBarWindow();
+        if (preferredTopBarWindow is not null)
+        {
+            return preferredTopBarWindow.ScreenBounds;
+        }
+
+        MonitorInfo2? preferredMonitor = MonitorService.GetAllMonitors().FirstOrDefault(static monitor => monitor.IsPrimary)
+            ?? MonitorService.GetAllMonitors().FirstOrDefault();
+
+        return preferredMonitor?.ToScreenBounds() ?? new ScreenBounds(160, 160, 1440, 960);
+    }
+
     private void OnTrayShowRequested()
     {
         TopBarWindow? preferredWindow = GetPreferredTopBarWindow();
@@ -136,20 +278,40 @@ public partial class App : Application
 
     private void OnTrayQuitRequested()
     {
+        AppLogger.Info("Tray quit requested.");
         _monitorRefreshTimer?.Stop();
         _monitorRefreshTimer = null;
         _topBarActivityTimer?.Stop();
         _topBarActivityTimer = null;
+        _openWidgetRegistration?.Unregister(null);
+        _openWidgetRegistration = null;
+        _openWidgetEvent?.Dispose();
+        _openWidgetEvent = null;
+        if (_widgetWindow is not null)
+        {
+            _widgetWindow.Closed -= OnWidgetWindowClosed;
+            _widgetWindow.Close();
+            _widgetWindow = null;
+        }
         DisposeAltTabSwitcher();
+        _desktopContextMenu?.Dispose();
+        _desktopContextMenu = null;
         _trayIcon?.Dispose();
         _trayIcon = null;
+        _desktopWidgetManager?.Dispose();
+        _desktopWidgetManager = null;
+        CloseAllDockWindows();
         CloseAllTopBarWindows();
+        _desktopShellService?.RestoreLaunchState();
+        _desktopShellService = null;
         PerformanceLogger.Stop();
     }
 
     private void OnSettingsChanged()
     {
         SyncTopBarWindows();
+        SyncDockWindows();
+        _desktopWidgetManager?.SyncWindows();
     }
 
     private void StartMonitorRefresh()
@@ -157,7 +319,7 @@ public partial class App : Application
         _monitorRefreshTimer?.Stop();
         _monitorRefreshTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(2)
+            Interval = TimeSpan.FromSeconds(5)
         };
         _monitorRefreshTimer.Tick += OnMonitorRefreshTick;
         _monitorRefreshTimer.Start();
@@ -165,7 +327,16 @@ public partial class App : Application
 
     private void OnMonitorRefreshTick(object? sender, object e)
     {
-        SyncTopBarWindows();
+        try
+        {
+            SyncTopBarWindows();
+            SyncDockWindows();
+            _desktopWidgetManager?.SyncWindows();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Monitor refresh tick failed.", ex);
+        }
     }
 
     private void StartTopBarActivityRefresh()
@@ -182,49 +353,70 @@ public partial class App : Application
 
     private void OnTopBarActivityTick(object? sender, object e)
     {
-        RefreshTopBarActivityState();
+        try
+        {
+            RefreshTopBarActivityState();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Top bar activity refresh tick failed.", ex);
+        }
     }
 
     private void RefreshTopBarActivityState()
     {
-        if (_topBarWindows.Count == 0)
+        try
         {
-            return;
-        }
-
-        string detectionMode = GameDetectionService.NormalizeDetectionMode(_settings.GameDetectionMode);
-        IReadOnlyList<string> configuredProcessNames = _settings.GameProcessNames;
-        bool configuredGameRunning = _gameDetectionService.IsConfiguredGameRunning(configuredProcessNames);
-        IntPtr[] ignoredWindows = _topBarWindows.Values
-            .Select(static window => window.WindowHandle)
-            .Where(static handle => handle != IntPtr.Zero)
-            .ToArray();
-        GameDetectionService.ForegroundProcessInfo foregroundProcessInfo = default;
-
-        bool hasForegroundProcess = detectionMode == GameDetectionService.HybridMode &&
-            _gameDetectionService.TryGetForegroundProcessInfo(ignoredWindows, out foregroundProcessInfo, out _);
-
-        foreach (TopBarWindow topBarWindow in _topBarWindows.Values)
-        {
-            bool gameRunning = configuredGameRunning;
-            int? activeGameProcessId = null;
-            bool shouldHideForForegroundWindow = false;
-
-            if (hasForegroundProcess)
+            if (_isSyncingTopBars || _topBarWindows.Count == 0)
             {
-                shouldHideForForegroundWindow = GameDetectionService.IsWindowFullscreenLike(foregroundProcessInfo.WindowRect, topBarWindow.ScreenBounds);
-
-                if (!gameRunning)
-                {
-                    activeGameProcessId = _gameDetectionService.TryGetForegroundGameProcessIdForScreen(
-                        foregroundProcessInfo,
-                        topBarWindow.ScreenBounds,
-                        configuredProcessNames);
-                    gameRunning = activeGameProcessId.HasValue;
-                }
+                return;
             }
 
-            topBarWindow.ApplyActivityState(gameRunning, shouldHideForForegroundWindow, activeGameProcessId);
+            string detectionMode = GameDetectionService.NormalizeDetectionMode(_settings.GameDetectionMode);
+            IReadOnlyList<string> configuredProcessNames = _settings.GameProcessNames;
+            bool configuredGameRunning = _gameDetectionService.IsConfiguredGameRunning(configuredProcessNames);
+            IntPtr[] ignoredWindows = _topBarWindows.Values
+                .Select(static window => window.WindowHandle)
+                .Where(static handle => handle != IntPtr.Zero)
+                .ToArray();
+            GameDetectionService.ForegroundProcessInfo foregroundProcessInfo = default;
+
+            bool hasForegroundProcess = detectionMode == GameDetectionService.HybridMode &&
+                _gameDetectionService.TryGetForegroundProcessInfo(ignoredWindows, out foregroundProcessInfo, out _);
+
+            foreach (TopBarWindow topBarWindow in _topBarWindows.Values)
+            {
+                try
+                {
+                    bool gameRunning = configuredGameRunning;
+                    int? activeGameProcessId = null;
+                    bool shouldHideForForegroundWindow = false;
+
+                    if (hasForegroundProcess)
+                    {
+                        activeGameProcessId = _gameDetectionService.TryGetForegroundGameProcessIdForScreen(
+                            foregroundProcessInfo,
+                            topBarWindow.ScreenBounds,
+                            configuredProcessNames);
+                        shouldHideForForegroundWindow = activeGameProcessId.HasValue;
+
+                        if (!gameRunning)
+                        {
+                            gameRunning = activeGameProcessId.HasValue;
+                        }
+                    }
+
+                    topBarWindow.ApplyActivityState(gameRunning, shouldHideForForegroundWindow, activeGameProcessId);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Error($"Failed to refresh top bar activity state for {topBarWindow.ScreenBounds}.", ex);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to refresh top bar activity state.", ex);
         }
     }
 
@@ -242,11 +434,21 @@ public partial class App : Application
             List<MonitorInfo2> monitors = MonitorService.GetAllMonitors();
             if (monitors.Count == 0)
             {
-                CloseAllTopBarWindows();
+                _emptyMonitorRefreshCount++;
+                AppLogger.Error($"Monitor enumeration returned 0 displays (attempt {_emptyMonitorRefreshCount}).");
+
+                if (_topBarWindows.Count > 0 && _emptyMonitorRefreshCount < 3)
+                {
+                    return;
+                }
+
+                AppLogger.Error("Closing all top bar windows because no displays were detected repeatedly.");
+                CloseAllTopBarWindows("monitor-enumeration-empty");
                 _lastTopologySignature = string.Empty;
                 return;
             }
 
+            _emptyMonitorRefreshCount = 0;
             string topologySignature = string.Join(
                 "|",
                 monitors.Select(static monitor =>
@@ -254,13 +456,23 @@ public partial class App : Application
             bool topologyChanged = force || !string.Equals(_lastTopologySignature, topologySignature, StringComparison.Ordinal);
 
             IReadOnlyList<string> enabledMonitorIds = _settings.ResolveTopBarMonitorIds(monitors);
+            if (enabledMonitorIds.Count == 0)
+            {
+                AppLogger.Error("Top bar monitor resolution returned no eligible displays.");
+                CloseAllTopBarWindows("monitor-resolution-empty");
+                _lastTopologySignature = topologySignature;
+                return;
+            }
+
             string hotkeyOwnerId = monitors
                 .FirstOrDefault(monitor => monitor.IsPrimary && enabledMonitorIds.Contains(monitor.Id, StringComparer.OrdinalIgnoreCase))?.Id
-                ?? enabledMonitorIds[0];
+                ?? enabledMonitorIds.FirstOrDefault()
+                ?? monitors[0].Id;
 
             if (topologyChanged)
             {
-                CloseAllTopBarWindows();
+                AppLogger.Info($"Monitor topology changed to {topologySignature}.");
+                CloseAllTopBarWindows("topology-changed");
                 _lastTopologySignature = topologySignature;
             }
 
@@ -271,8 +483,19 @@ public partial class App : Application
                     continue;
                 }
 
-                _topBarWindows[existingMonitorId].Close();
-                _topBarWindows.Remove(existingMonitorId);
+                AppLogger.Info($"Closing top bar for disabled monitor {existingMonitorId}.");
+                try
+                {
+                    _topBarWindows[existingMonitorId].Close();
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Error($"Failed to close top bar for disabled monitor {existingMonitorId}.", ex);
+                }
+                finally
+                {
+                    _topBarWindows.Remove(existingMonitorId);
+                }
             }
 
             foreach (MonitorInfo2 monitor in monitors.Where(monitor => enabledMonitorIds.Contains(monitor.Id, StringComparer.OrdinalIgnoreCase)))
@@ -281,21 +504,40 @@ public partial class App : Application
 
                 if (!_topBarWindows.TryGetValue(monitor.Id, out TopBarWindow? topBarWindow))
                 {
-                    topBarWindow = new TopBarWindow(monitor.Id, monitor.ToScreenBounds(), ownsGlobalHotkeys);
-                    _topBarWindows[monitor.Id] = topBarWindow;
-                    topBarWindow.Activate();
-                    AppLogger.Info($"TopBarWindow activated for {monitor.Id}.");
+                    try
+                    {
+                        TopBarWindow createdWindow = new(monitor.Id, monitor.ToScreenBounds(), ownsGlobalHotkeys);
+                        createdWindow.Activate();
+                        _topBarWindows[monitor.Id] = createdWindow;
+                        AppLogger.Info($"TopBarWindow activated for {monitor.Id}.");
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Error($"Failed to create top bar for {monitor.Id}.", ex);
+                    }
+
                     continue;
                 }
 
-                topBarWindow.SetOwnsGlobalHotkeys(ownsGlobalHotkeys);
+                try
+                {
+                    topBarWindow.SetOwnsGlobalHotkeys(ownsGlobalHotkeys);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Error($"Failed to refresh top bar ownership for {monitor.Id}.", ex);
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to sync top bar windows.", ex);
         }
         finally
         {
             _isSyncingTopBars = false;
         }
-        
+
         RefreshTopBarActivityState();
     }
 
@@ -318,13 +560,147 @@ public partial class App : Application
     }
 
     private void CloseAllTopBarWindows()
+        => CloseAllTopBarWindows("unspecified");
+
+    private void CloseAllTopBarWindows(string reason)
     {
+        AppLogger.Info($"Closing all top bar windows. Reason: {reason}.");
         foreach (TopBarWindow topBarWindow in _topBarWindows.Values.ToArray())
         {
-            topBarWindow.Close();
+            try
+            {
+                topBarWindow.Close();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Failed to close a top bar window.", ex);
+            }
         }
 
         _topBarWindows.Clear();
+    }
+
+    private void SyncDockWindows(bool force = false)
+    {
+        try
+        {
+            List<MonitorInfo2> monitors = MonitorService.GetAllMonitors();
+            if (monitors.Count == 0)
+            {
+                CloseAllDockWindows("monitor-enumeration-empty");
+                return;
+            }
+
+            string topologySignature = string.Join(
+                "|",
+                monitors.Select(static monitor =>
+                    $"{monitor.Id}:{monitor.Bounds.Left},{monitor.Bounds.Top},{monitor.Bounds.Right},{monitor.Bounds.Bottom}:{monitor.IsPrimary}"));
+            IReadOnlyList<string> enabledMonitorIds = _settings.ResolveTopBarMonitorIds(monitors);
+
+            if (enabledMonitorIds.Count == 0)
+            {
+                CloseAllDockWindows("monitor-resolution-empty");
+                return;
+            }
+
+            if (force)
+            {
+                CloseAllDockWindows("force-sync");
+            }
+
+            foreach (string existingMonitorId in _dockWindows.Keys.ToArray())
+            {
+                if (enabledMonitorIds.Contains(existingMonitorId, StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                AppLogger.Info($"Closing dock for disabled monitor {existingMonitorId}.");
+                try
+                {
+                    _dockWindows[existingMonitorId].Close();
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Error($"Failed to close dock for disabled monitor {existingMonitorId}.", ex);
+                }
+                finally
+                {
+                    _dockWindows.Remove(existingMonitorId);
+                }
+            }
+
+            foreach (MonitorInfo2 monitor in monitors.Where(monitor => enabledMonitorIds.Contains(monitor.Id, StringComparer.OrdinalIgnoreCase)))
+            {
+                if (_dockWindows.ContainsKey(monitor.Id))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    DockWindow createdWindow = new(monitor.Id, monitor.ToScreenBounds());
+                    createdWindow.Activate();
+                    _dockWindows[monitor.Id] = createdWindow;
+                    AppLogger.Info($"DockWindow activated for {monitor.Id} on topology {topologySignature}.");
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Error($"Failed to create dock for {monitor.Id}.", ex);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to sync dock windows.", ex);
+        }
+    }
+
+    private void CloseAllDockWindows()
+        => CloseAllDockWindows("unspecified");
+
+    private void CloseAllDockWindows(string reason)
+    {
+        if (_dockWindows.Count == 0)
+        {
+            return;
+        }
+
+        AppLogger.Info($"Closing all dock windows. Reason: {reason}.");
+        foreach (DockWindow dockWindow in _dockWindows.Values.ToArray())
+        {
+            try
+            {
+                dockWindow.Close();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Failed to close a dock window.", ex);
+            }
+        }
+
+        _dockWindows.Clear();
+    }
+
+    private void InitializeDesktopContextMenu()
+    {
+        var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        if (dispatcherQueue is null)
+        {
+            return;
+        }
+
+        _desktopContextMenu = new DesktopContextMenuService(dispatcherQueue);
+        _desktopContextMenu.AddWidgetRequested += OnDesktopAddWidget;
+        _desktopContextMenu.WidgetSettingsRequested += OpenWidgetWindow;
+        _desktopContextMenu.SettingsRequested += OnTraySettingsRequested;
+        _desktopContextMenu.Initialize();
+    }
+
+    private void OnDesktopAddWidget(string kind)
+    {
+        string monitorId = GetPreferredMonitorId();
+        _settings.AddDesktopWidget(kind, monitorId);
     }
 
     private void InitializeAltTabSwitcher()

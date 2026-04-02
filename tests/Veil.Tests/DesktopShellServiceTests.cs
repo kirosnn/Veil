@@ -70,22 +70,23 @@ public sealed class DesktopShellServiceTests
         {
             Calls.Add("CaptureState");
             return new DesktopShellState(
-                desktopIconsHidden: false,
-                startLayoutFile: new RegistryStringValueSnapshot(false, null),
-                lockedStartLayout: new RegistryDwordValueSnapshot(false, 0),
-                recycleBinNewStartPanel: new RegistryDwordValueSnapshot(false, 0),
-                recycleBinClassicStartMenu: new RegistryDwordValueSnapshot(false, 0));
+                DesktopIconsHidden: false,
+                TaskbarsHidden: false,
+                StartLayoutFile: new RegistryStringValueSnapshot(false, null),
+                LockedStartLayout: new RegistryDwordValueSnapshot(false, 0),
+                RecycleBinNewStartPanel: new RegistryDwordValueSnapshot(false, 0),
+                RecycleBinClassicStartMenu: new RegistryDwordValueSnapshot(false, 0));
         }
 
         public DesktopTaskbarArtifacts PrepareTaskbarArtifacts()
         {
             Calls.Add("PrepareTaskbarArtifacts");
             return new DesktopTaskbarArtifacts(
-                shortcutName: "Corbeille",
-                shortcutPath: "shortcut",
-                shortcutBackupPath: null,
-                launcherScriptPath: "script",
-                taskbarPolicyPath: "policy");
+                ShortcutName: "Corbeille",
+                ShortcutPath: "shortcut",
+                ShortcutBackupPath: null,
+                LauncherScriptPath: "script",
+                TaskbarPolicyPath: "policy");
         }
 
         public void ApplyTaskbarPolicy(DesktopTaskbarArtifacts artifacts)

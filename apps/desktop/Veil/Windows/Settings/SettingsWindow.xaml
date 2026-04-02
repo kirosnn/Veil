@@ -212,6 +212,7 @@
                                             Foreground="White"
                                             VerticalAlignment="Center" />
                                     </Button>
+
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -1130,6 +1131,7 @@
                                     </Border>
                                 </StackPanel>
                             </Grid>
+
                         </Grid>
                     </Grid>
 

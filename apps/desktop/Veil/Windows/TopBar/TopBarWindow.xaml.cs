@@ -1,0 +1,518 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Composition;
+using Microsoft.UI.Composition.SystemBackdrops;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.WindowsRuntime;
+using Windows.Graphics.Imaging;
+using Veil.Configuration;
+using Veil.Diagnostics;
+using Veil.Interop;
+using Veil.Services;
+using WinRT;
+using static Veil.Interop.NativeMethods;
+
+namespace Veil.Windows;
+
+public sealed partial class TopBarWindow : Window
+{
+    private const int BarHeight = 32;
+    private const double MinimumClockClearance = 164;
+    private const double DefaultRenderedTopBarOpacity = 0.92;
+    private const double MinimumRenderedTopBarOpacity = 0.04;
+    private const double DefaultRenderedBlurIntensity = 0.55;
+    private const double MinimumRenderedBlurIntensity = 0.20;
+    private static readonly TimeSpan AdaptiveVisualWarmRefreshInterval = TimeSpan.FromMilliseconds(700);
+    private static readonly TimeSpan AdaptiveVisualRefreshInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan AdaptiveVisualDeepSampleInterval = TimeSpan.FromMilliseconds(900);
+    private static readonly TimeSpan AdaptiveClearTransitionDelay = TimeSpan.FromMilliseconds(450);
+    private static readonly TimeSpan AdaptiveOpaqueTransitionDelay = TimeSpan.FromMilliseconds(150);
+    private static readonly TimeSpan AdaptiveVisualHotHoldDuration = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan AdaptiveVisualWarmHoldDuration = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan DiscordHotHoldDuration = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan DiscordWarmHoldDuration = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan BackgroundMaintenanceInterval = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan BackgroundMaintenanceWarmInterval = TimeSpan.FromMinutes(6);
+    private static readonly TimeSpan BackgroundMaintenanceHotHoldDuration = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan BackgroundMaintenanceWarmHoldDuration = TimeSpan.FromMinutes(4);
+    private static readonly ImageSource YouTubeLightIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/youtube.svg"));
+    private static readonly ImageSource YouTubeDarkIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/youtube-dark.svg"));
+    private static readonly ImageSource DiscordLightIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/discord.svg"));
+    private static readonly ImageSource DiscordDarkIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/discord-dark.svg"));
+    private static readonly ImageSource PanelThemeLightIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/theme-adjustments.svg"));
+    private static readonly ImageSource PanelThemeDarkIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/theme-adjustments-dark.svg"));
+    private static readonly DiscordNotificationService SharedDiscordNotificationService = new();
+    private readonly DispatcherTimer _clockTimer;
+    private readonly DispatcherTimer _visualTimer;
+    private readonly DemandDrivenModule _adaptiveVisualModule;
+    private readonly DemandDrivenModule _discordModule;
+    private readonly DemandDrivenModule _backgroundMaintenanceModule;
+    private readonly string _monitorId;
+    private readonly ScreenBounds _screen;
+    private readonly AppSettings _settings;
+    private readonly string _discordDemandOwnerId;
+    private bool _ownsGlobalHotkeys;
+    private bool _isHidden;
+    private bool _isGameMinimalMode;
+    private bool _appBarRegistered;
+    private IntPtr _hwnd;
+    private global::Windows.UI.Color? _lastAdaptiveColor;
+    private global::Windows.UI.Color? _lastAdaptiveProbeColor;
+    private global::Windows.UI.Color? _adaptiveForegroundOverride;
+    private DesktopAcrylicController? _acrylicController;
+    private SystemBackdropConfiguration? _backdropConfig;
+    private FinderWindow? _finderWindow;
+    private FinderHotkeyService? _finderHotkeyService;
+    private SettingsWindow? _settingsWindow;
+    private SystemStatsWindow? _systemStatsWindow;
+    private WeatherWindow? _weatherWindow;
+    private PanelThemeWindow? _panelThemeWindow;
+    private MusicControlWindow? _musicControlWindow;
+    private DiscordNotificationWindow? _discordNotificationWindow;
+    private readonly DiscordNotificationService _discordNotificationService;
+    private readonly MediaControlService _mediaControlService = new();
+    private readonly WeatherService _weatherService = new();
+    private RunCatService? _runCatService;
+    private readonly GamePerformanceService _gamePerformanceService = new();
+    private ImageSource?[]? _runCatFrames;
+    private int _runCatLoadVersion;
+    private int _musicAlbumArtLoadVersion;
+    private string? _lastRunCatTintHex;
+    private readonly DispatcherTimer _weatherRefreshTimer;
+    private readonly DispatcherTimer _backgroundMaintenanceTimer;
+    private int _backgroundMaintenanceInFlight;
+    private string _lastWindowRegionSignature = string.Empty;
+    private string _lastClockText = string.Empty;
+    private string _lastSettingsSignature = string.Empty;
+    private string _lastShortcutGlassBlurRegionSignature = string.Empty;
+    private bool _isAdaptiveClearModeActive;
+    private bool _hasAdaptiveModeState;
+    private bool? _pendingAdaptiveClearMode;
+    private DateTime _pendingAdaptiveClearModeUtc = DateTime.MinValue;
+    private DateTime _lastAdaptiveVisualBoostUtc = DateTime.MinValue;
+    private DateTime _lastAdaptiveDeepSampleUtc = DateTime.MinValue;
+    private DateTime _lastAdaptiveClearSampleUtc = DateTime.MinValue;
+    private DateTime _lastDiscordBoostUtc = DateTime.MinValue;
+    private DateTime _lastBackgroundMaintenanceBoostUtc = DateTime.MinValue;
+    private double _lastAppliedBlurIntensity = -1;
+
+    internal TopBarWindow(string monitorId, ScreenBounds screen, bool ownsGlobalHotkeys)
+    {
+        _monitorId = monitorId;
+        _screen = screen;
+        _settings = AppSettings.Current;
+        _ownsGlobalHotkeys = ownsGlobalHotkeys;
+        _discordDemandOwnerId = $"topbar:{monitorId}";
+        _discordNotificationService = SharedDiscordNotificationService;
+
+        InitializeComponent();
+        Title = "Veil TopBar";
+        UpdateWeatherButton();
+
+        _clockTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(2)
+        };
+        _clockTimer.Tick += OnClockTick;
+        _clockTimer.Start();
+        UpdateClock();
+
+        _visualTimer = new DispatcherTimer
+        {
+            Interval = AdaptiveVisualRefreshInterval
+        };
+        _visualTimer.Tick += OnVisualTick;
+
+        _weatherRefreshTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMinutes(20)
+        };
+        _weatherRefreshTimer.Tick += OnWeatherRefreshTick;
+
+        _backgroundMaintenanceTimer = new DispatcherTimer
+        {
+            Interval = BackgroundMaintenanceInterval
+        };
+        _backgroundMaintenanceTimer.Tick += OnBackgroundMaintenanceTick;
+
+        _adaptiveVisualModule = new DemandDrivenModule(
+            AdaptiveVisualWarmHoldDuration,
+            AdaptiveVisualHotHoldDuration,
+            OnAdaptiveVisualTemperatureChanged);
+        _discordModule = new DemandDrivenModule(
+            DiscordWarmHoldDuration,
+            DiscordHotHoldDuration,
+            OnDiscordTemperatureChanged);
+        _backgroundMaintenanceModule = new DemandDrivenModule(
+            BackgroundMaintenanceWarmHoldDuration,
+            BackgroundMaintenanceHotHoldDuration,
+            OnBackgroundMaintenanceTemperatureChanged);
+
+        Activated += OnActivated;
+        Closed += OnClosed;
+        _settings.Changed += OnSettingsChanged;
+        SizeChanged += OnTopBarSizeChanged;
+        LeftButtonsPanel.SizeChanged += OnLeftButtonsPanelSizeChanged;
+        RightButtonsPanel.SizeChanged += OnRightButtonsPanelSizeChanged;
+        ApplySettings();
+        _lastSettingsSignature = CreateSettingsSignature();
+    }
+
+    private void OnActivated(object sender, WindowActivatedEventArgs args)
+    {
+        Activated -= OnActivated;
+
+        _hwnd = WindowHelper.GetHwnd(this);
+
+        WindowHelper.RemoveTitleBar(this);
+        WindowHelper.ExtendFrameIntoClientArea(this);
+        WindowHelper.MakeOverlay(this);
+
+        int width = _screen.Right - _screen.Left;
+        WindowHelper.PositionOnMonitor(this, _screen.Left, _screen.Top, width, BarHeight);
+
+        WindowHelper.SetAlwaysOnTop(this);
+        WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, BarHeight);
+        _appBarRegistered = true;
+        ApplySettings();
+
+        RebuildShortcutButtons();
+        _ = InstalledAppService.PreloadAsync();
+        _ = InitWeatherAsync();
+        _ = ApplyRunCatSettingsAsync();
+        _ = InitMediaControlAsync();
+        _ = InitDiscordNotificationsAsync();
+        ApplyHotkeyOwnership();
+        UpdateVisualRefreshState(boost: true);
+        UpdateDiscordDemand(boost: true);
+        UpdateBackgroundMaintenanceState(boost: true);
+    }
+
+    private void OnClosed(object sender, WindowEventArgs args)
+    {
+        AppLogger.Info($"TopBarWindow closed for {_monitorId}. Hidden={_isHidden} MinimalMode={_isGameMinimalMode}.");
+        _clockTimer.Stop();
+        _visualTimer.Stop();
+        _weatherRefreshTimer.Stop();
+        _backgroundMaintenanceTimer.Stop();
+        _settings.Changed -= OnSettingsChanged;
+        _weatherService.StateChanged -= OnWeatherStateChanged;
+        _mediaControlService.StateChanged -= OnMediaStateChanged;
+        _discordNotificationService.NotificationsChanged -= OnDiscordNotificationsChanged;
+        _discordNotificationService.ReleaseDemand(_discordDemandOwnerId);
+        SizeChanged -= OnTopBarSizeChanged;
+        LeftButtonsPanel.SizeChanged -= OnLeftButtonsPanelSizeChanged;
+        RightButtonsPanel.SizeChanged -= OnRightButtonsPanelSizeChanged;
+        _acrylicController?.Dispose();
+        _finderWindow?.Destroy();
+        _finderWindow = null;
+        DisposeFinderHotkey();
+        _runCatService?.Dispose();
+        _gamePerformanceService.RestoreNormalOptimizations();
+        _gamePerformanceService.Dispose();
+        _runCatService = null;
+        if (_appBarRegistered)
+        {
+            WindowHelper.UnregisterAppBar(this);
+        }
+    }
+
+    internal ScreenBounds ScreenBounds => _screen;
+
+    internal IntPtr WindowHandle => _hwnd;
+
+    internal bool IsMinimalModeActive => _isGameMinimalMode;
+
+    internal void ApplyActivityState(bool gameRunning, bool shouldHideForForegroundWindow, int? activeGameProcessId)
+    {
+        bool visibilityChanged = false;
+        if (gameRunning)
+        {
+            EnterMinimalMode(activeGameProcessId);
+            return;
+        }
+
+        if (_isGameMinimalMode)
+        {
+            ExitMinimalMode();
+        }
+
+        bool shouldHideWindow = shouldHideForForegroundWindow;
+
+        if (shouldHideWindow && !_isHidden)
+        {
+            _isHidden = true;
+            visibilityChanged = true;
+            AppLogger.Info($"TopBarWindow hiding for {_monitorId}. Foreground game fullscreen={shouldHideForForegroundWindow}.");
+            if (_appBarRegistered)
+            {
+                WindowHelper.UnregisterAppBar(this);
+                _appBarRegistered = false;
+            }
+            WindowHelper.HideWindow(this);
+        }
+        else if (!shouldHideWindow && _isHidden)
+        {
+            _isHidden = false;
+            visibilityChanged = true;
+            AppLogger.Info($"TopBarWindow showing for {_monitorId}.");
+            WindowHelper.ShowWindow(this);
+
+            int width = _screen.Right - _screen.Left;
+            WindowHelper.PositionOnMonitor(this, _screen.Left, _screen.Top, width, BarHeight);
+            WindowHelper.SetAlwaysOnTop(this);
+            WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, BarHeight);
+            _appBarRegistered = true;
+        }
+
+        if (visibilityChanged)
+        {
+            UpdateVisualRefreshState(boost: !_isHidden);
+            UpdateDiscordDemand(boost: !_isHidden);
+            UpdateBackgroundMaintenanceState(boost: !_isHidden);
+        }
+    }
+
+    private void OnClockTick(object? sender, object e)
+    {
+        using var perfScope = PerformanceLogger.Measure("TopBar.OnClockTick", 1.5);
+        UpdateClock();
+        UpdateVisualRefreshState();
+        UpdateDiscordDemand();
+        UpdateBackgroundMaintenanceState();
+    }
+
+    private void UpdateClock()
+    {
+        if (_isGameMinimalMode)
+        {
+            return;
+        }
+
+        var now = DateTime.Now;
+        var text = now.ToString("dddd d MMMM  HH:mm");
+        string formatted = char.ToUpper(text[0]) + text[1..];
+        if (string.Equals(formatted, _lastClockText, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastClockText = formatted;
+        ClockText.Text = formatted;
+        UpdateTopBarLayout();
+    }
+
+    private void OnSettingsChanged()
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            string settingsSignature = CreateSettingsSignature();
+            if (string.Equals(settingsSignature, _lastSettingsSignature, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _lastSettingsSignature = settingsSignature;
+            ApplySettings();
+            RebuildShortcutButtons();
+            _finderHotkeyService?.SetEnabled(_settings.FinderHotkeyEnabled);
+            _musicControlWindow?.RefreshLayout();
+            _discordNotificationWindow?.RefreshLayout();
+            _weatherWindow?.RefreshAppearance();
+            _systemStatsWindow?.RefreshAppearance();
+            UpdateMusicButtonVisibility();
+            UpdateDiscordButtonVisibility();
+            UpdateDiscordDemand(boost: true);
+            UpdateWeatherButton();
+            _ = _weatherService.RefreshAsync(true);
+            _ = ApplyRunCatSettingsAsync();
+        });
+    }
+
+    private void ApplySettings()
+    {
+        using var perfScope = PerformanceLogger.Measure("TopBar.ApplySettings", 4.0);
+        UpdateTopBarLayout();
+        double effectiveTopBarOpacity = GetEffectiveTopBarOpacity();
+
+        switch (_settings.TopBarStyle)
+        {
+            case "Transparent":
+                ResetAdaptiveModeState();
+                _adaptiveForegroundOverride = null;
+                EnsureTransparentBackdrop();
+                WindowHelper.DisableLayeredTransparency(this);
+                RootPanel.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
+                break;
+            case "Blur":
+                ResetAdaptiveModeState();
+                _adaptiveForegroundOverride = null;
+                EnsureTopBarAcrylic();
+                WindowHelper.DisableLayeredTransparency(this);
+                RootPanel.Background = CreateBlurBackgroundBrush();
+                break;
+            case "Adaptive":
+                ResetAdaptiveModeState();
+                UpdateAdaptiveBackground(effectiveTopBarOpacity, true);
+                break;
+            default:
+                ResetAdaptiveModeState();
+                _adaptiveForegroundOverride = null;
+                RemoveTopBarAcrylic();
+                WindowHelper.DisableLayeredTransparency(this);
+                var solidColor = ParseHexColor(_settings.SolidColor);
+                RootPanel.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(
+                    (byte)Math.Round(effectiveTopBarOpacity * 255), solidColor.R, solidColor.G, solidColor.B));
+                break;
+        }
+
+        UpdateGlassPanels(true);
+
+        UpdateVisualRefreshState(boost: true);
+        UpdateWindowRegion();
+
+        ApplyForegroundTheme();
+
+        UpdateBackgroundMaintenanceState(boost: true);
+    }
+
+    private string CreateSettingsSignature()
+    {
+        string shortcutSignature = string.Join(
+            "|",
+            _settings.ShortcutButtons.Select(static shortcut =>
+                shortcut is null
+                    ? "-"
+                    : $"{shortcut.AppId}:{shortcut.DisplayName}:{shortcut.AppName}"));
+
+        return string.Join(
+            ";",
+            _settings.TopBarStyle,
+            _settings.TopBarOpacity.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
+            _settings.BlurIntensity.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
+            _settings.SolidColor,
+            _settings.TopBarForegroundColor,
+            _settings.ShowFinderBubble,
+            _settings.FinderBubbleOpacity.ToString("F3", System.Globalization.CultureInfo.InvariantCulture),
+            _settings.FinderHotkeyEnabled,
+            _settings.DiscordButtonEnabled,
+            _settings.MusicButtonEnabled,
+            _settings.MusicShowVolume,
+            _settings.MusicShowSourceToggle,
+            _settings.WeatherButtonEnabled,
+            _settings.WeatherPrimaryCity,
+            string.Join(",", _settings.WeatherSecondaryCities),
+            _settings.TopBarPanelTheme,
+            _settings.RunCatEnabled,
+            _settings.RunCatRunner,
+            _settings.BackgroundOptimizationEnabled,
+            shortcutSignature);
+    }
+
+    private void OnTopBarSizeChanged(object sender, WindowSizeChangedEventArgs args)
+    {
+        UpdateTopBarLayout();
+    }
+
+    private void OnLeftButtonsPanelSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateTopBarLayout();
+    }
+
+    private void OnRightButtonsPanelSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateTopBarLayout();
+    }
+
+    private void UpdateTopBarLayout()
+    {
+        UpdateActionButtonLayout();
+        UpdateClockPosition();
+        UpdateWindowRegion();
+    }
+
+    private void UpdateActionButtonLayout()
+    {
+        int screenWidth = _screen.Right - _screen.Left;
+        double leftMargin = LeftButtonsPanel.Margin.Left + LeftButtonsPanel.Margin.Right;
+        double rightWidth = RightButtonsPanel.ActualWidth + RightButtonsPanel.Margin.Left + RightButtonsPanel.Margin.Right;
+        double maxLeftWidth = Math.Max(0, screenWidth - rightWidth - MinimumClockClearance - leftMargin);
+
+        LeftButtonsPanel.MaxWidth = maxLeftWidth;
+
+        double finderMaxWidth = Math.Clamp(maxLeftWidth * 0.42, 72, 180);
+        FinderButton.MaxWidth = finderMaxWidth;
+        FinderButtonText.MaxWidth = Math.Max(24, finderMaxWidth - FinderButton.Padding.Left - FinderButton.Padding.Right);
+
+        Button[] shortcutButtons = ShortcutButtonsPanel.Children.OfType<Button>().ToArray();
+        if (shortcutButtons.Length == 0)
+        {
+            ShortcutButtonsPanel.MaxWidth = 0;
+            return;
+        }
+
+        double spacing = LeftButtonsPanel.Spacing;
+        double menuAndFinderWidth = MenuButton.Width + FinderButton.MaxWidth + (spacing * 2);
+        double availableShortcutWidth = Math.Max(0, maxLeftWidth - menuAndFinderWidth);
+        ShortcutButtonsPanel.MaxWidth = availableShortcutWidth;
+
+        double availablePerButtonWidth = Math.Max(
+            0,
+            (availableShortcutWidth - (Math.Max(0, shortcutButtons.Length - 1) * ShortcutButtonsPanel.Spacing)) / shortcutButtons.Length);
+        double buttonMaxWidth = Math.Min(130, availablePerButtonWidth);
+        double textMaxWidth = Math.Max(0, buttonMaxWidth - 20);
+
+        foreach (Button button in shortcutButtons)
+        {
+            button.MaxWidth = buttonMaxWidth;
+
+            if (button.Content is TextBlock textBlock)
+            {
+                textBlock.MaxWidth = textMaxWidth;
+            }
+        }
+    }
+
+    private void UpdateClockPosition()
+    {
+        double leftWidth = LeftButtonsPanel.ActualWidth + LeftButtonsPanel.Margin.Left + LeftButtonsPanel.Margin.Right;
+        double rightWidth = RightButtonsPanel.ActualWidth + RightButtonsPanel.Margin.Left + RightButtonsPanel.Margin.Right;
+        double balancedOffset = ((leftWidth - rightWidth) / 2.0) * _settings.ClockBalance;
+        ClockText.Margin = new Thickness(_settings.ClockOffset + balancedOffset, 0, 0, 0);
+    }
+
+    private double GetEffectiveTopBarOpacity()
+    {
+        if (_settings.TopBarStyle == "Transparent")
+        {
+            return 0;
+        }
+
+        if (_settings.TopBarStyle == "Adaptive")
+        {
+            return 1.0;
+        }
+
+        double opacity = Math.Clamp(_settings.TopBarOpacity, 0.0, 1.0);
+        if (opacity <= 0.001)
+        {
+            return DefaultRenderedTopBarOpacity;
+        }
+
+        return Math.Max(opacity, MinimumRenderedTopBarOpacity);
+    }
+
+    private double GetEffectiveBlurIntensity()
+    {
+        double intensity = Math.Clamp(_settings.BlurIntensity, 0.0, 1.0);
+        if (intensity <= 0.001)
+        {
+            return DefaultRenderedBlurIntensity;
+        }
+
+        return Math.Max(intensity, MinimumRenderedBlurIntensity);
+    }
+}

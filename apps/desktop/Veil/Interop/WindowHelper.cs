@@ -10,6 +10,9 @@ namespace Veil.Interop;
 
 internal static class WindowHelper
 {
+    private const uint DesktopSpawnWorkerMessage = 0x052C;
+    private const uint SendMessageTimeoutNormal = 0x0000;
+
     internal static IntPtr GetHwnd(Window window)
     {
         return WindowNative.GetWindowHandle(window);
@@ -66,6 +69,19 @@ internal static class WindowHelper
         var hwnd = GetHwnd(window);
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    }
+
+    internal static void AttachToDesktop(Window window)
+    {
+        IntPtr hwnd = GetHwnd(window);
+        IntPtr desktopHost = GetDesktopHostWindow();
+        if (desktopHost != IntPtr.Zero)
+        {
+            SetParent(hwnd, desktopHost);
+        }
+
+        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
 
     internal static void RemoveTitleBar(Window window)
@@ -226,7 +242,6 @@ internal static class WindowHelper
     }
 
     internal static bool TryGetForegroundContentWindow(
-        ScreenBounds screen,
         IntPtr excludeHwnd,
         out IntPtr foregroundWindow,
         out Rect windowRect)
@@ -246,15 +261,77 @@ internal static class WindowHelper
         if (!IsWindowVisible(foregroundWindow) || IsIconic(foregroundWindow))
             return false;
 
-        if (!GetWindowRect(foregroundWindow, out windowRect))
+        return GetWindowRect(foregroundWindow, out windowRect);
+    }
+
+    internal static bool TryGetTopContentWindowForScreen(
+        ScreenBounds screen,
+        IntPtr excludeHwnd,
+        out IntPtr window,
+        out Rect windowRect)
+    {
+        IntPtr foundWindow = IntPtr.Zero;
+        Rect foundWindowRect = default;
+
+        EnumWindows((topLevel, _) =>
+        {
+            if (!TryGetContentWindowInfo(topLevel, excludeHwnd, out Rect candidateRect))
+            {
+                return true;
+            }
+
+            if (!IntersectsScreen(candidateRect, screen))
+            {
+                return true;
+            }
+
+            foundWindow = topLevel;
+            foundWindowRect = candidateRect;
+            return false;
+        }, IntPtr.Zero);
+
+        window = foundWindow;
+        windowRect = foundWindowRect;
+        return window != IntPtr.Zero;
+    }
+
+    internal static bool TryGetForegroundContentWindow(
+        ScreenBounds screen,
+        IntPtr excludeHwnd,
+        out IntPtr foregroundWindow,
+        out Rect windowRect)
+    {
+        if (!TryGetForegroundContentWindow(excludeHwnd, out foregroundWindow, out windowRect))
             return false;
 
-        bool intersectsScreen = windowRect.Right > screen.Left
+        return IntersectsScreen(windowRect, screen);
+    }
+
+    internal static bool IntersectsScreen(Rect windowRect, ScreenBounds screen)
+    {
+        return windowRect.Right > screen.Left
             && windowRect.Left < screen.Right
             && windowRect.Bottom > screen.Top
             && windowRect.Top < screen.Bottom;
+    }
 
-        return intersectsScreen;
+    private static bool TryGetContentWindowInfo(IntPtr hwnd, IntPtr excludeHwnd, out Rect windowRect)
+    {
+        windowRect = default;
+
+        if (hwnd == IntPtr.Zero || hwnd == excludeHwnd)
+            return false;
+
+        if (IsDesktopShellWindow(hwnd))
+            return false;
+
+        if (IsExplorerShellProcess(hwnd))
+            return false;
+
+        if (!IsWindowVisible(hwnd) || IsIconic(hwnd))
+            return false;
+
+        return GetWindowRect(hwnd, out windowRect);
     }
 
     private static bool IsDesktopShellWindow(IntPtr hwnd)
@@ -273,6 +350,37 @@ internal static class WindowHelper
             return true;
 
         return HasShellDesktopChild(hwnd);
+    }
+
+    private static IntPtr GetDesktopHostWindow()
+    {
+        IntPtr progman = FindWindowW("Progman", null);
+        if (progman != IntPtr.Zero)
+        {
+            _ = SendMessageTimeoutW(
+                progman,
+                DesktopSpawnWorkerMessage,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                SendMessageTimeoutNormal,
+                1000,
+                out _);
+        }
+
+        IntPtr workerW = IntPtr.Zero;
+        EnumWindows((topLevel, _) =>
+        {
+            IntPtr shellView = FindWindowExW(topLevel, IntPtr.Zero, "SHELLDLL_DefView", null);
+            if (shellView == IntPtr.Zero)
+            {
+                return true;
+            }
+
+            workerW = FindWindowExW(IntPtr.Zero, topLevel, "WorkerW", null);
+            return false;
+        }, IntPtr.Zero);
+
+        return workerW != IntPtr.Zero ? workerW : progman;
     }
 
     private static bool HasShellDesktopChild(IntPtr hwnd)

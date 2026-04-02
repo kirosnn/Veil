@@ -1,0 +1,171 @@
+<Window
+    x:Class="Veil.Windows.WidgetWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Background="Transparent" IsTabStop="False">
+        <Border
+            x:Name="PanelBorder"
+            Padding="0"
+            Background="#18000000"
+            CornerRadius="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="36" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border
+                    x:Name="TitleBarDragRegion"
+                    Grid.Row="0"
+                    Background="#18000000" />
+
+                <ScrollViewer
+                    Grid.Row="1"
+                    Margin="22,10,22,22"
+                    HorizontalScrollBarVisibility="Disabled"
+                    HorizontalScrollMode="Disabled"
+                    VerticalScrollBarVisibility="Auto"
+                    VerticalScrollMode="Enabled">
+                    <StackPanel Spacing="16">
+                        <TextBlock
+                            Text="Widget"
+                            FontSize="26"
+                            FontWeight="SemiBold"
+                            FontFamily="{StaticResource SfDisplaySemibold}"
+                            Foreground="White" />
+
+                        <TextBlock
+                            Text="Create desktop widgets and adjust their layout, colors and behavior separately from Settings."
+                            TextWrapping="WrapWholeWords"
+                            FontSize="13"
+                            FontFamily="{StaticResource SfTextRegular}"
+                            Foreground="#D6FFFFFF" />
+
+                        <Border Background="#18000000" CornerRadius="16" Padding="16">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="120" />
+                                    </Grid.ColumnDefinitions>
+                                    <ToggleButton
+                                        x:Name="WidgetSnapToGridButton"
+                                        Content="Snap To Grid"
+                                        IsChecked="True"
+                                        Checked="OnWidgetSnapToGridChanged"
+                                        Unchecked="OnWidgetSnapToGridChanged" />
+                                    <TextBox
+                                        x:Name="WidgetGridSizeTextBox"
+                                        Grid.Column="1"
+                                        Header="Grid"
+                                        Text="16"
+                                        TextChanged="OnWidgetGridSizeChanged" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="WidgetKindComboBox" SelectedIndex="0">
+                                        <ComboBoxItem Content="Clock" Tag="Clock" />
+                                        <ComboBoxItem Content="Weather" Tag="Weather" />
+                                        <ComboBoxItem Content="System" Tag="System" />
+                                    </ComboBox>
+                                    <Button
+                                        Grid.Column="1"
+                                        Content="Add"
+                                        Padding="12,0"
+                                        Click="OnAddDesktopWidgetClick" />
+                                </Grid>
+
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox
+                                        x:Name="DesktopWidgetComboBox"
+                                        DisplayMemberPath="Label"
+                                        SelectionChanged="OnDesktopWidgetSelectionChanged" />
+                                    <Button
+                                        x:Name="RemoveDesktopWidgetButton"
+                                        Grid.Column="1"
+                                        Content="Remove"
+                                        Padding="12,0"
+                                        Click="OnRemoveDesktopWidgetClick" />
+                                </Grid>
+
+                                <StackPanel x:Name="WidgetEditorPanel" Spacing="8" Visibility="Collapsed">
+                                    <TextBox x:Name="WidgetTitleTextBox" Header="Title" />
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="WidgetXTextBox" Header="X" />
+                                        <TextBox x:Name="WidgetYTextBox" Grid.Column="1" Header="Y" />
+                                    </Grid>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="WidgetWidthTextBox" Header="Width" />
+                                        <TextBox x:Name="WidgetHeightTextBox" Grid.Column="1" Header="Height" />
+                                    </Grid>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="WidgetOpacityTextBox" Header="Opacity" />
+                                        <TextBox x:Name="WidgetCornerRadiusTextBox" Grid.Column="1" Header="Radius" />
+                                        <TextBox x:Name="WidgetScaleTextBox" Grid.Column="2" Header="Scale" />
+                                    </Grid>
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="WidgetThemeComboBox" Header="Theme" SelectedIndex="0">
+                                            <ComboBoxItem Content="Dark" Tag="Dark" />
+                                            <ComboBoxItem Content="Light" Tag="Light" />
+                                        </ComboBox>
+                                        <TextBox x:Name="WidgetRefreshTextBox" Grid.Column="1" Header="Refresh (s)" />
+                                    </Grid>
+                                    <TextBox x:Name="WidgetMonitorIdTextBox" Header="Monitor Id (empty = primary)" />
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="WidgetBackgroundColorTextBox" Header="Background (#RRGGBB)" />
+                                        <TextBox x:Name="WidgetForegroundColorTextBox" Grid.Column="1" Header="Foreground" />
+                                        <TextBox x:Name="WidgetAccentColorTextBox" Grid.Column="2" Header="Accent" />
+                                    </Grid>
+                                    <ToggleButton x:Name="WidgetShowSecondsButton" Content="Clock: show seconds" />
+                                    <Button Content="Apply Widget Settings" Click="OnApplyDesktopWidgetClick" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid>
+                            <Button
+                                Width="92"
+                                Height="34"
+                                HorizontalAlignment="Right"
+                                IsTabStop="False"
+                                FontFamily="{StaticResource SfTextMedium}"
+                                Content="Done"
+                                Click="OnDoneClick" />
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
