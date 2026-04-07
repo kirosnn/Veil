@@ -11,13 +11,10 @@ namespace Veil;
 public partial class App : Application
 {
     private static readonly TimeSpan TopBarActivityInterval = TimeSpan.FromMilliseconds(1000);
-    private const string OpenWidgetEventName = @"Local\Veil.OpenWidget";
     private readonly AppSettings _settings;
     private readonly GameDetectionService _gameDetectionService = new();
     private readonly Dictionary<string, TopBarWindow> _topBarWindows = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, DockWindow> _dockWindows = new(StringComparer.OrdinalIgnoreCase);
-    private DesktopShellService? _desktopShellService;
-    private DesktopWidgetManager? _desktopWidgetManager;
+    private DesktopIconVisibilityService? _desktopIconVisibilityService;
     private DesktopContextMenuService? _desktopContextMenu;
     private TrayIconService? _trayIcon;
     private AltTabHookService? _altTabHookService;
@@ -26,12 +23,8 @@ public partial class App : Application
     private int _windowSwitchSelectedIndex = -1;
     private DispatcherTimer? _monitorRefreshTimer;
     private DispatcherTimer? _topBarActivityTimer;
-    private WidgetWindow? _widgetWindow;
-    private EventWaitHandle? _openWidgetEvent;
-    private RegisteredWaitHandle? _openWidgetRegistration;
     private string _lastTopologySignature = string.Empty;
     private bool _isSyncingTopBars;
-    private bool _openWidgetOnStartup;
     private int _emptyMonitorRefreshCount;
 
     public App()
@@ -47,13 +40,6 @@ public partial class App : Application
     {
         try
         {
-            _openWidgetOnStartup = IsWidgetLaunchRequested(args.Arguments);
-            if (_openWidgetOnStartup && TrySignalRunningInstanceToOpenWidget())
-            {
-                Exit();
-                return;
-            }
-
             KillOtherInstances();
             PerformanceLogger.Start();
             AppLogger.Info("Application launch started.");
@@ -78,34 +64,23 @@ public partial class App : Application
                 }
             }
 
-            _desktopShellService = new DesktopShellService(new WindowsDesktopShellBridge());
-            if (!_desktopShellService.TryApplyLaunchState())
-            {
-                AppLogger.Error("Desktop shell launch state could not be fully applied.");
-            }
+            _desktopIconVisibilityService = new DesktopIconVisibilityService(new WindowsDesktopIconVisibilityBridge());
+            _desktopIconVisibilityService.ApplyLaunchState();
 
             _trayIcon = new TrayIconService();
             _trayIcon.ShowRequested += OnTrayShowRequested;
             _trayIcon.SettingsRequested += OnTraySettingsRequested;
             _trayIcon.QuitRequested += OnTrayQuitRequested;
             _trayIcon.Initialize();
-            _desktopWidgetManager = new DesktopWidgetManager(_settings);
-            _ = _desktopWidgetManager.InitializeAsync();
 
-            InitializeDesktopContextMenu();
             InitializeAltTabSwitcher();
             _gameDetectionService.WarmUp();
+            _ = InstalledAppService.PreloadAsync();
             SyncTopBarWindows(true);
-            SyncDockWindows(true);
-            InitializeWidgetLaunchBridge();
             StartMonitorRefresh();
             StartTopBarActivityRefresh();
 
-            if (_openWidgetOnStartup)
-            {
-                OpenWidgetWindow();
-            }
-            else if (_settings.IsFirstLaunch)
+            if (_settings.IsFirstLaunch)
             {
                 GetPreferredTopBarWindow()?.OpenSettings();
             }
@@ -114,11 +89,12 @@ public partial class App : Application
         {
             try
             {
-                _desktopShellService?.RestoreLaunchState();
+                _desktopIconVisibilityService?.RestoreLaunchState();
+                _desktopIconVisibilityService = null;
             }
             catch (Exception restoreEx)
             {
-                AppLogger.Error("Failed to restore desktop shell state after launch error.", restoreEx);
+                AppLogger.Error("Failed to restore desktop icons after launch error.", restoreEx);
             }
 
             AppLogger.Error("Fatal error during launch.", ex);
@@ -130,6 +106,7 @@ public partial class App : Application
     {
         int currentPid = Environment.ProcessId;
         string currentName = Process.GetCurrentProcess().ProcessName;
+        List<int> previousInstanceIds = [];
 
         foreach (var process in Process.GetProcessesByName(currentName))
         {
@@ -137,9 +114,9 @@ public partial class App : Application
             {
                 if (process.Id != currentPid)
                 {
+                    previousInstanceIds.Add(process.Id);
                     AppLogger.Info($"Killing previous instance (pid {process.Id}).");
                     process.Kill();
-                    process.WaitForExit(3000);
                 }
             }
             catch
@@ -150,107 +127,42 @@ public partial class App : Application
                 process.Dispose();
             }
         }
-    }
 
-    private static bool IsWidgetLaunchRequested(string? arguments)
-    {
-        if (string.IsNullOrWhiteSpace(arguments))
-        {
-            return false;
-        }
-
-        return arguments
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Any(argument => string.Equals(argument, "--widget", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool TrySignalRunningInstanceToOpenWidget()
-    {
-        try
-        {
-            using EventWaitHandle openWidgetEvent = EventWaitHandle.OpenExisting(OpenWidgetEventName);
-            return openWidgetEvent.Set();
-        }
-        catch (WaitHandleCannotBeOpenedException)
-        {
-            return false;
-        }
-    }
-
-    private void InitializeWidgetLaunchBridge()
-    {
-        var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
-        if (dispatcherQueue is null)
+        if (previousInstanceIds.Count == 0)
         {
             return;
         }
 
-        _openWidgetEvent = new EventWaitHandle(false, EventResetMode.AutoReset, OpenWidgetEventName);
-        _openWidgetRegistration = ThreadPool.RegisterWaitForSingleObject(
-            _openWidgetEvent,
-            (_, _) => dispatcherQueue.TryEnqueue(OpenWidgetWindow),
-            null,
-            Timeout.Infinite,
-            false);
-    }
-
-    private void OpenWidgetWindow()
-    {
-        if (_widgetWindow is not null)
+        DateTime deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
         {
-            _widgetWindow.ShowCentered();
-            return;
-        }
+            bool hasRemainingInstance = false;
 
-        ScreenBounds screen = GetPreferredScreenBounds();
-        string preferredMonitorId = GetPreferredMonitorId();
-        _widgetWindow = new WidgetWindow(screen, preferredMonitorId);
-        _widgetWindow.Closed += OnWidgetWindowClosed;
-        _widgetWindow.ShowCentered();
-    }
-
-    private void OnWidgetWindowClosed(object sender, WindowEventArgs args)
-    {
-        if (sender is WidgetWindow widgetWindow)
-        {
-            widgetWindow.Closed -= OnWidgetWindowClosed;
-        }
-
-        _widgetWindow = null;
-    }
-
-    private string GetPreferredMonitorId()
-    {
-        if (_topBarWindows.Count > 0)
-        {
-            List<MonitorInfo2> monitors = MonitorService.GetAllMonitors();
-            IReadOnlyList<string> enabledMonitorIds = _settings.ResolveTopBarMonitorIds(monitors);
-            string? preferredMonitorId = monitors
-                .FirstOrDefault(monitor => monitor.IsPrimary && enabledMonitorIds.Contains(monitor.Id, StringComparer.OrdinalIgnoreCase))?.Id
-                ?? enabledMonitorIds.FirstOrDefault();
-
-            if (!string.IsNullOrWhiteSpace(preferredMonitorId))
+            foreach (var process in Process.GetProcessesByName(currentName))
             {
-                return preferredMonitorId;
+                try
+                {
+                    if (process.Id != currentPid)
+                    {
+                        hasRemainingInstance = true;
+                        break;
+                    }
+                }
+                finally
+                {
+                    process.Dispose();
+                }
             }
+
+            if (!hasRemainingInstance)
+            {
+                return;
+            }
+
+            Thread.Sleep(250);
         }
 
-        return MonitorService.GetAllMonitors().FirstOrDefault(static monitor => monitor.IsPrimary)?.Id
-            ?? string.Empty;
-    }
-
-    private ScreenBounds GetPreferredScreenBounds()
-    {
-        TopBarWindow? preferredTopBarWindow = GetPreferredTopBarWindow();
-        if (preferredTopBarWindow is not null)
-        {
-            return preferredTopBarWindow.ScreenBounds;
-        }
-
-        MonitorInfo2? preferredMonitor = MonitorService.GetAllMonitors().FirstOrDefault(static monitor => monitor.IsPrimary)
-            ?? MonitorService.GetAllMonitors().FirstOrDefault();
-
-        return preferredMonitor?.ToScreenBounds() ?? new ScreenBounds(160, 160, 1440, 960);
+        AppLogger.Error("Previous Veil instance is still shutting down after timeout.");
     }
 
     private void OnTrayShowRequested()
@@ -283,35 +195,20 @@ public partial class App : Application
         _monitorRefreshTimer = null;
         _topBarActivityTimer?.Stop();
         _topBarActivityTimer = null;
-        _openWidgetRegistration?.Unregister(null);
-        _openWidgetRegistration = null;
-        _openWidgetEvent?.Dispose();
-        _openWidgetEvent = null;
-        if (_widgetWindow is not null)
-        {
-            _widgetWindow.Closed -= OnWidgetWindowClosed;
-            _widgetWindow.Close();
-            _widgetWindow = null;
-        }
         DisposeAltTabSwitcher();
         _desktopContextMenu?.Dispose();
         _desktopContextMenu = null;
         _trayIcon?.Dispose();
         _trayIcon = null;
-        _desktopWidgetManager?.Dispose();
-        _desktopWidgetManager = null;
-        CloseAllDockWindows();
         CloseAllTopBarWindows();
-        _desktopShellService?.RestoreLaunchState();
-        _desktopShellService = null;
+        _desktopIconVisibilityService?.RestoreLaunchState();
+        _desktopIconVisibilityService = null;
         PerformanceLogger.Stop();
     }
 
     private void OnSettingsChanged()
     {
         SyncTopBarWindows();
-        SyncDockWindows();
-        _desktopWidgetManager?.SyncWindows();
     }
 
     private void StartMonitorRefresh()
@@ -330,8 +227,6 @@ public partial class App : Application
         try
         {
             SyncTopBarWindows();
-            SyncDockWindows();
-            _desktopWidgetManager?.SyncWindows();
         }
         catch (Exception ex)
         {
@@ -580,108 +475,6 @@ public partial class App : Application
         _topBarWindows.Clear();
     }
 
-    private void SyncDockWindows(bool force = false)
-    {
-        try
-        {
-            List<MonitorInfo2> monitors = MonitorService.GetAllMonitors();
-            if (monitors.Count == 0)
-            {
-                CloseAllDockWindows("monitor-enumeration-empty");
-                return;
-            }
-
-            string topologySignature = string.Join(
-                "|",
-                monitors.Select(static monitor =>
-                    $"{monitor.Id}:{monitor.Bounds.Left},{monitor.Bounds.Top},{monitor.Bounds.Right},{monitor.Bounds.Bottom}:{monitor.IsPrimary}"));
-            IReadOnlyList<string> enabledMonitorIds = _settings.ResolveTopBarMonitorIds(monitors);
-
-            if (enabledMonitorIds.Count == 0)
-            {
-                CloseAllDockWindows("monitor-resolution-empty");
-                return;
-            }
-
-            if (force)
-            {
-                CloseAllDockWindows("force-sync");
-            }
-
-            foreach (string existingMonitorId in _dockWindows.Keys.ToArray())
-            {
-                if (enabledMonitorIds.Contains(existingMonitorId, StringComparer.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                AppLogger.Info($"Closing dock for disabled monitor {existingMonitorId}.");
-                try
-                {
-                    _dockWindows[existingMonitorId].Close();
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Error($"Failed to close dock for disabled monitor {existingMonitorId}.", ex);
-                }
-                finally
-                {
-                    _dockWindows.Remove(existingMonitorId);
-                }
-            }
-
-            foreach (MonitorInfo2 monitor in monitors.Where(monitor => enabledMonitorIds.Contains(monitor.Id, StringComparer.OrdinalIgnoreCase)))
-            {
-                if (_dockWindows.ContainsKey(monitor.Id))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    DockWindow createdWindow = new(monitor.Id, monitor.ToScreenBounds());
-                    createdWindow.Activate();
-                    _dockWindows[monitor.Id] = createdWindow;
-                    AppLogger.Info($"DockWindow activated for {monitor.Id} on topology {topologySignature}.");
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Error($"Failed to create dock for {monitor.Id}.", ex);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("Failed to sync dock windows.", ex);
-        }
-    }
-
-    private void CloseAllDockWindows()
-        => CloseAllDockWindows("unspecified");
-
-    private void CloseAllDockWindows(string reason)
-    {
-        if (_dockWindows.Count == 0)
-        {
-            return;
-        }
-
-        AppLogger.Info($"Closing all dock windows. Reason: {reason}.");
-        foreach (DockWindow dockWindow in _dockWindows.Values.ToArray())
-        {
-            try
-            {
-                dockWindow.Close();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("Failed to close a dock window.", ex);
-            }
-        }
-
-        _dockWindows.Clear();
-    }
-
     private void InitializeDesktopContextMenu()
     {
         var dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
@@ -691,16 +484,8 @@ public partial class App : Application
         }
 
         _desktopContextMenu = new DesktopContextMenuService(dispatcherQueue);
-        _desktopContextMenu.AddWidgetRequested += OnDesktopAddWidget;
-        _desktopContextMenu.WidgetSettingsRequested += OpenWidgetWindow;
         _desktopContextMenu.SettingsRequested += OnTraySettingsRequested;
         _desktopContextMenu.Initialize();
-    }
-
-    private void OnDesktopAddWidget(string kind)
-    {
-        string monitorId = GetPreferredMonitorId();
-        _settings.AddDesktopWidget(kind, monitorId);
     }
 
     private void InitializeAltTabSwitcher()

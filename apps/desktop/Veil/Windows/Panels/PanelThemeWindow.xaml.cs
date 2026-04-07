@@ -61,6 +61,7 @@ public sealed partial class PanelThemeWindow : Window
         SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
+        WindowHelper.PrepareForSystemBackdrop(this);
         SetupAcrylic();
         BuildUI(0, 0);
         ShowWindowNative(_hwnd, SW_HIDE);
@@ -72,24 +73,21 @@ public sealed partial class PanelThemeWindow : Window
 
         _acrylicController = new DesktopAcrylicController
         {
-            TintColor = UseLightTheme
-                ? global::Windows.UI.Color.FromArgb(255, 255, 255, 255)
-                : global::Windows.UI.Color.FromArgb(255, 0, 0, 0),
-            TintOpacity = UseLightTheme ? 0.06f : 0.68f,
-            LuminosityOpacity = UseLightTheme ? 0.78f : 0.22f,
-            FallbackColor = UseLightTheme
-                ? global::Windows.UI.Color.FromArgb(216, 255, 255, 255)
-                : global::Windows.UI.Color.FromArgb(232, 0, 0, 0)
+            TintColor = PanelGlassPalette.GetAcrylicTintColor(UseLightTheme),
+            TintOpacity = PanelGlassPalette.GetAcrylicTintOpacity(UseLightTheme),
+            LuminosityOpacity = PanelGlassPalette.GetAcrylicLuminosityOpacity(UseLightTheme),
+            FallbackColor = PanelGlassPalette.GetAcrylicFallbackColor(UseLightTheme)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
         {
             IsInputActive = true,
-            Theme = UseLightTheme ? SystemBackdropTheme.Light : SystemBackdropTheme.Dark
+            Theme = PanelGlassPalette.GetBackdropTheme(UseLightTheme)
         };
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
+        PanelBorder.Background = PanelGlassPalette.CreateFrameBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 10);
     }
 
     private PanelWindowMetrics BuildUI(int anchorRight, int anchorY)
@@ -99,9 +97,7 @@ public sealed partial class PanelThemeWindow : Window
         var shell = new Border
         {
             CornerRadius = new CornerRadius(PanelCornerRadius),
-            Background = new SolidColorBrush(UseLightTheme
-                ? global::Windows.UI.Color.FromArgb(42, 255, 255, 255)
-                : global::Windows.UI.Color.FromArgb(42, 0, 0, 0)),
+            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0)),
             Padding = new Thickness(14),
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
@@ -123,6 +119,7 @@ public sealed partial class PanelThemeWindow : Window
 
         shell.Child = stack;
         PanelWindowMetrics metrics = PanelWindowSizer.Measure(
+            this,
             shell,
             anchorRight,
             anchorY,
@@ -134,12 +131,13 @@ public sealed partial class PanelThemeWindow : Window
         if (metrics.IsHeightClamped)
         {
             shell.Child = CreateScrollableContent(stack);
-            shell.Width = metrics.Width;
-            shell.MaxWidth = metrics.Width;
-            shell.Height = metrics.Height;
+            shell.Width = metrics.ViewWidth;
+            shell.MaxWidth = metrics.ViewWidth;
+            shell.Height = metrics.ViewHeight;
         }
         _panelWidth = metrics.Width;
         _panelHeight = metrics.Height;
+        shell.Height = metrics.ViewHeight;
         ContentPanel.Children.Add(shell);
         return metrics;
     }

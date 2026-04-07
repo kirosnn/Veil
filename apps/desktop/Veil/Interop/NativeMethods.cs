@@ -7,6 +7,8 @@ internal static partial class NativeMethods
 {
     internal const int GWL_STYLE = -16;
     internal const int GWL_EXSTYLE = -20;
+    internal const uint GW_OWNER = 4;
+    internal const uint GA_ROOTOWNER = 3;
 
     internal const int WS_THICKFRAME = 0x00040000;
     internal const int WS_BORDER = 0x00800000;
@@ -19,6 +21,12 @@ internal static partial class NativeMethods
     internal const int WS_EX_APPWINDOW = 0x00040000;
     internal const int WS_EX_LAYERED = 0x00080000;
     internal const uint LWA_ALPHA = 0x00000002;
+    internal const uint WM_GETICON = 0x007F;
+    internal const int ICON_SMALL = 0;
+    internal const int ICON_BIG = 1;
+    internal const int ICON_SMALL2 = 2;
+    internal const int GCLP_HICON = -14;
+    internal const int GCLP_HICONSM = -34;
 
     internal const uint SWP_NOMOVE = 0x0002;
     internal const uint SWP_NOSIZE = 0x0001;
@@ -38,6 +46,7 @@ internal static partial class NativeMethods
     internal const int ABE_BOTTOM = 3;
 
     internal const int MONITOR_DEFAULTTOPRIMARY = 1;
+    internal const int UserDefaultScreenDpi = 96;
 
     internal const int SW_HIDE = 0;
     internal const int SW_SHOW = 5;
@@ -54,6 +63,21 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     internal static partial IntPtr GetForegroundWindow();
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr GetLastActivePopup(IntPtr hWnd);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetClassLongPtrW")]
+    internal static partial IntPtr GetClassLongPtrW(IntPtr hWnd, int nIndex);
+
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetDpiForWindow(IntPtr hwnd);
 
     [LibraryImport("user32.dll")]
     internal static partial IntPtr GetShellWindow();
@@ -424,9 +448,20 @@ internal static partial class NativeMethods
     [LibraryImport("shell32.dll", EntryPoint = "ExtractIconW", StringMarshalling = StringMarshalling.Utf16)]
     internal static partial IntPtr ExtractIconW(IntPtr hInst, string lpszExeFileName, uint nIconIndex);
 
+    [DllImport("shell32.dll", EntryPoint = "ExtractIconExW", CharSet = CharSet.Unicode)]
+    internal static extern uint ExtractIconExW(
+        string lpszFile,
+        int nIconIndex,
+        [Out] IntPtr[]? phiconLarge,
+        [Out] IntPtr[]? phiconSmall,
+        uint nIcons);
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool DestroyIcon(IntPtr hIcon);
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr CopyIcon(IntPtr hIcon);
 
     [DllImport("user32.dll", EntryPoint = "RegisterClassExW", CharSet = CharSet.Unicode)]
     internal static extern ushort RegisterClassExW(ref WndClassExW lpwcx);

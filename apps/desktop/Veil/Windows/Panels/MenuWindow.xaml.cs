@@ -99,6 +99,8 @@ public sealed partial class MenuWindow : Window
         SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
+        WindowHelper.PrepareForSystemBackdrop(this);
+
         SetupAcrylic();
         ApplySettings();
         ShowWindowNative(_hwnd, SW_HIDE);

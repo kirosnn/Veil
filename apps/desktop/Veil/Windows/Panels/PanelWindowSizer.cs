@@ -7,12 +7,16 @@ namespace Veil.Windows;
 internal readonly record struct PanelWindowMetrics(
     int Width,
     int Height,
+    double ViewWidth,
+    double ViewHeight,
+    bool IsWidthClamped,
     bool IsHeightClamped,
     global::Windows.Graphics.RectInt32 Bounds);
 
 internal static class PanelWindowSizer
 {
     internal static PanelWindowMetrics Measure(
+        Window window,
         FrameworkElement shell,
         int anchorRight,
         int anchorY,
@@ -26,29 +30,36 @@ internal static class PanelWindowSizer
         NativeMethods.Rect workArea = ResolveWorkArea(anchorRight, anchorY);
         int boundedAnchorY = Math.Clamp(anchorY, workArea.Top + screenMargin, workArea.Bottom - screenMargin);
         int availableWidth = Math.Max(1, workArea.Right - workArea.Left - (screenMargin * 2));
-        int availableHeight = Math.Max(minHeight, workArea.Bottom - boundedAnchorY - screenMargin);
-        int measurementWidth = Math.Min(preferredWidth, availableWidth);
+        int availableHeight = Math.Max(1, workArea.Bottom - boundedAnchorY - screenMargin);
+        double availableWidthView = Math.Max(1, WindowHelper.PhysicalPixelsToView(window, availableWidth));
+        double availableHeightView = Math.Max(1, WindowHelper.PhysicalPixelsToView(window, availableHeight));
+        double measurementWidth = Math.Min(preferredWidth, availableWidthView);
 
         shell.Width = double.NaN;
         shell.MaxWidth = measurementWidth;
-        shell.Measure(new global::Windows.Foundation.Size(measurementWidth, availableHeight));
+        shell.Height = double.NaN;
+        shell.Measure(new global::Windows.Foundation.Size(measurementWidth, availableHeightView));
 
-        int finalWidth = Math.Clamp(
-            (int)Math.Ceiling(shell.DesiredSize.Width) + widthPadding,
-            Math.Min(minWidth, availableWidth),
-            availableWidth);
+        double desiredWidth = Math.Ceiling(shell.DesiredSize.Width) + widthPadding;
+        double finalWidthView = Math.Clamp(
+            desiredWidth,
+            Math.Min(minWidth, availableWidthView),
+            availableWidthView);
 
-        shell.Width = finalWidth;
-        shell.MaxWidth = finalWidth;
-        shell.Measure(new global::Windows.Foundation.Size(finalWidth, availableHeight));
+        shell.Width = finalWidthView;
+        shell.MaxWidth = finalWidthView;
+        shell.Measure(new global::Windows.Foundation.Size(finalWidthView, availableHeightView));
 
-        int desiredHeight = (int)Math.Ceiling(shell.DesiredSize.Height) + heightPadding;
-        int finalHeight = Math.Clamp(
+        double desiredHeight = Math.Ceiling(shell.DesiredSize.Height) + heightPadding;
+        double finalHeightView = Math.Clamp(
             desiredHeight,
             minHeight,
-            availableHeight);
+            availableHeightView);
 
-        shell.Height = finalHeight;
+        int finalWidth = Math.Max(1, WindowHelper.ViewPixelsToPhysical(window, finalWidthView));
+        int finalHeight = Math.Max(1, WindowHelper.ViewPixelsToPhysical(window, finalHeightView));
+
+        shell.Height = finalHeightView;
 
         int desiredLeft = anchorRight - finalWidth;
         int finalX = Math.Clamp(desiredLeft, workArea.Left + screenMargin, workArea.Right - finalWidth - screenMargin);
@@ -57,7 +68,10 @@ internal static class PanelWindowSizer
         return new PanelWindowMetrics(
             finalWidth,
             finalHeight,
-            desiredHeight > availableHeight,
+            finalWidthView,
+            finalHeightView,
+            finalWidthView < preferredWidth,
+            finalHeightView < desiredHeight,
             new global::Windows.Graphics.RectInt32(finalX, finalY, finalWidth, finalHeight));
     }
 

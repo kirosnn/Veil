@@ -25,6 +25,41 @@ internal static class WindowHelper
         return AppWindow.GetFromWindowId(windowId);
     }
 
+    internal static double GetRasterizationScale(Window window)
+    {
+        IntPtr hwnd = GetHwnd(window);
+        if (hwnd != IntPtr.Zero)
+        {
+            uint dpi = GetDpiForWindow(hwnd);
+            if (dpi > 0)
+            {
+                return dpi / (double)UserDefaultScreenDpi;
+            }
+        }
+
+        if (window.Content is UIElement element && element.XamlRoot is not null)
+        {
+            double scale = element.XamlRoot.RasterizationScale;
+            if (scale > 0.01)
+            {
+                return scale;
+            }
+        }
+
+        return 1.0;
+    }
+
+    internal static int ViewPixelsToPhysical(Window window, double viewPixels)
+    {
+        return Math.Max(0, (int)Math.Round(viewPixels * GetRasterizationScale(window)));
+    }
+
+    internal static double PhysicalPixelsToView(Window window, double physicalPixels)
+    {
+        double scale = GetRasterizationScale(window);
+        return scale <= 0.01 ? physicalPixels : physicalPixels / scale;
+    }
+
     internal static void MakeOverlay(Window window)
     {
         var hwnd = GetHwnd(window);
@@ -32,6 +67,11 @@ internal static class WindowHelper
         exStyle |= WS_EX_TOOLWINDOW;
         exStyle |= WS_EX_NOACTIVATE;
         SetWindowLongW(hwnd, GWL_EXSTYLE, exStyle);
+    }
+
+    internal static void PrepareForSystemBackdrop(Window window)
+    {
+        DisableLayeredTransparency(window);
     }
 
     internal static void DisableLayeredTransparency(Window window)

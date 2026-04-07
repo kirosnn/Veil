@@ -1,30 +1,11 @@
 using System.Text.Json;
 using System.Threading;
 using Veil.Diagnostics;
-using Veil.Interop;
 using Veil.Services;
 
 namespace Veil.Configuration;
 
 internal sealed record AppShortcutSetting(string AppName, string AppId, string DisplayName);
-internal sealed record DesktopWidgetSetting(
-    string Id,
-    string Kind,
-    string Title,
-    string MonitorId,
-    int X,
-    int Y,
-    int Width,
-    int Height,
-    double Opacity,
-    int CornerRadius,
-    double Scale,
-    string Theme,
-    string BackgroundColor,
-    string ForegroundColor,
-    string AccentColor,
-    int RefreshSeconds,
-    bool ShowSeconds);
 
 internal sealed partial class AppSettings
 {
@@ -78,12 +59,9 @@ internal sealed partial class AppSettings
     private string _gameDetectionMode = GameDetectionService.HybridMode;
     private string[] _gameProcessNames = [];
     private bool _backgroundOptimizationEnabled = true;
-    private bool _desktopWidgetSnapToGrid = true;
-    private int _desktopWidgetGridSize = 16;
     private string _topBarDisplayMode = "Primary";
     private string[] _topBarMonitorIds = [];
     private AppShortcutSetting?[] _shortcutButtons = new AppShortcutSetting?[MaxShortcutButtons];
-    private DesktopWidgetSetting[] _desktopWidgets = [];
 
     public static AppSettings Current => _current.Value;
 

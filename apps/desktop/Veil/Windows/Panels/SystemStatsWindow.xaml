@@ -9,10 +9,17 @@
             Padding="0"
             Background="Transparent"
             CornerRadius="14">
-            <StackPanel
-                x:Name="StatsPanel"
-                Margin="14,12,14,12"
-                Spacing="10" />
+            <ScrollViewer
+                x:Name="StatsScrollViewer"
+                HorizontalScrollMode="Disabled"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollMode="Auto"
+                VerticalScrollBarVisibility="Auto">
+                <StackPanel
+                    x:Name="StatsPanel"
+                    Margin="14,12,14,12"
+                    Spacing="10" />
+            </ScrollViewer>
         </Border>
     </Grid>
 </Window>

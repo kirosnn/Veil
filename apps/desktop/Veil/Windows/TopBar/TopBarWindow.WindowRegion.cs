@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Veil.Interop;
 using static Veil.Interop.NativeMethods;
 
 namespace Veil.Windows;
@@ -160,11 +161,17 @@ public sealed partial class TopBarWindow
             GeneralTransform transform = element.TransformToVisual(RootPanel);
             var topLeft = transform.TransformPoint(new global::Windows.Foundation.Point(0, 0));
             var bottomRight = transform.TransformPoint(new global::Windows.Foundation.Point(element.ActualWidth, element.ActualHeight));
+            double minX = Math.Min(topLeft.X, bottomRight.X) - paddingX;
+            double minY = Math.Min(topLeft.Y, bottomRight.Y) - paddingY;
+            double maxX = Math.Max(topLeft.X, bottomRight.X) + paddingX;
+            double maxY = Math.Max(topLeft.Y, bottomRight.Y) + paddingY;
 
-            int left = Math.Max(0, (int)Math.Floor(Math.Min(topLeft.X, bottomRight.X) - paddingX));
-            int top = Math.Max(0, (int)Math.Floor(Math.Min(topLeft.Y, bottomRight.Y) - paddingY));
-            int right = Math.Min((int)Math.Ceiling(RootPanel.ActualWidth), (int)Math.Ceiling(Math.Max(topLeft.X, bottomRight.X) + paddingX));
-            int bottom = Math.Min((int)Math.Ceiling(RootPanel.ActualHeight), (int)Math.Ceiling(Math.Max(topLeft.Y, bottomRight.Y) + paddingY));
+            int rootWidth = Math.Max(1, WindowHelper.ViewPixelsToPhysical(this, RootPanel.ActualWidth));
+            int rootHeight = Math.Max(1, WindowHelper.ViewPixelsToPhysical(this, RootPanel.ActualHeight));
+            int left = Math.Max(0, WindowHelper.ViewPixelsToPhysical(this, minX));
+            int top = Math.Max(0, WindowHelper.ViewPixelsToPhysical(this, minY));
+            int right = Math.Min(rootWidth, WindowHelper.ViewPixelsToPhysical(this, maxX));
+            int bottom = Math.Min(rootHeight, WindowHelper.ViewPixelsToPhysical(this, maxY));
 
             if (right <= left || bottom <= top)
             {

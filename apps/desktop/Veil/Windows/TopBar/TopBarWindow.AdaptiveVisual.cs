@@ -507,7 +507,7 @@ public sealed partial class TopBarWindow
         try
         {
             int screenWidth = _screen.Right - _screen.Left;
-            int sampleY = _screen.Top + BarHeight;
+            int sampleY = _screen.Top + GetBarHeightInPhysicalPixels();
 
             Span<int> xOffsets = stackalloc int[]
             {
@@ -588,7 +588,7 @@ public sealed partial class TopBarWindow
         {
             int screenWidth = _screen.Right - _screen.Left;
             int sampleX = _screen.Left + (screenWidth / 2);
-            int sampleY = _screen.Top + BarHeight;
+            int sampleY = _screen.Top + GetBarHeightInPhysicalPixels();
             uint colorValue = GetPixel(screenDc, sampleX, sampleY);
             if (colorValue == 0xFFFFFFFF)
             {

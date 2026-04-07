@@ -21,7 +21,35 @@
                     HorizontalAlignment="Right"
                     VerticalAlignment="Center"
                     Margin="0,0,8,0">
+            <StackPanel.Resources>
+                <Style x:Key="TopBarRightButtonStyle" TargetType="Button">
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                    <Setter Property="BorderThickness" Value="0" />
+                    <Setter Property="HorizontalContentAlignment" Value="Center" />
+                    <Setter Property="VerticalContentAlignment" Value="Center" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="{TemplateBinding CornerRadius}">
+                                    <ContentPresenter Content="{TemplateBinding Content}"
+                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                      ContentTransitions="{TemplateBinding ContentTransitions}"
+                                                      Padding="{TemplateBinding Padding}"
+                                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                      Foreground="{TemplateBinding Foreground}" />
+                                </Border>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </StackPanel.Resources>
             <Button x:Name="WeatherButton"
+                    Style="{StaticResource TopBarRightButtonStyle}"
                     VerticalAlignment="Center"
                     Padding="8,2"
                     MinWidth="0"
@@ -32,12 +60,6 @@
                     Foreground="#FFFFFFFF"
                     IsTabStop="False"
                     Click="OnWeatherButtonClick">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#0CFFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#08FFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
-                </Button.Resources>
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <Grid x:Name="WeatherIconHost"
                           Width="14"
@@ -52,6 +74,7 @@
                 </StackPanel>
             </Button>
             <Button x:Name="DiscordButton"
+                    Style="{StaticResource TopBarRightButtonStyle}"
                     VerticalAlignment="Center"
                     Padding="2,2"
                     MinWidth="0"
@@ -62,12 +85,6 @@
                     IsTabStop="False"
                     Visibility="Collapsed"
                     Click="OnDiscordButtonClick">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#0CFFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#08FFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
-                </Button.Resources>
                 <Grid Width="16" Height="16">
                     <Image x:Name="DiscordIcon"
                            Width="14"
@@ -96,6 +113,7 @@
                 </Grid>
             </Button>
             <Button x:Name="MusicButton"
+                    Style="{StaticResource TopBarRightButtonStyle}"
                     VerticalAlignment="Center"
                     Padding="4,2"
                     MinWidth="0"
@@ -106,12 +124,6 @@
                     IsTabStop="False"
                     Visibility="Collapsed"
                     Click="OnMusicButtonClick">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#0CFFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#08FFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
-                </Button.Resources>
                 <Grid Width="18" Height="18">
                     <Image x:Name="MusicAlbumArt"
                            Width="18"
@@ -128,6 +140,7 @@
                 </Grid>
             </Button>
             <Button x:Name="RunCatButton"
+                    Style="{StaticResource TopBarRightButtonStyle}"
                     VerticalAlignment="Center"
                     Padding="4,2"
                     MinWidth="0"
@@ -138,18 +151,13 @@
                     IsTabStop="False"
                     Visibility="Collapsed"
                     Click="OnRunCatButtonClick">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#0CFFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#08FFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
-                </Button.Resources>
                 <Image x:Name="RunCatImage"
                        Width="20"
                        Height="20"
                        IsHitTestVisible="False" />
             </Button>
             <Button x:Name="PanelThemeButton"
+                    Style="{StaticResource TopBarRightButtonStyle}"
                     VerticalAlignment="Center"
                     Padding="4,2"
                     MinWidth="0"
@@ -159,12 +167,6 @@
                     Background="Transparent"
                     IsTabStop="False"
                     Click="OnPanelThemeButtonClick">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#0CFFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#08FFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
-                </Button.Resources>
                 <Image x:Name="PanelThemeIcon"
                        Width="16"
                        Height="16"

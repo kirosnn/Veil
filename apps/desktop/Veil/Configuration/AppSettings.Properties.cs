@@ -478,37 +478,6 @@ internal sealed partial class AppSettings
         }
     }
 
-    public bool DesktopWidgetSnapToGrid
-    {
-        get => _desktopWidgetSnapToGrid;
-        set
-        {
-            if (_desktopWidgetSnapToGrid == value)
-            {
-                return;
-            }
-
-            _desktopWidgetSnapToGrid = value;
-            PersistAndNotify();
-        }
-    }
-
-    public int DesktopWidgetGridSize
-    {
-        get => _desktopWidgetGridSize;
-        set
-        {
-            value = Math.Clamp(value, 8, 64);
-            if (_desktopWidgetGridSize == value)
-            {
-                return;
-            }
-
-            _desktopWidgetGridSize = value;
-            PersistAndNotify();
-        }
-    }
-
     public void SetTopBarMonitorIds(IEnumerable<string> monitorIds)
     {
         string[] normalizedIds = monitorIds
@@ -556,75 +525,6 @@ internal sealed partial class AppSettings
         }
 
         _shortcutButtons[index] = setting;
-        PersistAndNotify();
-    }
-
-    public IReadOnlyList<DesktopWidgetSetting> DesktopWidgets => _desktopWidgets;
-
-    public DesktopWidgetSetting AddDesktopWidget(string kind, string monitorId)
-    {
-        string normalizedKind = NormalizeDesktopWidgetKind(kind);
-        string id = Guid.NewGuid().ToString("N");
-        string title = normalizedKind switch
-        {
-            "Clock" => "Clock",
-            "Weather" => "Weather",
-            _ => "System"
-        };
-
-        var setting = new DesktopWidgetSetting(
-            id,
-            normalizedKind,
-            title,
-            monitorId,
-            56,
-            56 + (_desktopWidgets.Length * 24),
-            normalizedKind == "System" ? 290 : 260,
-            normalizedKind == "Weather" ? 150 : 118,
-            0.90,
-            22,
-            1.0,
-            "Dark",
-            "#101114",
-            "#F4F4F5",
-            "#7EC7FF",
-            normalizedKind == "Clock" ? 1 : 6,
-            true);
-
-        _desktopWidgets = [.. _desktopWidgets, setting];
-        PersistAndNotify();
-        return setting;
-    }
-
-    public void RemoveDesktopWidget(string id)
-    {
-        DesktopWidgetSetting[] remaining = _desktopWidgets
-            .Where(widget => !string.Equals(widget.Id, id, StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-        if (remaining.Length == _desktopWidgets.Length)
-        {
-            return;
-        }
-
-        _desktopWidgets = remaining;
-        PersistAndNotify();
-    }
-
-    public void UpdateDesktopWidget(DesktopWidgetSetting setting)
-    {
-        int index = Array.FindIndex(_desktopWidgets, widget => string.Equals(widget.Id, setting.Id, StringComparison.OrdinalIgnoreCase));
-        if (index < 0)
-        {
-            return;
-        }
-
-        DesktopWidgetSetting normalized = NormalizeDesktopWidget(setting);
-        if (normalized == _desktopWidgets[index])
-        {
-            return;
-        }
-
-        _desktopWidgets[index] = normalized;
         PersistAndNotify();
     }
 }

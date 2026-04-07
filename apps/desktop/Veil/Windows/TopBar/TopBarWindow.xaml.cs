@@ -172,10 +172,11 @@ public sealed partial class TopBarWindow : Window
         WindowHelper.MakeOverlay(this);
 
         int width = _screen.Right - _screen.Left;
-        WindowHelper.PositionOnMonitor(this, _screen.Left, _screen.Top, width, BarHeight);
+        int height = GetBarHeightInPhysicalPixels();
+        WindowHelper.PositionOnMonitor(this, _screen.Left, _screen.Top, width, height);
 
         WindowHelper.SetAlwaysOnTop(this);
-        WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, BarHeight);
+        WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, height);
         _appBarRegistered = true;
         ApplySettings();
 
@@ -226,6 +227,12 @@ public sealed partial class TopBarWindow : Window
 
     internal bool IsMinimalModeActive => _isGameMinimalMode;
 
+    private int GetBarHeightInPhysicalPixels()
+        => Math.Max(1, WindowHelper.ViewPixelsToPhysical(this, BarHeight));
+
+    private double GetScreenWidthInViewPixels()
+        => WindowHelper.PhysicalPixelsToView(this, _screen.Right - _screen.Left);
+
     internal void ApplyActivityState(bool gameRunning, bool shouldHideForForegroundWindow, int? activeGameProcessId)
     {
         bool visibilityChanged = false;
@@ -262,9 +269,10 @@ public sealed partial class TopBarWindow : Window
             WindowHelper.ShowWindow(this);
 
             int width = _screen.Right - _screen.Left;
-            WindowHelper.PositionOnMonitor(this, _screen.Left, _screen.Top, width, BarHeight);
+            int height = GetBarHeightInPhysicalPixels();
+            WindowHelper.PositionOnMonitor(this, _screen.Left, _screen.Top, width, height);
             WindowHelper.SetAlwaysOnTop(this);
-            WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, BarHeight);
+            WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, height);
             _appBarRegistered = true;
         }
 
@@ -436,7 +444,7 @@ public sealed partial class TopBarWindow : Window
 
     private void UpdateActionButtonLayout()
     {
-        int screenWidth = _screen.Right - _screen.Left;
+        double screenWidth = GetScreenWidthInViewPixels();
         double leftMargin = LeftButtonsPanel.Margin.Left + LeftButtonsPanel.Margin.Right;
         double rightWidth = RightButtonsPanel.ActualWidth + RightButtonsPanel.Margin.Left + RightButtonsPanel.Margin.Right;
         double maxLeftWidth = Math.Max(0, screenWidth - rightWidth - MinimumClockClearance - leftMargin);

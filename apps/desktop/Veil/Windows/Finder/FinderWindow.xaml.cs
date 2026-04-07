@@ -22,7 +22,7 @@ namespace Veil.Windows;
 
 public sealed partial class FinderWindow : Window
 {
-    private const int DebounceMilliseconds = 60;
+    private const int DebounceMilliseconds = 25;
     private const int WindowCornerRadius = 12;
     private const int MaxVisibleResults = 200;
     private static readonly CornerRadius InactiveRowCornerRadius = new(0);
@@ -63,6 +63,17 @@ public sealed partial class FinderWindow : Window
     private DateTime _openedAtUtc;
     private int _selectedIndex = -1;
     private Button[]? _cachedAppRows;
+
+    // Pooled scoring buffer to avoid allocations per keystroke
+    private (FinderEntry entry, int score)[] _scoreBuffer = [];
+
+    // Sorted names for binary-search autocomplete
+    private string[] _sortedNames = [];
+    private FinderEntry[] _sortedNameEntries = [];
+
+    // Pooled StringBuilder for NormalizeSearch
+    [ThreadStatic]
+    private static StringBuilder? t_normalizeBuilder;
 
     internal FinderWindow(ScreenBounds screen)
     {
@@ -123,6 +134,7 @@ public sealed partial class FinderWindow : Window
 
         SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        WindowHelper.PrepareForSystemBackdrop(this);
     }
 
     private void SetupAcrylic()
@@ -180,7 +192,7 @@ public sealed partial class FinderWindow : Window
         SetForegroundWindow(_hwnd);
         SearchTextBox.Focus(FocusState.Programmatic);
 
-        // Only load if not yet loaded
+        // Only load if not yet loaded - await silently so no "Loading..." is visible
         if (_allEntries.Length == 0)
         {
             _ = EnsureAppsLoadedAsync();
@@ -250,7 +262,9 @@ public sealed partial class FinderWindow : Window
         }
 
         _isLoadingApps = true;
-        UpdateStatusBar();
+
+        // Don't show "Loading..." - the preload from App.OnLaunched should already be in flight.
+        // If apps arrive quickly the user never sees an empty state.
 
         try
         {
@@ -275,6 +289,12 @@ public sealed partial class FinderWindow : Window
             _appEntries = appEntries;
             _allEntries = allEntries;
 
+            // Allocate pooled scoring buffer once
+            _scoreBuffer = new (FinderEntry, int)[allEntries.Length];
+
+            // Build sorted name index for fast autocomplete
+            BuildAutocompleteIndex(allEntries);
+
             // Pre-build the default rows (all apps, no filter)
             _cachedAppRows = new Button[appEntries.Length];
             for (int i = 0; i < appEntries.Length; i++)
@@ -295,6 +315,30 @@ public sealed partial class FinderWindow : Window
         }
 
         ApplyFilter(SearchTextBox.Text);
+    }
+
+    private void BuildAutocompleteIndex(FinderEntry[] entries)
+    {
+        // Sort entries by lowercase name for binary-search prefix matching
+        var pairs = new (string lower, FinderEntry entry)[entries.Length];
+        for (int i = 0; i < entries.Length; i++)
+        {
+            pairs[i] = (entries[i].Name.ToLowerInvariant(), entries[i]);
+        }
+
+        Array.Sort(pairs, static (a, b) =>
+        {
+            int cmp = string.Compare(a.lower, b.lower, StringComparison.Ordinal);
+            return cmp != 0 ? cmp : a.entry.Name.Length.CompareTo(b.entry.Name.Length);
+        });
+
+        _sortedNames = new string[pairs.Length];
+        _sortedNameEntries = new FinderEntry[pairs.Length];
+        for (int i = 0; i < pairs.Length; i++)
+        {
+            _sortedNames[i] = pairs[i].lower;
+            _sortedNameEntries[i] = pairs[i].entry;
+        }
     }
 
     private void OnSearchTextChanged(object sender, TextChangedEventArgs e)
@@ -391,7 +435,14 @@ public sealed partial class FinderWindow : Window
         }
         else
         {
-            var buffer = new (FinderEntry entry, int score)[_allEntries.Length];
+            // Reuse pooled buffer
+            var buffer = _scoreBuffer;
+            if (buffer.Length < _allEntries.Length)
+            {
+                buffer = new (FinderEntry, int)[_allEntries.Length];
+                _scoreBuffer = buffer;
+            }
+
             int count = 0;
 
             for (int i = 0; i < _allEntries.Length; i++)
@@ -422,24 +473,119 @@ public sealed partial class FinderWindow : Window
     private static int ScoreMatch(FinderEntry entry, string query)
     {
         string token = entry.SearchToken;
-        int kindBonus = entry.App is not null ? 1 : 0;
+        int kindBonus = entry.App is not null ? 2 : 0;
 
+        // Exact prefix match - best score
         if (token.StartsWith(query, StringComparison.Ordinal))
         {
-            return 100 + kindBonus;
+            // Bonus for shorter names (more precise match)
+            int lengthBonus = Math.Max(0, 20 - (token.Length - query.Length));
+            return 200 + kindBonus + lengthBonus;
         }
 
+        // Word-boundary match: query matches the start of any word
+        int wordBoundaryScore = ScoreWordBoundary(token, query);
+        if (wordBoundaryScore > 0)
+        {
+            return 120 + kindBonus + wordBoundaryScore;
+        }
+
+        // Substring match
         if (token.Contains(query, StringComparison.Ordinal))
         {
-            return 50 + kindBonus;
+            return 80 + kindBonus;
         }
 
+        // Abbreviation match: first letters of words
+        if (query.Length >= 2 && MatchesAbbreviation(token, query))
+        {
+            return 70 + kindBonus;
+        }
+
+        // Category match for non-app entries
         if (entry.App is null && entry.CategoryLower.Contains(query, StringComparison.Ordinal))
         {
             return 30;
         }
 
+        // Fuzzy: all characters present in order
+        if (query.Length >= 3 && FuzzyContains(token, query))
+        {
+            return 15 + kindBonus;
+        }
+
         return 0;
+    }
+
+    private static int ScoreWordBoundary(string token, string query)
+    {
+        // Check if query matches the start of any "word" in the token
+        // Words start after non-alphanumeric chars or at uppercase letters in camelCase
+        int tokenLen = token.Length;
+        int queryLen = query.Length;
+
+        for (int i = 1; i <= tokenLen - queryLen; i++)
+        {
+            char prev = token[i - 1];
+            char curr = token[i];
+
+            // Word boundary: previous char is non-letter or transition to uppercase
+            bool isBoundary = !char.IsLetterOrDigit(prev) ||
+                              (char.IsLower(prev) && char.IsUpper(curr));
+
+            if (!isBoundary)
+            {
+                continue;
+            }
+
+            if (token.AsSpan(i, queryLen).SequenceEqual(query.AsSpan()))
+            {
+                return 10;
+            }
+        }
+
+        return 0;
+    }
+
+    private static bool MatchesAbbreviation(string token, string query)
+    {
+        // Check if query chars match the first letter of consecutive words
+        int qi = 0;
+        bool atWordStart = true;
+
+        for (int i = 0; i < token.Length && qi < query.Length; i++)
+        {
+            char c = token[i];
+
+            if (!char.IsLetterOrDigit(c))
+            {
+                atWordStart = true;
+                continue;
+            }
+
+            if (atWordStart && c == query[qi])
+            {
+                qi++;
+            }
+
+            atWordStart = false;
+        }
+
+        return qi == query.Length;
+    }
+
+    private static bool FuzzyContains(string token, string query)
+    {
+        int qi = 0;
+        for (int i = 0; i < token.Length && qi < query.Length; i++)
+        {
+            if (token[i] == query[qi])
+            {
+                qi++;
+            }
+        }
+
+        return qi == query.Length;
     }
 
     private sealed class ScoredEntryComparer : IComparer<(FinderEntry entry, int score)>
@@ -456,7 +602,8 @@ public sealed partial class FinderWindow : Window
     {
         if (_isLoadingApps)
         {
-            ResultCountText.Text = "Loading...";
+            // Show nothing instead of "Loading..." - avoid visible loading state
+            ResultCountText.Text = string.Empty;
             HintText.Text = string.Empty;
             return;
         }
@@ -852,7 +999,9 @@ public sealed partial class FinderWindow : Window
 
         string trimmed = value.Trim();
         string decomposed = trimmed.Normalize(NormalizationForm.FormD);
-        var sb = new StringBuilder(decomposed.Length);
+
+        var sb = t_normalizeBuilder ??= new StringBuilder(64);
+        sb.Clear();
 
         foreach (char c in decomposed)
         {
@@ -872,24 +1021,16 @@ public sealed partial class FinderWindow : Window
 
     private void ApplyAutocomplete(string query)
     {
-        if (query.Length == 0 || _allEntries.Length == 0)
+        if (query.Length == 0 || _sortedNames.Length == 0)
         {
             AutocompleteHint.Inlines.Clear();
             AutocompleteHint.Visibility = Visibility.Collapsed;
             return;
         }
 
-        string? best = null;
-        for (int i = 0; i < _allEntries.Length; i++)
-        {
-            string name = _allEntries[i].Name;
-            if (name.Length > query.Length &&
-                name.StartsWith(query, StringComparison.CurrentCultureIgnoreCase) &&
-                (best is null || name.Length < best.Length))
-            {
-                best = name;
-            }
-        }
+        // Binary search for the first name that starts with the query (case-insensitive)
+        string queryLower = query.ToLowerInvariant();
+        string? best = FindShortestPrefixMatch(queryLower, query.Length);
 
         if (best is null)
         {
@@ -910,5 +1051,73 @@ public sealed partial class FinderWindow : Window
             Foreground = AutocompleteBrush
         });
         AutocompleteHint.Visibility = Visibility.Visible;
+    }
+
+    private string? FindShortestPrefixMatch(string queryLower, int queryLength)
+    {
+        // Binary search to find the leftmost name >= queryLower
+        int lo = 0;
+        int hi = _sortedNames.Length - 1;
+        int firstCandidate = -1;
+
+        while (lo <= hi)
+        {
+            int mid = lo + ((hi - lo) >> 1);
+            string name = _sortedNames[mid];
+
+            int cmp = name.Length >= queryLength
+                ? string.Compare(name, 0, queryLower, 0, queryLength, StringComparison.Ordinal)
+                : string.Compare(name, queryLower, StringComparison.Ordinal);
+
+            if (cmp < 0)
+            {
+                lo = mid + 1;
+            }
+            else if (cmp > 0)
+            {
+                hi = mid - 1;
+            }
+            else
+            {
+                // Found a prefix match - look for the shortest one
+                firstCandidate = mid;
+                hi = mid - 1;
+            }
+        }
+
+        if (firstCandidate < 0)
+        {
+            return null;
+        }
+
+        // The sorted array is ordered by (name, length), so the first match at firstCandidate
+        // is already among the shortest. But scan forward to find the absolute shortest.
+        string? bestName = null;
+        int bestLen = int.MaxValue;
+
+        for (int i = firstCandidate; i < _sortedNames.Length; i++)
+        {
+            string name = _sortedNames[i];
+
+            if (name.Length < queryLength)
+            {
+                continue;
+            }
+
+            if (!name.StartsWith(queryLower, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            // Must be strictly longer than query to show a completion
+            string originalName = _sortedNameEntries[i].Name;
+            if (originalName.Length > queryLength && originalName.Length < bestLen)
+            {
+                bestLen = originalName.Length;
+                bestName = originalName;
+            }
+        }
+
+        return bestName;
     }
 }

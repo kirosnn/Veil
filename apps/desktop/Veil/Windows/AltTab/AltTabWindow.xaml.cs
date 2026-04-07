@@ -43,6 +43,7 @@ public sealed partial class AltTabWindow : Window
         _hwnd = WindowHelper.GetHwnd(this);
         WindowHelper.RemoveTitleBar(this);
         WindowHelper.MakeOverlay(this);
+        WindowHelper.PrepareForSystemBackdrop(this);
         SetupAcrylic(global::Windows.UI.Color.FromArgb(255, 24, 28, 36));
         ShowWindowNative(_hwnd, SW_HIDE);
     }

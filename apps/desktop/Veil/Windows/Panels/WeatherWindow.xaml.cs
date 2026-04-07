@@ -89,6 +89,7 @@ public sealed partial class WeatherWindow : Window
         SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
+        WindowHelper.PrepareForSystemBackdrop(this);
         SetupAcrylic();
         BuildContent(0, 0);
         ShowWindowNative(_hwnd, SW_HIDE);
@@ -100,24 +101,21 @@ public sealed partial class WeatherWindow : Window
 
         _acrylicController = new DesktopAcrylicController
         {
-            TintColor = UseLightTheme
-                ? global::Windows.UI.Color.FromArgb(255, 255, 255, 255)
-                : global::Windows.UI.Color.FromArgb(255, 0, 0, 0),
-            TintOpacity = UseLightTheme ? 0.06f : 0.68f,
-            LuminosityOpacity = UseLightTheme ? 0.78f : 0.24f,
-            FallbackColor = UseLightTheme
-                ? global::Windows.UI.Color.FromArgb(216, 255, 255, 255)
-                : global::Windows.UI.Color.FromArgb(236, 0, 0, 0)
+            TintColor = PanelGlassPalette.GetAcrylicTintColor(UseLightTheme),
+            TintOpacity = PanelGlassPalette.GetAcrylicTintOpacity(UseLightTheme),
+            LuminosityOpacity = PanelGlassPalette.GetAcrylicLuminosityOpacity(UseLightTheme),
+            FallbackColor = PanelGlassPalette.GetAcrylicFallbackColor(UseLightTheme)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
         {
             IsInputActive = true,
-            Theme = UseLightTheme ? SystemBackdropTheme.Light : SystemBackdropTheme.Dark
+            Theme = PanelGlassPalette.GetBackdropTheme(UseLightTheme)
         };
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
+        PanelBorder.Background = PanelGlassPalette.CreateFrameBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 10);
     }
 
     public void Initialize()
@@ -237,7 +235,7 @@ public sealed partial class WeatherWindow : Window
 
         var shell = new Border
         {
-            Background = CreatePanelBackgroundBrush(),
+            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0)),
             CornerRadius = new CornerRadius(PanelCornerRadius),
             Padding = new Thickness(ContentInset),
             HorizontalAlignment = HorizontalAlignment.Stretch
@@ -268,6 +266,7 @@ public sealed partial class WeatherWindow : Window
 
             shell.Child = layout;
             PanelWindowMetrics emptyMetrics = PanelWindowSizer.Measure(
+                this,
                 shell,
                 anchorRight,
                 anchorY,
@@ -279,12 +278,13 @@ public sealed partial class WeatherWindow : Window
             if (emptyMetrics.IsHeightClamped)
             {
                 shell.Child = CreateScrollableContent(layout);
-                shell.Width = emptyMetrics.Width;
-                shell.MaxWidth = emptyMetrics.Width;
-                shell.Height = emptyMetrics.Height;
+                shell.Width = emptyMetrics.ViewWidth;
+                shell.MaxWidth = emptyMetrics.ViewWidth;
+                shell.Height = emptyMetrics.ViewHeight;
             }
             _panelWidth = emptyMetrics.Width;
             _panelHeight = emptyMetrics.Height;
+            shell.Height = emptyMetrics.ViewHeight;
             ContentPanel.Children.Add(shell);
             return emptyMetrics;
         }
@@ -301,6 +301,7 @@ public sealed partial class WeatherWindow : Window
 
         shell.Child = layout;
         PanelWindowMetrics metrics = PanelWindowSizer.Measure(
+            this,
             shell,
             anchorRight,
             anchorY,
@@ -312,12 +313,13 @@ public sealed partial class WeatherWindow : Window
         if (metrics.IsHeightClamped)
         {
             shell.Child = CreateScrollableContent(layout);
-            shell.Width = metrics.Width;
-            shell.MaxWidth = metrics.Width;
-            shell.Height = metrics.Height;
+            shell.Width = metrics.ViewWidth;
+            shell.MaxWidth = metrics.ViewWidth;
+            shell.Height = metrics.ViewHeight;
         }
         _panelWidth = metrics.Width;
         _panelHeight = metrics.Height;
+        shell.Height = metrics.ViewHeight;
         ContentPanel.Children.Add(shell);
         return metrics;
     }
@@ -674,16 +676,12 @@ public sealed partial class WeatherWindow : Window
 
     private SolidColorBrush CreatePanelBackgroundBrush()
     {
-        return UseLightTheme
-            ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(38, 255, 255, 255))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(34, 10, 10, 10));
+        return PanelGlassPalette.CreateFrameBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 10);
     }
 
     private SolidColorBrush CreateCardBackgroundBrush()
     {
-        return UseLightTheme
-            ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, 255, 255, 255));
+        return PanelGlassPalette.CreateCardBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 18);
     }
 
     private SolidColorBrush CreatePrimaryTextBrush()

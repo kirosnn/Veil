@@ -8,10 +8,6 @@ namespace Veil.Services;
 
 internal sealed class DesktopContextMenuService : IDisposable
 {
-    private const int MenuIdAddClock = 2001;
-    private const int MenuIdAddWeather = 2002;
-    private const int MenuIdAddSystem = 2003;
-    private const int MenuIdWidgetSettings = 2010;
     private const int MenuIdSettings = 2020;
 
     private IntPtr _mouseHook;
@@ -22,8 +18,6 @@ internal sealed class DesktopContextMenuService : IDisposable
     private bool _disposed;
     private bool _menuOpen;
 
-    public event Action<string>? AddWidgetRequested;
-    public event Action? WidgetSettingsRequested;
     public event Action? SettingsRequested;
 
     public DesktopContextMenuService(DispatcherQueue dispatcherQueue)
@@ -72,18 +66,6 @@ internal sealed class DesktopContextMenuService : IDisposable
             int menuId = (int)(wParam & 0xFFFF);
             switch (menuId)
             {
-                case MenuIdAddClock:
-                    AddWidgetRequested?.Invoke("Clock");
-                    break;
-                case MenuIdAddWeather:
-                    AddWidgetRequested?.Invoke("Weather");
-                    break;
-                case MenuIdAddSystem:
-                    AddWidgetRequested?.Invoke("System");
-                    break;
-                case MenuIdWidgetSettings:
-                    WidgetSettingsRequested?.Invoke();
-                    break;
                 case MenuIdSettings:
                     SettingsRequested?.Invoke();
                     break;
@@ -164,17 +146,6 @@ internal sealed class DesktopContextMenuService : IDisposable
 
         try
         {
-            var hSubMenu = CreatePopupMenu();
-            if (hSubMenu != IntPtr.Zero)
-            {
-                AppendMenuW(hSubMenu, MF_STRING, (nuint)MenuIdAddClock, "Clock");
-                AppendMenuW(hSubMenu, MF_STRING, (nuint)MenuIdAddWeather, "Weather");
-                AppendMenuW(hSubMenu, MF_STRING, (nuint)MenuIdAddSystem, "System");
-                AppendMenuW(hMenu, MF_POPUP, (nuint)hSubMenu, "Add Widget");
-            }
-
-            AppendMenuW(hMenu, MF_STRING, (nuint)MenuIdWidgetSettings, "Widget Settings");
-            AppendMenuW(hMenu, MF_SEPARATOR, 0, null);
             AppendMenuW(hMenu, MF_STRING, (nuint)MenuIdSettings, "Settings");
 
             SetForegroundWindow(_messageHwnd);

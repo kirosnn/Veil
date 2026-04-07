@@ -41,8 +41,6 @@ internal sealed partial class AppSettings
             GameDetectionMode = _gameDetectionMode,
             GameProcessNames = _gameProcessNames,
             BackgroundOptimizationEnabled = _backgroundOptimizationEnabled,
-            DesktopWidgetSnapToGrid = _desktopWidgetSnapToGrid,
-            DesktopWidgetGridSize = _desktopWidgetGridSize,
             ShortcutButtons = _shortcutButtons
                 .Select(setting => setting is null
                     ? null
@@ -52,28 +50,6 @@ internal sealed partial class AppSettings
                         AppId = setting.AppId,
                         DisplayName = setting.DisplayName
                     })
-                .ToArray(),
-            DesktopWidgets = _desktopWidgets
-                .Select(setting => new DesktopWidgetDto
-                {
-                    Id = setting.Id,
-                    Kind = setting.Kind,
-                    Title = setting.Title,
-                    MonitorId = setting.MonitorId,
-                    X = setting.X,
-                    Y = setting.Y,
-                    Width = setting.Width,
-                    Height = setting.Height,
-                    Opacity = setting.Opacity,
-                    CornerRadius = setting.CornerRadius,
-                    Scale = setting.Scale,
-                    Theme = setting.Theme,
-                    BackgroundColor = setting.BackgroundColor,
-                    ForegroundColor = setting.ForegroundColor,
-                    AccentColor = setting.AccentColor,
-                    RefreshSeconds = setting.RefreshSeconds,
-                    ShowSeconds = setting.ShowSeconds
-                })
                 .ToArray()
         };
 
@@ -139,10 +115,7 @@ internal sealed partial class AppSettings
                 settings._gameDetectionMode = GameDetectionService.NormalizeDetectionMode(dto.GameDetectionMode);
                 settings._gameProcessNames = NormalizeGameProcessNames(dto.GameProcessNames);
                 settings._backgroundOptimizationEnabled = dto.BackgroundOptimizationEnabled;
-                settings._desktopWidgetSnapToGrid = dto.DesktopWidgetSnapToGrid;
-                settings._desktopWidgetGridSize = Math.Clamp(dto.DesktopWidgetGridSize <= 0 ? 16 : dto.DesktopWidgetGridSize, 8, 64);
                 settings._shortcutButtons = NormalizeShortcutButtons(dto.ShortcutButtons);
-                settings._desktopWidgets = NormalizeDesktopWidgets(dto.DesktopWidgets);
 
                 if (requiresSave)
                 {
@@ -190,10 +163,7 @@ internal sealed partial class AppSettings
         public string GameDetectionMode { get; set; } = GameDetectionService.HybridMode;
         public string[]? GameProcessNames { get; set; }
         public bool BackgroundOptimizationEnabled { get; set; } = true;
-        public bool DesktopWidgetSnapToGrid { get; set; } = true;
-        public int DesktopWidgetGridSize { get; set; } = 16;
         public AppShortcutDto?[]? ShortcutButtons { get; set; }
-        public DesktopWidgetDto[]? DesktopWidgets { get; set; }
     }
 
     private sealed class AppShortcutDto
@@ -201,26 +171,5 @@ internal sealed partial class AppSettings
         public string Name { get; set; } = string.Empty;
         public string AppId { get; set; } = string.Empty;
         public string DisplayName { get; set; } = string.Empty;
-    }
-
-    private sealed class DesktopWidgetDto
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Kind { get; set; } = "Clock";
-        public string Title { get; set; } = string.Empty;
-        public string MonitorId { get; set; } = string.Empty;
-        public int X { get; set; } = 56;
-        public int Y { get; set; } = 56;
-        public int Width { get; set; } = 260;
-        public int Height { get; set; } = 118;
-        public double Opacity { get; set; } = 0.90;
-        public int CornerRadius { get; set; } = 22;
-        public double Scale { get; set; } = 1.0;
-        public string Theme { get; set; } = "Dark";
-        public string BackgroundColor { get; set; } = "#101114";
-        public string ForegroundColor { get; set; } = "#F4F4F5";
-        public string AccentColor { get; set; } = "#7EC7FF";
-        public int RefreshSeconds { get; set; } = 6;
-        public bool ShowSeconds { get; set; } = true;
     }
 }

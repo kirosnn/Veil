@@ -24,10 +24,21 @@ internal static class WindowSwitcherService
         "Progman",
         "WorkerW",
         "Shell_TrayWnd",
-        "Shell_SecondaryTrayWnd"
+        "Shell_SecondaryTrayWnd",
+        "NotifyIconOverflowWindow"
     };
 
     internal static IReadOnlyList<WindowSwitchEntry> GetSwitchableWindows()
+    {
+        return GetSwitchableWindowsCore(screen: null);
+    }
+
+    internal static IReadOnlyList<WindowSwitchEntry> GetSwitchableWindowsForScreen(ScreenBounds screen)
+    {
+        return GetSwitchableWindowsCore(screen);
+    }
+
+    private static IReadOnlyList<WindowSwitchEntry> GetSwitchableWindowsCore(ScreenBounds? screen)
     {
         IntPtr foregroundWindow = GetForegroundWindow();
         WindowSwitchEntry? foregroundEntry = null;
@@ -36,7 +47,7 @@ internal static class WindowSwitcherService
 
         EnumWindows((hwnd, _) =>
         {
-            if (!TryCreateEntry(hwnd, out WindowSwitchEntry entry))
+            if (!TryCreateEntry(hwnd, screen, out WindowSwitchEntry entry))
             {
                 return true;
             }
@@ -113,7 +124,7 @@ internal static class WindowSwitcherService
             bestMonitor.WorkArea.Bottom);
     }
 
-    private static bool TryCreateEntry(IntPtr hwnd, out WindowSwitchEntry entry)
+    private static bool TryCreateEntry(IntPtr hwnd, ScreenBounds? screen, out WindowSwitchEntry entry)
     {
         entry = default!;
 
@@ -135,7 +146,12 @@ internal static class WindowSwitcherService
         }
 
         int exStyle = GetWindowLongW(hwnd, GWL_EXSTYLE);
-        if ((exStyle & WS_EX_TOOLWINDOW) != 0 && (exStyle & WS_EX_APPWINDOW) == 0)
+        if (!HasSwitchableExtendedStyles(exStyle))
+        {
+            return false;
+        }
+
+        if (!HasTaskbarLikePresence(hwnd, exStyle))
         {
             return false;
         }
@@ -149,6 +165,20 @@ internal static class WindowSwitcherService
         if (!IsWindowVisible(hwnd) && !isMinimized)
         {
             return false;
+        }
+
+        bool hasWindowRect = GetWindowRect(hwnd, out Rect windowRect);
+        if (!isMinimized)
+        {
+            if (!hasWindowRect || !HasMeaningfulBounds(windowRect))
+            {
+                return false;
+            }
+
+            if (screen.HasValue && !WindowHelper.IntersectsScreen(windowRect, screen.Value))
+            {
+                return false;
+            }
         }
 
         string windowTitle = GetWindowTitle(hwnd);
@@ -165,6 +195,56 @@ internal static class WindowSwitcherService
             isMinimized,
             GetWindowAccentColor(hwnd));
         return true;
+    }
+
+    internal static bool HasSwitchableExtendedStyles(int exStyle)
+    {
+        if ((exStyle & WS_EX_TOOLWINDOW) != 0 && (exStyle & WS_EX_APPWINDOW) == 0)
+        {
+            return false;
+        }
+
+        return (exStyle & WS_EX_NOACTIVATE) == 0;
+    }
+
+    internal static bool HasMeaningfulBounds(Rect rect)
+    {
+        return rect.Right - rect.Left > 1 && rect.Bottom - rect.Top > 1;
+    }
+
+    private static bool HasTaskbarLikePresence(IntPtr hwnd, int exStyle)
+    {
+        IntPtr owner = GetWindow(hwnd, GW_OWNER);
+        if (owner != IntPtr.Zero && (exStyle & WS_EX_APPWINDOW) == 0)
+        {
+            return false;
+        }
+
+        IntPtr rootOwner = GetAncestor(hwnd, GA_ROOTOWNER);
+        if (rootOwner == IntPtr.Zero)
+        {
+            rootOwner = hwnd;
+        }
+
+        IntPtr walk = rootOwner;
+        while (true)
+        {
+            IntPtr lastPopup = GetLastActivePopup(walk);
+            if (lastPopup == IntPtr.Zero || lastPopup == walk)
+            {
+                break;
+            }
+
+            if (IsWindowVisible(lastPopup))
+            {
+                walk = lastPopup;
+                break;
+            }
+
+            walk = lastPopup;
+        }
+
+        return walk == hwnd || rootOwner == hwnd;
     }
 
     private static string GetClassName(IntPtr hwnd)

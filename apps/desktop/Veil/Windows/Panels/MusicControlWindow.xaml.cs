@@ -109,6 +109,7 @@ public sealed partial class MusicControlWindow : Window
         SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
+        WindowHelper.PrepareForSystemBackdrop(this);
         SetupAcrylic();
         BuildUI(0, 0);
         ShowWindowNative(_hwnd, SW_HIDE);
@@ -120,24 +121,21 @@ public sealed partial class MusicControlWindow : Window
 
         _acrylicController = new DesktopAcrylicController
         {
-            TintColor = UseLightTheme
-                ? global::Windows.UI.Color.FromArgb(255, 255, 255, 255)
-                : global::Windows.UI.Color.FromArgb(255, 0, 0, 0),
-            TintOpacity = UseLightTheme ? 0.06f : 0.58f,
-            LuminosityOpacity = UseLightTheme ? 0.76f : 0.24f,
-            FallbackColor = UseLightTheme
-                ? global::Windows.UI.Color.FromArgb(214, 255, 255, 255)
-                : global::Windows.UI.Color.FromArgb(228, 0, 0, 0)
+            TintColor = PanelGlassPalette.GetAcrylicTintColor(UseLightTheme),
+            TintOpacity = PanelGlassPalette.GetAcrylicTintOpacity(UseLightTheme),
+            LuminosityOpacity = PanelGlassPalette.GetAcrylicLuminosityOpacity(UseLightTheme),
+            FallbackColor = PanelGlassPalette.GetAcrylicFallbackColor(UseLightTheme)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
         {
             IsInputActive = true,
-            Theme = UseLightTheme ? SystemBackdropTheme.Light : SystemBackdropTheme.Dark
+            Theme = PanelGlassPalette.GetBackdropTheme(UseLightTheme)
         };
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
+        PanelBorder.Background = PanelGlassPalette.CreateFrameBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 10);
     }
 
     private PanelWindowMetrics BuildUI(int anchorRight, int anchorY)
@@ -207,6 +205,7 @@ public sealed partial class MusicControlWindow : Window
 
         shell.Child = root;
         PanelWindowMetrics metrics = PanelWindowSizer.Measure(
+            this,
             shell,
             anchorRight,
             anchorY,
@@ -218,13 +217,13 @@ public sealed partial class MusicControlWindow : Window
         if (metrics.IsHeightClamped)
         {
             shell.Child = CreateScrollableContent(root);
-            shell.Width = metrics.Width;
-            shell.MaxWidth = metrics.Width;
-            shell.Height = metrics.Height;
+            shell.Width = metrics.ViewWidth;
+            shell.MaxWidth = metrics.ViewWidth;
+            shell.Height = metrics.ViewHeight;
         }
         _panelWidth = metrics.Width;
         _panelHeight = metrics.Height;
-        shell.Height = _panelHeight;
+        shell.Height = metrics.ViewHeight;
         ContentPanel.Children.Add(shell);
 
         _ = LoadAlbumArtAsync();

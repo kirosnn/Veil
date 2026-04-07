@@ -72,9 +72,9 @@
       "Bash(ls:*)",
       "Bash(mv:*)",
       "Bash(mv FinderWindow.xaml FinderWindow.xaml.cs Finder/)",
-      "Bash(mv DesktopWidgetWindow.cs WidgetWindow.xaml WidgetWindow.xaml.cs Desktop/)",
       "Bash(mv AltTabWindow.xaml AltTabWindow.xaml.cs AltTab/)",
-      "Bash(mv SettingsWindow.xaml SettingsWindow.xaml.cs Settings/)"
+      "Bash(mv SettingsWindow.xaml SettingsWindow.xaml.cs Settings/)",
+      "Bash(powershell:*)"
     ]
   }
 }

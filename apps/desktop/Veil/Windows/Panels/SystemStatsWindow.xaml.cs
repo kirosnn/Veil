@@ -16,7 +16,10 @@ namespace Veil.Windows;
 public sealed partial class SystemStatsWindow : Window
 {
     private const int PanelWidth = 250;
+    private const int MinimumPanelHeight = 160;
     private const int PanelCornerRadius = 14;
+    private const int ScreenMargin = 8;
+    private const int HorizontalContentInset = 28;
 
     private readonly AppSettings _settings = AppSettings.Current;
     private IntPtr _hwnd;
@@ -29,6 +32,7 @@ public sealed partial class SystemStatsWindow : Window
     private string? _cpuName;
     private DateTime _lastVeilCpuSampleUtc;
     private TimeSpan _lastVeilCpuTime;
+    private double _panelViewWidth = PanelWidth;
 
     public bool IsStatsVisible { get; private set; }
     public DateTime LastHiddenAtUtc { get; private set; }
@@ -105,6 +109,7 @@ public sealed partial class SystemStatsWindow : Window
         SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
+        WindowHelper.PrepareForSystemBackdrop(this);
         SetupAcrylic();
         ShowWindowNative(_hwnd, SW_HIDE);
     }
@@ -115,24 +120,22 @@ public sealed partial class SystemStatsWindow : Window
 
         _acrylicController = new DesktopAcrylicController
         {
-            TintColor = UseLightTheme
-                ? global::Windows.UI.Color.FromArgb(255, 255, 255, 255)
-                : global::Windows.UI.Color.FromArgb(255, 0, 0, 0),
-            TintOpacity = UseLightTheme ? 0.06f : 0.64f,
-            LuminosityOpacity = UseLightTheme ? 0.78f : 0.22f,
-            FallbackColor = UseLightTheme
-                ? global::Windows.UI.Color.FromArgb(214, 255, 255, 255)
-                : global::Windows.UI.Color.FromArgb(232, 0, 0, 0)
+            TintColor = PanelGlassPalette.GetAcrylicTintColor(UseLightTheme),
+            TintOpacity = PanelGlassPalette.GetAcrylicTintOpacity(UseLightTheme),
+            LuminosityOpacity = PanelGlassPalette.GetAcrylicLuminosityOpacity(UseLightTheme),
+            FallbackColor = PanelGlassPalette.GetAcrylicFallbackColor(UseLightTheme)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
         {
             IsInputActive = true,
-            Theme = UseLightTheme ? SystemBackdropTheme.Light : SystemBackdropTheme.Dark
+            Theme = PanelGlassPalette.GetBackdropTheme(UseLightTheme)
         };
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
+
+        PanelBorder.Background = PanelGlassPalette.CreateFrameBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 10);
     }
 
     public void Initialize()
@@ -144,12 +147,15 @@ public sealed partial class SystemStatsWindow : Window
 
     public void ShowAt(int x, int y)
     {
+        int panelWidth = GetTargetPanelWidth(x, y + 6);
+        _panelViewWidth = Math.Max(1, WindowHelper.PhysicalPixelsToView(this, panelWidth));
         BuildAndRefresh();
 
         int panelHeight = CalculateHeight();
 
         var appWindow = WindowHelper.GetAppWindow(this);
-        var bounds = ResolveWindowBounds(x - PanelWidth, y + 6, PanelWidth, panelHeight);
+        var bounds = ResolveWindowBounds(x - panelWidth, y + 6, panelWidth, panelHeight);
+        ApplyPanelSize(bounds.Width, bounds.Height);
         appWindow.MoveAndResize(bounds);
         WindowHelper.ApplyRoundedRegion(_hwnd, bounds.Width, bounds.Height, PanelCornerRadius);
 
@@ -204,20 +210,25 @@ public sealed partial class SystemStatsWindow : Window
     private void OnRefreshTick(object? sender, object e)
     {
         if (!IsStatsVisible) return;
+
+        var appWindow = WindowHelper.GetAppWindow(this);
+        var pos = appWindow.Position;
+        int panelWidth = GetTargetPanelWidth(pos.X, pos.Y);
+        _panelViewWidth = Math.Max(1, WindowHelper.PhysicalPixelsToView(this, panelWidth));
         BuildAndRefresh();
 
         int panelHeight = CalculateHeight();
-        var appWindow = WindowHelper.GetAppWindow(this);
-        var pos = appWindow.Position;
-        var bounds = ResolveWindowBounds(pos.X, pos.Y, PanelWidth, panelHeight);
+        var bounds = ResolveWindowBounds(pos.X, pos.Y, panelWidth, panelHeight);
+        ApplyPanelSize(bounds.Width, bounds.Height);
         appWindow.MoveAndResize(bounds);
         WindowHelper.ApplyRoundedRegion(_hwnd, bounds.Width, bounds.Height, PanelCornerRadius);
     }
 
     private int CalculateHeight()
     {
-        StatsPanel.Measure(new global::Windows.Foundation.Size(PanelWidth - 28, double.PositiveInfinity));
-        return (int)Math.Ceiling(StatsPanel.DesiredSize.Height + 24);
+        StatsPanel.Measure(new global::Windows.Foundation.Size(Math.Max(1, _panelViewWidth - HorizontalContentInset), double.PositiveInfinity));
+        double desiredHeight = Math.Ceiling(StatsPanel.DesiredSize.Height + 24);
+        return Math.Max(1, WindowHelper.ViewPixelsToPhysical(this, Math.Max(MinimumPanelHeight, desiredHeight)));
     }
 
     private void BuildAndRefresh()
@@ -325,7 +336,7 @@ public sealed partial class SystemStatsWindow : Window
         headerRow.Children.Add(labelText);
         headerRow.Children.Add(valueText);
 
-        double barMaxWidth = PanelWidth - 28;
+        double barMaxWidth = Math.Max(0, _panelViewWidth - HorizontalContentInset);
         var barBg = new Border
         {
             Height = 4,
@@ -492,6 +503,10 @@ public sealed partial class SystemStatsWindow : Window
         }
 
         SetupAcrylic();
+        int panelWidth = IsStatsVisible && GetWindowRect(_hwnd, out var rect)
+            ? GetTargetPanelWidth(rect.Right, rect.Top)
+            : GetTargetPanelWidth(0, 0);
+        _panelViewWidth = Math.Max(1, WindowHelper.PhysicalPixelsToView(this, panelWidth));
         BuildAndRefresh();
 
         if (!IsStatsVisible)
@@ -502,7 +517,8 @@ public sealed partial class SystemStatsWindow : Window
         int panelHeight = CalculateHeight();
         var appWindow = WindowHelper.GetAppWindow(this);
         var pos = appWindow.Position;
-        var bounds = ResolveWindowBounds(pos.X, pos.Y, PanelWidth, panelHeight);
+        var bounds = ResolveWindowBounds(pos.X, pos.Y, panelWidth, panelHeight);
+        ApplyPanelSize(bounds.Width, bounds.Height);
         appWindow.MoveAndResize(bounds);
         WindowHelper.ApplyRoundedRegion(_hwnd, bounds.Width, bounds.Height, PanelCornerRadius);
     }
@@ -537,8 +553,6 @@ public sealed partial class SystemStatsWindow : Window
 
     private global::Windows.Graphics.RectInt32 ResolveWindowBounds(int x, int y, int width, int height)
     {
-        const int ScreenMargin = 8;
-
         var workArea = ResolveWorkArea(x, y);
         int boundedWidth = Math.Min(width, Math.Max(1, workArea.Right - workArea.Left - (ScreenMargin * 2)));
         int boundedHeight = Math.Min(height, Math.Max(1, workArea.Bottom - workArea.Top - (ScreenMargin * 2)));
@@ -563,6 +577,22 @@ public sealed partial class SystemStatsWindow : Window
             .OrderByDescending(static monitor => monitor.IsPrimary)
             .Select(static monitor => monitor.WorkArea)
             .FirstOrDefault();
+    }
+
+    private int GetTargetPanelWidth(int x, int y)
+    {
+        int desiredWidth = Math.Max(1, WindowHelper.ViewPixelsToPhysical(this, PanelWidth));
+        var workArea = ResolveWorkArea(x, y);
+        return Math.Min(desiredWidth, Math.Max(1, workArea.Right - workArea.Left - (ScreenMargin * 2)));
+    }
+
+    private void ApplyPanelSize(int physicalWidth, int physicalHeight)
+    {
+        double viewWidth = Math.Max(1, WindowHelper.PhysicalPixelsToView(this, physicalWidth));
+        double viewHeight = Math.Max(1, WindowHelper.PhysicalPixelsToView(this, physicalHeight));
+        PanelBorder.Width = viewWidth;
+        PanelBorder.MaxWidth = viewWidth;
+        PanelBorder.Height = viewHeight;
     }
 
     private readonly record struct VeilStats(
