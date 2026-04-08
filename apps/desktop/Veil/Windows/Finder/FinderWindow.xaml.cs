@@ -23,25 +23,31 @@ namespace Veil.Windows;
 public sealed partial class FinderWindow : Window
 {
     private const int DebounceMilliseconds = 25;
-    private const int WindowCornerRadius = 12;
+    private const int WindowCornerRadius = 24;
     private const int MaxVisibleResults = 200;
-    private static readonly CornerRadius InactiveRowCornerRadius = new(0);
+    private static readonly CornerRadius RowCornerRadius = new(14);
 
     private static readonly SolidColorBrush TransparentBrush = new(Colors.Transparent);
     private static readonly SolidColorBrush SelectedBrush = new(
-        global::Windows.UI.Color.FromArgb(20, 255, 255, 255));
+        global::Windows.UI.Color.FromArgb(30, 255, 255, 255));
     private static readonly SolidColorBrush HoverBrush = new(
-        global::Windows.UI.Color.FromArgb(12, 255, 255, 255));
+        global::Windows.UI.Color.FromArgb(18, 255, 255, 255));
     private static readonly SolidColorBrush PressedBrush = new(
-        global::Windows.UI.Color.FromArgb(8, 255, 255, 255));
+        global::Windows.UI.Color.FromArgb(12, 255, 255, 255));
     private static readonly SolidColorBrush TextBrush = new(
-        global::Windows.UI.Color.FromArgb(220, 255, 255, 255));
+        global::Windows.UI.Color.FromArgb(236, 255, 255, 255));
     private static readonly SolidColorBrush SubtleBrush = new(
-        global::Windows.UI.Color.FromArgb(100, 255, 255, 255));
+        global::Windows.UI.Color.FromArgb(150, 255, 255, 255));
+    private static readonly SolidColorBrush SecondaryTextBrush = new(
+        global::Windows.UI.Color.FromArgb(120, 255, 255, 255));
     private static readonly SolidColorBrush CategoryBrush = new(
-        global::Windows.UI.Color.FromArgb(60, 255, 255, 255));
+        global::Windows.UI.Color.FromArgb(170, 255, 255, 255));
     private static readonly SolidColorBrush AutocompleteBrush = new(
-        global::Windows.UI.Color.FromArgb(80, 255, 255, 255));
+        global::Windows.UI.Color.FromArgb(110, 255, 255, 255));
+    private static readonly SolidColorBrush SurfaceBrush = new(
+        global::Windows.UI.Color.FromArgb(18, 255, 255, 255));
+    private static readonly SolidColorBrush SurfaceOutlineBrush = new(
+        global::Windows.UI.Color.FromArgb(24, 255, 255, 255));
     private static readonly FontFamily GlyphFont = new("Segoe MDL2 Assets");
     private static readonly ImageSource LinuxIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/linux.svg"));
     private static readonly bool IsWslAvailable = File.Exists(Path.Combine(Environment.SystemDirectory, "wsl.exe"));
@@ -143,10 +149,10 @@ public sealed partial class FinderWindow : Window
 
         _acrylicController = new DesktopAcrylicController
         {
-            TintColor = global::Windows.UI.Color.FromArgb(255, 28, 28, 32),
-            TintOpacity = 0.78f,
-            LuminosityOpacity = 0.24f,
-            FallbackColor = global::Windows.UI.Color.FromArgb(240, 22, 22, 26)
+            TintColor = global::Windows.UI.Color.FromArgb(242, 24, 24, 28),
+            TintOpacity = 0.34f,
+            LuminosityOpacity = 0.12f,
+            FallbackColor = global::Windows.UI.Color.FromArgb(212, 20, 20, 24)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
@@ -234,11 +240,11 @@ public sealed partial class FinderWindow : Window
         int screenWidth = _screen.Right - _screen.Left;
         int screenHeight = _screen.Bottom - _screen.Top;
 
-        int width = Math.Clamp((int)(screenWidth * 0.32), 480, 680);
-        int height = Math.Clamp((int)(screenHeight * 0.48), 380, 520);
+        int width = Math.Clamp((int)(screenWidth * 0.38), 620, 760);
+        int height = Math.Clamp((int)(screenHeight * 0.56), 440, 620);
 
         int x = _screen.Left + ((screenWidth - width) / 2);
-        int y = _screen.Top + (int)(screenHeight * 0.22);
+        int y = _screen.Top + (int)(screenHeight * 0.16);
 
         WindowHelper.PositionOnMonitor(this, x, y, width, height);
         WindowHelper.ApplyRoundedRegion(_hwnd, width, height, WindowCornerRadius);
@@ -602,23 +608,44 @@ public sealed partial class FinderWindow : Window
     {
         if (_isLoadingApps)
         {
-            // Show nothing instead of "Loading..." - avoid visible loading state
+            SectionTitleText.Text = "Finder";
+            SectionSubtitleText.Text = "Loading your application library.";
             ResultCountText.Text = string.Empty;
             HintText.Text = string.Empty;
             return;
         }
 
+        if (_fallbackActions.Length > 0)
+        {
+            SectionTitleText.Text = "Quick actions";
+            SectionSubtitleText.Text = "Run the raw query in PowerShell, WSL, or your browser.";
+            ResultCountText.Text = $"{_fallbackActions.Length} quick actions";
+            HintText.Text = _selectedIndex >= 0 ? "Enter run  •  ↑↓ navigate" : string.Empty;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SearchTextBox.Text))
+        {
+            SectionTitleText.Text = "Applications";
+            SectionSubtitleText.Text = "Your installed apps, ready to open or focus.";
+            ResultCountText.Text = $"{_appEntries.Length} applications";
+            HintText.Text = _selectedIndex >= 0 ? "Enter open  •  ↑↓ navigate" : "Type to search";
+            return;
+        }
+
         if (_filteredEntries.Length == 0)
         {
-            ResultCountText.Text = _fallbackActions.Length > 0 ? "No app results" : string.Empty;
-            HintText.Text = _fallbackActions.Length > 0 ? "\u21b5 Run  \u2191\u2193 Navigate" : string.Empty;
+            SectionTitleText.Text = "No matches";
+            SectionSubtitleText.Text = "Try another name or use the quick actions below.";
+            ResultCountText.Text = string.Empty;
+            HintText.Text = "Esc close";
         }
         else
         {
-            ResultCountText.Text = _filteredEntries == _appEntries
-                ? $"{_appEntries.Length} applications"
-                : $"{_filteredEntries.Length} results";
-            HintText.Text = _selectedIndex >= 0 ? "\u21b5 Open  \u2191\u2193 Navigate" : string.Empty;
+            SectionTitleText.Text = _filteredEntries.Length == 1 ? "Best match" : "Results";
+            SectionSubtitleText.Text = "Ranked across apps, settings, and system actions.";
+            ResultCountText.Text = $"{_filteredEntries.Length} results";
+            HintText.Text = _selectedIndex >= 0 ? "Enter open  •  Tab complete" : "Tab complete";
         }
     }
 
@@ -626,7 +653,6 @@ public sealed partial class FinderWindow : Window
     {
         if (ReferenceEquals(_filteredEntries, _displayedEntries) && _filteredEntries.Length > 0)
         {
-            // Same data, just reset selection
             SetSelectedIndex(0);
             UpdateStatusBar();
             return;
@@ -642,7 +668,7 @@ public sealed partial class FinderWindow : Window
             for (int i = 0; i < _cachedAppRows.Length; i++)
             {
                 _cachedAppRows[i].Background = i == 0 ? SelectedBrush : TransparentBrush;
-                _cachedAppRows[i].CornerRadius = InactiveRowCornerRadius;
+                _cachedAppRows[i].CornerRadius = RowCornerRadius;
                 ResultsPanel.Children.Add(_cachedAppRows[i]);
             }
         }
@@ -679,7 +705,7 @@ public sealed partial class FinderWindow : Window
             && !_isLoadingApps
             ? Visibility.Visible
             : Visibility.Collapsed;
-        Separator.Visibility = ResultsPanel.Children.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+        Separator.Visibility = (_allEntries.Length > 0 || _isLoadingApps) ? Visibility.Visible : Visibility.Collapsed;
         StatusBar.Visibility = (_allEntries.Length > 0 || _isLoadingApps) ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -694,7 +720,7 @@ public sealed partial class FinderWindow : Window
             ResultsPanel.Children[_selectedIndex] is Button oldBtn)
         {
             oldBtn.Background = TransparentBrush;
-            oldBtn.CornerRadius = InactiveRowCornerRadius;
+            oldBtn.CornerRadius = RowCornerRadius;
         }
 
         _selectedIndex = index;
@@ -702,7 +728,7 @@ public sealed partial class FinderWindow : Window
         if (ResultsPanel.Children[_selectedIndex] is Button newBtn)
         {
             newBtn.Background = SelectedBrush;
-            newBtn.CornerRadius = InactiveRowCornerRadius;
+            newBtn.CornerRadius = RowCornerRadius;
             newBtn.StartBringIntoView();
         }
 
@@ -717,8 +743,8 @@ public sealed partial class FinderWindow : Window
         {
             var icon = new Image
             {
-                Width = 24,
-                Height = 24,
+                Width = 22,
+                Height = 22,
                 VerticalAlignment = VerticalAlignment.Center,
                 Stretch = Stretch.Uniform
             };
@@ -737,44 +763,57 @@ public sealed partial class FinderWindow : Window
             {
                 Text = entry.IconGlyph ?? "\uE713",
                 FontFamily = GlyphFont,
-                FontSize = 16,
-                Width = 24,
+                FontSize = 17,
                 TextAlignment = Microsoft.UI.Xaml.TextAlignment.Center,
                 Foreground = SubtleBrush,
                 VerticalAlignment = VerticalAlignment.Center
             };
         }
 
+        var iconPlate = CreateIconPlate(iconElement);
+
         var nameText = new TextBlock
         {
             Text = entry.Name,
             FontSize = 13,
-            FontFamily = (FontFamily)Application.Current.Resources["SfTextRegular"],
+            FontFamily = (FontFamily)Application.Current.Resources["SfTextSemibold"],
             Foreground = TextBrush,
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        var content = new StackPanel
+        var subtitleText = new TextBlock
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 12,
+            Text = entry.App is not null ? "Application" : GetEntrySubtitle(entry.Category),
+            FontSize = 11,
+            FontFamily = (FontFamily)Application.Current.Resources["SfTextRegular"],
+            Foreground = SecondaryTextBrush,
+            TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center,
-            Children = { iconElement, nameText }
+            MaxLines = 1
         };
 
-        if (entry.App is null)
+        var textStack = new StackPanel
         {
-            content.Children.Add(new TextBlock
-            {
-                Text = entry.Category,
-                FontSize = 10,
-                FontFamily = (FontFamily)Application.Current.Resources["SfTextRegular"],
-                Foreground = CategoryBrush,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(6, 0, 0, 0)
-            });
-        }
+            Spacing = 3,
+            VerticalAlignment = VerticalAlignment.Center,
+            Children = { nameText, subtitleText }
+        };
+
+        var content = new Grid
+        {
+            ColumnSpacing = 14,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        content.Children.Add(iconPlate);
+        Grid.SetColumn(iconPlate, 0);
+
+        content.Children.Add(textStack);
+        Grid.SetColumn(textStack, 1);
 
         var button = PanelButtonFactory.Create(
             content,
@@ -783,9 +822,9 @@ public sealed partial class FinderWindow : Window
             HoverBrush,
             PressedBrush,
             OnEntryButtonClick,
-            height: 36,
-            padding: new Thickness(14, 0, 14, 0),
-            cornerRadius: InactiveRowCornerRadius,
+            height: 62,
+            padding: new Thickness(12, 10, 12, 10),
+            cornerRadius: RowCornerRadius,
             tag: entry,
             horizontalAlignment: HorizontalAlignment.Stretch,
             horizontalContentAlignment: HorizontalAlignment.Stretch);
@@ -801,8 +840,8 @@ public sealed partial class FinderWindow : Window
             iconElement = new Image
             {
                 Source = LinuxIconSource,
-                Width = 18,
-                Height = 18,
+                Width = 17,
+                Height = 17,
                 VerticalAlignment = VerticalAlignment.Center,
                 Stretch = Stretch.Uniform
             };
@@ -813,19 +852,20 @@ public sealed partial class FinderWindow : Window
             {
                 Text = icon,
                 FontFamily = GlyphFont,
-                FontSize = 16,
-                Width = 24,
+                FontSize = 17,
                 TextAlignment = Microsoft.UI.Xaml.TextAlignment.Center,
                 Foreground = SubtleBrush,
                 VerticalAlignment = VerticalAlignment.Center
             };
         }
 
+        var iconPlate = CreateIconPlate(iconElement);
+
         var nameText = new TextBlock
         {
             Text = label,
             FontSize = 13,
-            FontFamily = (FontFamily)Application.Current.Resources["SfTextRegular"],
+            FontFamily = (FontFamily)Application.Current.Resources["SfTextSemibold"],
             Foreground = TextBrush,
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
@@ -833,21 +873,40 @@ public sealed partial class FinderWindow : Window
 
         var subtitleText = new TextBlock
         {
-            Text = subtitle,
-            FontSize = 10,
+            Text = GetFallbackSubtitle(tag, subtitle),
+            FontSize = 11,
             FontFamily = (FontFamily)Application.Current.Resources["SfTextRegular"],
-            Foreground = CategoryBrush,
+            Foreground = SecondaryTextBrush,
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(6, 0, 0, 0)
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxLines = 1
         };
 
-        var content = new StackPanel
+        var textStack = new StackPanel
         {
-            Orientation = Orientation.Horizontal,
-            Spacing = 12,
+            Spacing = 3,
             VerticalAlignment = VerticalAlignment.Center,
-            Children = { iconElement, nameText, subtitleText }
+            Children = { nameText, subtitleText }
         };
+
+        var content = new Grid
+        {
+            ColumnSpacing = 14,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        content.Children.Add(iconPlate);
+        Grid.SetColumn(iconPlate, 0);
+
+        content.Children.Add(textStack);
+        Grid.SetColumn(textStack, 1);
+
+        Border badge = CreateBadge(GetFallbackBadgeText(tag));
+        content.Children.Add(badge);
+        Grid.SetColumn(badge, 2);
 
         var button = PanelButtonFactory.Create(
             content,
@@ -856,13 +915,85 @@ public sealed partial class FinderWindow : Window
             HoverBrush,
             PressedBrush,
             OnFallbackButtonClick,
-            height: 36,
-            padding: new Thickness(14, 0, 14, 0),
-            cornerRadius: InactiveRowCornerRadius,
+            height: 62,
+            padding: new Thickness(12, 10, 12, 10),
+            cornerRadius: RowCornerRadius,
             tag: tag,
             horizontalAlignment: HorizontalAlignment.Stretch,
             horizontalContentAlignment: HorizontalAlignment.Stretch);
         return button;
+    }
+
+    private static Border CreateIconPlate(UIElement iconElement)
+    {
+        return new Border
+        {
+            Width = 38,
+            Height = 38,
+            CornerRadius = new CornerRadius(12),
+            Background = SurfaceBrush,
+            BorderBrush = SurfaceOutlineBrush,
+            BorderThickness = new Thickness(1),
+            Child = new Viewbox
+            {
+                Stretch = Stretch.Uniform,
+                Margin = new Thickness(8),
+                Child = iconElement
+            }
+        };
+    }
+
+    private static Border CreateBadge(string text)
+    {
+        return new Border
+        {
+            Padding = new Thickness(10, 5, 10, 5),
+            CornerRadius = new CornerRadius(999),
+            Background = SurfaceBrush,
+            BorderBrush = SurfaceOutlineBrush,
+            BorderThickness = new Thickness(1),
+            Child = new TextBlock
+            {
+                Text = text,
+                FontSize = 10,
+                FontFamily = (FontFamily)Application.Current.Resources["SfTextMedium"],
+                Foreground = CategoryBrush,
+                CharacterSpacing = 20
+            }
+        };
+    }
+
+    private static string GetEntrySubtitle(string category)
+    {
+        return category switch
+        {
+            "Settings" => "Windows setting",
+            "System" => "System command",
+            "Utility" => "Built-in utility",
+            _ => category
+        };
+    }
+
+    private static string GetFallbackSubtitle(string tag, string fallback)
+    {
+        return tag switch
+        {
+            "cmd" => "Run this query in PowerShell",
+            "wsl" => "Run this query in WSL",
+            "web" => "Search this query in your default browser",
+            _ => fallback
+        };
+    }
+
+    private static string GetFallbackBadgeText(string tag)
+    {
+        return tag switch
+        {
+            "cmd" => "Shell",
+            "wsl" => "WSL",
+            "web" => "Web",
+            _ => "Action"
+        };
     }
 
     private void OnFallbackButtonClick(object sender, RoutedEventArgs e)

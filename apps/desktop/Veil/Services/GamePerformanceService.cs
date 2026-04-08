@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime;
+using Veil.Configuration;
 using Veil.Diagnostics;
 using Veil.Interop;
 using static Veil.Interop.NativeMethods;
@@ -18,6 +19,7 @@ internal sealed class GamePerformanceService : IDisposable
     private static readonly TimeSpan PressureTempFileMinimumAge = TimeSpan.FromHours(3);
     private static readonly TimeSpan WorkingSetTrimMinimumInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan PressureCandidateMinimumAge = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan SystemPowerBoostMinimumHoldDuration = TimeSpan.FromMinutes(3);
     private const double CpuPressureThresholdPercent = 78;
     private const double BackgroundCpuPressureThresholdPercent = 90;
     private const int MemoryPressureThresholdPercent = 84;
@@ -33,7 +35,8 @@ internal sealed class GamePerformanceService : IDisposable
         "ts3client_win32",
         "obs64",
         "streamlabsobs",
-        "twitchstudio"
+        "twitchstudio",
+        "windhawk"
     ];
     private static readonly string[] BrowserProcesses =
     [
@@ -122,8 +125,10 @@ internal sealed class GamePerformanceService : IDisposable
     private DateTime _lastPressureReliefUtc = DateTime.MinValue;
     private DateTime _lastWorkingSetTrimUtc = DateTime.MinValue;
     private DateTime _lastBackgroundMaintenanceUtc = DateTime.MinValue;
+    private DateTime _lastSystemPowerBoostUtc = DateTime.MinValue;
     private readonly int _currentSessionId = GetCurrentSessionId();
     private readonly PerformanceCounter? _cpuCounter = CreateCpuCounter();
+    private readonly WindowsPowerProfileService _powerProfileService = new();
     private readonly object _syncRoot = new();
 
     internal void ApplyGameOptimizations(int? activeGameProcessId)
@@ -131,6 +136,7 @@ internal sealed class GamePerformanceService : IDisposable
         lock (_syncRoot)
         {
             ApplyVeilOptimizations();
+            RefreshSystemPowerBoost(forGameMode: true);
             RefreshCompanionProcessPriorities();
             RelieveSystemPressure(activeGameProcessId);
 
@@ -174,6 +180,7 @@ internal sealed class GamePerformanceService : IDisposable
             _lastCompanionRefreshUtc = DateTime.MinValue;
 
             ApplyVeilOptimizations();
+            ReleaseSystemPowerBoostIfIdle();
             PerformBackgroundMaintenance();
         }
     }
@@ -188,6 +195,8 @@ internal sealed class GamePerformanceService : IDisposable
             _lastPressureReliefUtc = DateTime.MinValue;
             _lastWorkingSetTrimUtc = DateTime.MinValue;
             _lastBackgroundMaintenanceUtc = DateTime.MinValue;
+            _lastSystemPowerBoostUtc = DateTime.MinValue;
+            _powerProfileService.RestoreOriginalProfile();
 
             if (!_veilGameOptimizationsApplied)
             {
@@ -211,6 +220,7 @@ internal sealed class GamePerformanceService : IDisposable
 
     public void Dispose()
     {
+        _powerProfileService.Dispose();
         _cpuCounter?.Dispose();
     }
 
@@ -271,14 +281,18 @@ internal sealed class GamePerformanceService : IDisposable
 
         if (!TryGetPressureSnapshot(out SystemPressureSnapshot snapshot))
         {
+            ReleaseSystemPowerBoostIfIdle();
             return;
         }
 
         if (snapshot.CpuPercent < BackgroundCpuPressureThresholdPercent &&
             snapshot.MemoryUsedPercent < BackgroundMemoryPressureThresholdPercent)
         {
+            ReleaseSystemPowerBoostIfIdle();
             return;
         }
+
+        RefreshSystemPowerBoost(forGameMode: false);
 
         int trimmedProcesses = 0;
         if (nowUtc - _lastWorkingSetTrimUtc >= WorkingSetTrimMinimumInterval)
@@ -318,6 +332,8 @@ internal sealed class GamePerformanceService : IDisposable
         {
             return;
         }
+
+        RefreshSystemPowerBoost(forGameMode: true);
 
         DateTime nowUtc = DateTime.UtcNow;
         int trimmedProcesses = 0;
@@ -757,6 +773,43 @@ internal sealed class GamePerformanceService : IDisposable
     {
         using Process currentProcess = Process.GetCurrentProcess();
         return currentProcess.SessionId;
+    }
+
+    private void RefreshSystemPowerBoost(bool forGameMode)
+    {
+        if (!AppSettings.Current.SystemPowerBoostEnabled)
+        {
+            _powerProfileService.RestoreOriginalProfile();
+            return;
+        }
+
+        if (_powerProfileService.TryBoostPerformanceProfile())
+        {
+            _lastSystemPowerBoostUtc = DateTime.UtcNow;
+            AppLogger.Info(forGameMode
+                ? "System power boost engaged for active gameplay."
+                : "System power boost engaged for background pressure relief.");
+            return;
+        }
+
+        if (_powerProfileService.IsManagingBoost)
+        {
+            _lastSystemPowerBoostUtc = DateTime.UtcNow;
+        }
+    }
+
+    private void ReleaseSystemPowerBoostIfIdle()
+    {
+        if (!_powerProfileService.IsManagingBoost)
+        {
+            return;
+        }
+
+        if (!AppSettings.Current.SystemPowerBoostEnabled ||
+            DateTime.UtcNow - _lastSystemPowerBoostUtc >= SystemPowerBoostMinimumHoldDuration)
+        {
+            _powerProfileService.RestoreOriginalProfile();
+        }
     }
 
     private static void CleanupTempFiles(TimeSpan minimumFileAge, int maxDeletedItems, bool includeChildDirectoryFiles)

@@ -128,9 +128,102 @@ public sealed partial class TopBarWindow
 
     private void EnsureFinderWindowCreated()
     {
-        if (_finderWindow != null) return;
+        if (_finderWindow != null)
+        {
+            return;
+        }
 
         _finderWindow = new FinderWindow(_screen);
+        _finderWindow.Prewarm();
+    }
+
+    private SystemStatsWindow EnsureSystemStatsWindowCreated()
+    {
+        if (_systemStatsWindow is not null)
+        {
+            return _systemStatsWindow;
+        }
+
+        _systemStatsWindow = new SystemStatsWindow();
+        _systemStatsWindow.Initialize();
+        return _systemStatsWindow;
+    }
+
+    private PanelThemeWindow EnsurePanelThemeWindowCreated()
+    {
+        if (_panelThemeWindow is not null)
+        {
+            return _panelThemeWindow;
+        }
+
+        _panelThemeWindow = new PanelThemeWindow();
+        _panelThemeWindow.Initialize();
+        return _panelThemeWindow;
+    }
+
+    private WeatherWindow EnsureWeatherWindowCreated()
+    {
+        if (_weatherWindow is not null)
+        {
+            return _weatherWindow;
+        }
+
+        _weatherWindow = new WeatherWindow();
+        _weatherWindow.SetWeatherService(_weatherService);
+        _weatherWindow.Initialize();
+        return _weatherWindow;
+    }
+
+    private MusicControlWindow EnsureMusicControlWindowCreated()
+    {
+        if (_musicControlWindow is not null)
+        {
+            return _musicControlWindow;
+        }
+
+        _musicControlWindow = new MusicControlWindow();
+        _musicControlWindow.SetMediaService(_mediaControlService);
+        _musicControlWindow.Initialize();
+        return _musicControlWindow;
+    }
+
+    private DiscordNotificationWindow EnsureDiscordNotificationWindowCreated()
+    {
+        if (_discordNotificationWindow is not null)
+        {
+            return _discordNotificationWindow;
+        }
+
+        _discordNotificationWindow = new DiscordNotificationWindow();
+        _discordNotificationWindow.SetDiscordService(_discordNotificationService);
+        _discordNotificationWindow.Initialize();
+        return _discordNotificationWindow;
+    }
+
+    private void PrewarmTransientWindows()
+    {
+        EnsureFinderWindowCreated();
+        EnsurePanelThemeWindowCreated();
+
+        if (_settings.RunCatEnabled)
+        {
+            EnsureSystemStatsWindowCreated();
+        }
+
+        if (_settings.WeatherButtonEnabled)
+        {
+            EnsureWeatherWindowCreated();
+        }
+
+        if (_settings.MusicButtonEnabled)
+        {
+            EnsureMusicControlWindowCreated();
+        }
+
+        if (_settings.DiscordButtonEnabled)
+        {
+            EnsureDiscordNotificationWindowCreated();
+        }
     }
 
     private void OpenFinderWindow()
@@ -159,19 +252,15 @@ public sealed partial class TopBarWindow
             return;
         }
 
-        if (_systemStatsWindow is null)
-        {
-            _systemStatsWindow = new SystemStatsWindow();
-            _systemStatsWindow.Initialize();
-        }
+        SystemStatsWindow window = EnsureSystemStatsWindowCreated();
 
-        if ((DateTime.UtcNow - _systemStatsWindow.LastHiddenAtUtc).TotalMilliseconds < 200)
+        if ((DateTime.UtcNow - window.LastHiddenAtUtc).TotalMilliseconds < 200)
         {
             return;
         }
 
         int barWidth = _screen.Right - _screen.Left;
-        _systemStatsWindow.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
+        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
     }
 
     private void OnPanelThemeButtonClick(object sender, RoutedEventArgs e)
@@ -187,19 +276,15 @@ public sealed partial class TopBarWindow
             return;
         }
 
-        if (_panelThemeWindow is null)
-        {
-            _panelThemeWindow = new PanelThemeWindow();
-            _panelThemeWindow.Initialize();
-        }
+        PanelThemeWindow window = EnsurePanelThemeWindowCreated();
 
-        if ((DateTime.UtcNow - _panelThemeWindow.LastHiddenAtUtc).TotalMilliseconds < 200)
+        if ((DateTime.UtcNow - window.LastHiddenAtUtc).TotalMilliseconds < 200)
         {
             return;
         }
 
         int barWidth = _screen.Right - _screen.Left;
-        _panelThemeWindow.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
+        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
     }
 
     private void OnWeatherButtonClick(object sender, RoutedEventArgs e)
@@ -215,20 +300,15 @@ public sealed partial class TopBarWindow
             return;
         }
 
-        if (_weatherWindow is null)
-        {
-            _weatherWindow = new WeatherWindow();
-            _weatherWindow.SetWeatherService(_weatherService);
-            _weatherWindow.Initialize();
-        }
+        WeatherWindow window = EnsureWeatherWindowCreated();
 
-        if ((DateTime.UtcNow - _weatherWindow.LastHiddenAtUtc).TotalMilliseconds < 200)
+        if ((DateTime.UtcNow - window.LastHiddenAtUtc).TotalMilliseconds < 200)
         {
             return;
         }
 
         int barWidth = _screen.Right - _screen.Left;
-        _weatherWindow.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
+        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
     }
 
     private void OnMusicButtonClick(object sender, RoutedEventArgs e)
@@ -244,20 +324,15 @@ public sealed partial class TopBarWindow
             return;
         }
 
-        if (_musicControlWindow is null)
-        {
-            _musicControlWindow = new MusicControlWindow();
-            _musicControlWindow.SetMediaService(_mediaControlService);
-            _musicControlWindow.Initialize();
-        }
+        MusicControlWindow window = EnsureMusicControlWindowCreated();
 
-        if ((DateTime.UtcNow - _musicControlWindow.LastHiddenAtUtc).TotalMilliseconds < 200)
+        if ((DateTime.UtcNow - window.LastHiddenAtUtc).TotalMilliseconds < 200)
         {
             return;
         }
 
         int barWidth = _screen.Right - _screen.Left;
-        _musicControlWindow.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
+        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
     }
 
     private void OnDiscordButtonClick(object sender, RoutedEventArgs e)
@@ -275,20 +350,15 @@ public sealed partial class TopBarWindow
             return;
         }
 
-        if (_discordNotificationWindow is null)
-        {
-            _discordNotificationWindow = new DiscordNotificationWindow();
-            _discordNotificationWindow.SetDiscordService(_discordNotificationService);
-            _discordNotificationWindow.Initialize();
-        }
+        DiscordNotificationWindow window = EnsureDiscordNotificationWindowCreated();
 
-        if ((DateTime.UtcNow - _discordNotificationWindow.LastHiddenAtUtc).TotalMilliseconds < 200)
+        if ((DateTime.UtcNow - window.LastHiddenAtUtc).TotalMilliseconds < 200)
         {
             return;
         }
 
         int barWidth = _screen.Right - _screen.Left;
-        _discordNotificationWindow.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
+        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
     }
 
     private void RebuildShortcutButtons()

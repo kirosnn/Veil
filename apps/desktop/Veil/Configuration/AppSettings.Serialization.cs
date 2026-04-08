@@ -41,6 +41,7 @@ internal sealed partial class AppSettings
             GameDetectionMode = _gameDetectionMode,
             GameProcessNames = _gameProcessNames,
             BackgroundOptimizationEnabled = _backgroundOptimizationEnabled,
+            SystemPowerBoostEnabled = _systemPowerBoostEnabled,
             ShortcutButtons = _shortcutButtons
                 .Select(setting => setting is null
                     ? null
@@ -115,6 +116,7 @@ internal sealed partial class AppSettings
                 settings._gameDetectionMode = GameDetectionService.NormalizeDetectionMode(dto.GameDetectionMode);
                 settings._gameProcessNames = NormalizeGameProcessNames(dto.GameProcessNames);
                 settings._backgroundOptimizationEnabled = dto.BackgroundOptimizationEnabled;
+                settings._systemPowerBoostEnabled = dto.SystemPowerBoostEnabled;
                 settings._shortcutButtons = NormalizeShortcutButtons(dto.ShortcutButtons);
 
                 if (requiresSave)
@@ -163,6 +165,7 @@ internal sealed partial class AppSettings
         public string GameDetectionMode { get; set; } = GameDetectionService.HybridMode;
         public string[]? GameProcessNames { get; set; }
         public bool BackgroundOptimizationEnabled { get; set; } = true;
+        public bool SystemPowerBoostEnabled { get; set; } = true;
         public AppShortcutDto?[]? ShortcutButtons { get; set; }
     }
 

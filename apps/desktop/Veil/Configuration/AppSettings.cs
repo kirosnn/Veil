@@ -59,6 +59,7 @@ internal sealed partial class AppSettings
     private string _gameDetectionMode = GameDetectionService.HybridMode;
     private string[] _gameProcessNames = [];
     private bool _backgroundOptimizationEnabled = true;
+    private bool _systemPowerBoostEnabled = true;
     private string _topBarDisplayMode = "Primary";
     private string[] _topBarMonitorIds = [];
     private AppShortcutSetting?[] _shortcutButtons = new AppShortcutSetting?[MaxShortcutButtons];

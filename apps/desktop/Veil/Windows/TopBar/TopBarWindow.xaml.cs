@@ -51,9 +51,10 @@ public sealed partial class TopBarWindow : Window
     private readonly DemandDrivenModule _discordModule;
     private readonly DemandDrivenModule _backgroundMaintenanceModule;
     private readonly string _monitorId;
-    private readonly ScreenBounds _screen;
+    private ScreenBounds _screen;
     private readonly AppSettings _settings;
     private readonly string _discordDemandOwnerId;
+    private bool _startHiddenUntilReady;
     private bool _ownsGlobalHotkeys;
     private bool _isHidden;
     private bool _isGameMinimalMode;
@@ -99,11 +100,12 @@ public sealed partial class TopBarWindow : Window
     private DateTime _lastBackgroundMaintenanceBoostUtc = DateTime.MinValue;
     private double _lastAppliedBlurIntensity = -1;
 
-    internal TopBarWindow(string monitorId, ScreenBounds screen, bool ownsGlobalHotkeys)
+    internal TopBarWindow(string monitorId, ScreenBounds screen, bool ownsGlobalHotkeys, bool startHiddenUntilReady = false)
     {
         _monitorId = monitorId;
         _screen = screen;
         _settings = AppSettings.Current;
+        _startHiddenUntilReady = startHiddenUntilReady;
         _ownsGlobalHotkeys = ownsGlobalHotkeys;
         _discordDemandOwnerId = $"topbar:{monitorId}";
         _discordNotificationService = SharedDiscordNotificationService;
@@ -111,6 +113,10 @@ public sealed partial class TopBarWindow : Window
         InitializeComponent();
         Title = "Veil TopBar";
         UpdateWeatherButton();
+        if (_startHiddenUntilReady)
+        {
+            RootPanel.Opacity = 0;
+        }
 
         _clockTimer = new DispatcherTimer
         {
@@ -166,18 +172,17 @@ public sealed partial class TopBarWindow : Window
         Activated -= OnActivated;
 
         _hwnd = WindowHelper.GetHwnd(this);
+        bool revealAfterSetup = _startHiddenUntilReady;
 
         WindowHelper.RemoveTitleBar(this);
         WindowHelper.ExtendFrameIntoClientArea(this);
         WindowHelper.MakeOverlay(this);
+        if (revealAfterSetup)
+        {
+            ShowWindowNative(_hwnd, SW_HIDE);
+        }
 
-        int width = _screen.Right - _screen.Left;
-        int height = GetBarHeightInPhysicalPixels();
-        WindowHelper.PositionOnMonitor(this, _screen.Left, _screen.Top, width, height);
-
-        WindowHelper.SetAlwaysOnTop(this);
-        WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, height);
-        _appBarRegistered = true;
+        ApplyTopBarPlacement(true);
         ApplySettings();
 
         RebuildShortcutButtons();
@@ -190,6 +195,13 @@ public sealed partial class TopBarWindow : Window
         UpdateVisualRefreshState(boost: true);
         UpdateDiscordDemand(boost: true);
         UpdateBackgroundMaintenanceState(boost: true);
+        DispatcherQueue.TryEnqueue(PrewarmTransientWindows);
+        if (revealAfterSetup)
+        {
+            RootPanel.Opacity = 1;
+            ShowWindowNative(_hwnd, SW_SHOWNOACTIVATE);
+            _startHiddenUntilReady = false;
+        }
     }
 
     private void OnClosed(object sender, WindowEventArgs args)
@@ -227,11 +239,49 @@ public sealed partial class TopBarWindow : Window
 
     internal bool IsMinimalModeActive => _isGameMinimalMode;
 
+    internal void UpdateScreenBounds(ScreenBounds screen)
+    {
+        if (_screen == screen)
+        {
+            return;
+        }
+
+        _screen = screen;
+
+        if (_hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        if (!_isHidden && !_isGameMinimalMode)
+        {
+            ApplyTopBarPlacement(true);
+        }
+
+        UpdateTopBarLayout();
+    }
+
     private int GetBarHeightInPhysicalPixels()
         => Math.Max(1, WindowHelper.ViewPixelsToPhysical(this, BarHeight));
 
     private double GetScreenWidthInViewPixels()
         => WindowHelper.PhysicalPixelsToView(this, _screen.Right - _screen.Left);
+
+    private void ApplyTopBarPlacement(bool refreshAppBar)
+    {
+        int height = GetBarHeightInPhysicalPixels();
+
+        if (refreshAppBar && _appBarRegistered)
+        {
+            WindowHelper.UnregisterAppBar(this);
+            _appBarRegistered = false;
+        }
+
+        WindowHelper.SetAlwaysOnTop(this);
+        global::Windows.Graphics.RectInt32 bounds = WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, height);
+        WindowHelper.PositionOnMonitor(this, bounds.X, bounds.Y, bounds.Width, bounds.Height);
+        _appBarRegistered = true;
+    }
 
     internal void ApplyActivityState(bool gameRunning, bool shouldHideForForegroundWindow, int? activeGameProcessId)
     {
@@ -267,13 +317,7 @@ public sealed partial class TopBarWindow : Window
             visibilityChanged = true;
             AppLogger.Info($"TopBarWindow showing for {_monitorId}.");
             WindowHelper.ShowWindow(this);
-
-            int width = _screen.Right - _screen.Left;
-            int height = GetBarHeightInPhysicalPixels();
-            WindowHelper.PositionOnMonitor(this, _screen.Left, _screen.Top, width, height);
-            WindowHelper.SetAlwaysOnTop(this);
-            WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, height);
-            _appBarRegistered = true;
+            ApplyTopBarPlacement(true);
         }
 
         if (visibilityChanged)

@@ -242,6 +242,7 @@ internal static partial class NativeMethods
 
     internal const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     internal const int DWMWCP_DONOTROUND = 1;
+    internal const int DWMWCP_ROUND = 2;
     internal const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
     internal const int DWMWA_CLOAKED = 14;
     internal const int DWMWA_BORDER_COLOR = 34;

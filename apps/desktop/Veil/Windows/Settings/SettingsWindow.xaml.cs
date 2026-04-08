@@ -4,7 +4,6 @@ using Veil.Interop;
 using Veil.Services;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Composition.SystemBackdrops;
-using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -27,6 +26,7 @@ public sealed partial class SettingsWindow : Window
     private SystemBackdropConfiguration? _backdropConfig;
     private bool _isInitializing;
     private bool _showRequested;
+    private DateTime _openedAtUtc;
     private string _selectedSection = "TopBar";
     private bool _useDarkForeground;
     private IReadOnlyList<ShortcutOption> _shortcutOptions =
@@ -45,6 +45,7 @@ public sealed partial class SettingsWindow : Window
         Title = "Veil Settings";
 
         Activated += OnFirstActivated;
+        Activated += OnWindowActivated;
         Closed += OnClosed;
     }
 
@@ -101,43 +102,17 @@ public sealed partial class SettingsWindow : Window
 
     private void ConfigureWindowChrome()
     {
-        ExtendsContentIntoTitleBar = true;
-        SetTitleBar(TitleBarDragRegion);
-        Title = string.Empty;
+        WindowHelper.RemoveTitleBar(this);
 
-        string icoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Logo", "veil.ico");
-        if (File.Exists(icoPath))
-        {
-            WindowHelper.SetWindowIcon(this, icoPath);
-        }
+        int rounded = DWMWCP_ROUND;
+        DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref rounded, sizeof(int));
+    }
 
-        var appWindow = WindowHelper.GetAppWindow(this);
-        if (appWindow.Presenter is OverlappedPresenter presenter)
-        {
-            presenter.IsMaximizable = false;
-            presenter.IsResizable = false;
-        }
-
-        int style = GetWindowLongW(_hwnd, GWL_STYLE);
-        style &= ~WS_MAXIMIZEBOX;
-        style &= ~WS_THICKFRAME;
-        SetWindowLongW(_hwnd, GWL_STYLE, style);
-        SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
-
-        var titleBar = appWindow.TitleBar;
-        titleBar.BackgroundColor = global::Windows.UI.Color.FromArgb(255, 24, 24, 24);
-        titleBar.ForegroundColor = global::Windows.UI.Color.FromArgb(0, 255, 255, 255);
-        titleBar.InactiveBackgroundColor = global::Windows.UI.Color.FromArgb(255, 24, 24, 24);
-        titleBar.InactiveForegroundColor = global::Windows.UI.Color.FromArgb(0, 255, 255, 255);
-        titleBar.ButtonBackgroundColor = global::Windows.UI.Color.FromArgb(0, 0, 0, 0);
-        titleBar.ButtonInactiveBackgroundColor = global::Windows.UI.Color.FromArgb(0, 0, 0, 0);
-        titleBar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(48, 255, 255, 255);
-        titleBar.ButtonPressedBackgroundColor = global::Windows.UI.Color.FromArgb(28, 255, 255, 255);
-        titleBar.ButtonForegroundColor = global::Windows.UI.Color.FromArgb(230, 255, 255, 255);
-        titleBar.ButtonHoverForegroundColor = global::Windows.UI.Color.FromArgb(255, 255, 255, 255);
-        titleBar.ButtonPressedForegroundColor = global::Windows.UI.Color.FromArgb(255, 255, 255, 255);
-        titleBar.ButtonInactiveForegroundColor = global::Windows.UI.Color.FromArgb(160, 255, 255, 255);
+    private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
+    {
+        if (args.WindowActivationState != WindowActivationState.Deactivated) return;
+        if ((DateTime.UtcNow - _openedAtUtc).TotalMilliseconds < 300) return;
+        ShowWindowNative(_hwnd, SW_HIDE);
     }
 
     private void LoadSettings()
@@ -218,6 +193,7 @@ public sealed partial class SettingsWindow : Window
         }
 
         _showRequested = false;
+        _openedAtUtc = DateTime.UtcNow;
         ApplyWindowSize();
         Activate();
         SetForegroundWindow(WindowHelper.GetHwnd(this));
@@ -471,6 +447,17 @@ public sealed partial class SettingsWindow : Window
         }
 
         _settings.BackgroundOptimizationEnabled = !_settings.BackgroundOptimizationEnabled;
+        UpdateSectionUi();
+    }
+
+    private void OnSystemPowerBoostEnabledButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _settings.SystemPowerBoostEnabled = !_settings.SystemPowerBoostEnabled;
         UpdateSectionUi();
     }
 
@@ -973,6 +960,11 @@ public sealed partial class SettingsWindow : Window
         BackgroundOptimizationEnabledButton.Content = isBackgroundOptimizationEnabled ? "Enabled" : "Disabled";
         BackgroundOptimizationEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isBackgroundOptimizationEnabled ? (byte)48 : (byte)0, 255, 255, 255));
         BackgroundOptimizationEnabledButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isBackgroundOptimizationEnabled ? (byte)255 : (byte)214);
+
+        bool isSystemPowerBoostEnabled = _settings.SystemPowerBoostEnabled;
+        SystemPowerBoostEnabledButton.Content = isSystemPowerBoostEnabled ? "Enabled" : "Disabled";
+        SystemPowerBoostEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isSystemPowerBoostEnabled ? (byte)48 : (byte)0, 255, 255, 255));
+        SystemPowerBoostEnabledButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isSystemPowerBoostEnabled ? (byte)255 : (byte)214);
     }
 
     private void ApplyReadableContrast()

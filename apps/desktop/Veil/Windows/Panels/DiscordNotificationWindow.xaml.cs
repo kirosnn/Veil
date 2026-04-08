@@ -58,6 +58,16 @@ public sealed partial class DiscordNotificationWindow : Window
 
     internal void SetDiscordService(DiscordNotificationService service)
     {
+        if (_discordService == service)
+        {
+            return;
+        }
+
+        if (_discordService is not null)
+        {
+            _discordService.NotificationsChanged -= OnNotificationsChanged;
+        }
+
         _discordService = service;
         _discordService.NotificationsChanged += OnNotificationsChanged;
     }

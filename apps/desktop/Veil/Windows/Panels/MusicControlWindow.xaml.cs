@@ -89,6 +89,17 @@ public sealed partial class MusicControlWindow : Window
 
     internal void SetMediaService(MediaControlService service)
     {
+        if (_mediaService == service)
+        {
+            return;
+        }
+
+        if (_mediaService is not null)
+        {
+            _mediaService.StateChanged -= OnMediaStateChanged;
+            _mediaService.TimelineChanged -= OnTimelineChanged;
+        }
+
         _mediaService = service;
         _mediaService.StateChanged += OnMediaStateChanged;
         _mediaService.TimelineChanged += OnTimelineChanged;

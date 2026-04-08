@@ -26,6 +26,7 @@ public partial class App : Application
     private string _lastTopologySignature = string.Empty;
     private bool _isSyncingTopBars;
     private int _emptyMonitorRefreshCount;
+    private bool _startTopBarsHiddenUntilReady;
 
     public App()
     {
@@ -43,6 +44,7 @@ public partial class App : Application
             KillOtherInstances();
             PerformanceLogger.Start();
             AppLogger.Info("Application launch started.");
+            _startTopBarsHiddenUntilReady = StartupService.IsStartupLaunch(args.Arguments);
             try
             {
                 _settings.Save();
@@ -401,7 +403,11 @@ public partial class App : Application
                 {
                     try
                     {
-                        TopBarWindow createdWindow = new(monitor.Id, monitor.ToScreenBounds(), ownsGlobalHotkeys);
+                        TopBarWindow createdWindow = new(
+                            monitor.Id,
+                            monitor.ToScreenBounds(),
+                            ownsGlobalHotkeys,
+                            _startTopBarsHiddenUntilReady);
                         createdWindow.Activate();
                         _topBarWindows[monitor.Id] = createdWindow;
                         AppLogger.Info($"TopBarWindow activated for {monitor.Id}.");
@@ -416,12 +422,18 @@ public partial class App : Application
 
                 try
                 {
+                    topBarWindow.UpdateScreenBounds(monitor.ToScreenBounds());
                     topBarWindow.SetOwnsGlobalHotkeys(ownsGlobalHotkeys);
                 }
                 catch (Exception ex)
                 {
                     AppLogger.Error($"Failed to refresh top bar ownership for {monitor.Id}.", ex);
                 }
+            }
+
+            if (_topBarWindows.Count > 0)
+            {
+                _startTopBarsHiddenUntilReady = false;
             }
         }
         catch (Exception ex)

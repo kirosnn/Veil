@@ -478,6 +478,21 @@ internal sealed partial class AppSettings
         }
     }
 
+    public bool SystemPowerBoostEnabled
+    {
+        get => _systemPowerBoostEnabled;
+        set
+        {
+            if (_systemPowerBoostEnabled == value)
+            {
+                return;
+            }
+
+            _systemPowerBoostEnabled = value;
+            PersistAndNotify();
+        }
+    }
+
     public void SetTopBarMonitorIds(IEnumerable<string> monitorIds)
     {
         string[] normalizedIds = monitorIds

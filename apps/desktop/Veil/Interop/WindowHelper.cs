@@ -176,7 +176,7 @@ internal static class WindowHelper
         appWindow.MoveAndResize(new global::Windows.Graphics.RectInt32(x, y, width, height));
     }
 
-    internal static void RegisterAppBar(Window window, ScreenBounds screen, uint edge, int barSize)
+    internal static global::Windows.Graphics.RectInt32 RegisterAppBar(Window window, ScreenBounds screen, uint edge, int barSize)
     {
         var hwnd = GetHwnd(window);
 
@@ -206,6 +206,12 @@ internal static class WindowHelper
         SHAppBarMessage(ABM_NEW, ref abd);
         SHAppBarMessage(ABM_QUERYPOS, ref abd);
         SHAppBarMessage(ABM_SETPOS, ref abd);
+
+        return new global::Windows.Graphics.RectInt32(
+            abd.rc.Left,
+            abd.rc.Top,
+            Math.Max(1, abd.rc.Right - abd.rc.Left),
+            Math.Max(1, abd.rc.Bottom - abd.rc.Top));
     }
 
     internal static void UnregisterAppBar(Window window)
