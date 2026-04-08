@@ -263,7 +263,12 @@ public sealed partial class SettingsWindow : Window
             return;
         }
 
-        string hex = SolidColorTextBox.Text.Trim();
+        if (!TryGetCommittedHexColor(SolidColorTextBox.Text, out string hex))
+        {
+            SyncSolidColorPreview();
+            return;
+        }
+
         _settings.SolidColor = hex;
         SyncSolidColorPreview();
     }
@@ -289,7 +294,12 @@ public sealed partial class SettingsWindow : Window
             return;
         }
 
-        string hex = TopBarForegroundColorTextBox.Text.Trim();
+        if (!TryGetCommittedHexColor(TopBarForegroundColorTextBox.Text, out string hex))
+        {
+            SyncTopBarForegroundColorPreview();
+            return;
+        }
+
         _settings.TopBarForegroundColor = hex;
         SyncTopBarForegroundColorPreview();
     }
@@ -447,6 +457,17 @@ public sealed partial class SettingsWindow : Window
         }
 
         _settings.BackgroundOptimizationEnabled = !_settings.BackgroundOptimizationEnabled;
+        UpdateSectionUi();
+    }
+
+    private void OnAppButtonOutlineButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _settings.ShowAppButtonOutline = !_settings.ShowAppButtonOutline;
         UpdateSectionUi();
     }
 
@@ -828,6 +849,7 @@ public sealed partial class SettingsWindow : Window
         SyncTopBarForegroundColorPreview();
         UpdateFinderBubbleButton();
         UpdateFinderHotkeyButton();
+        UpdateAppButtonOutlineButton();
         UpdateDiscordButtons();
         UpdateMusicButtons();
         UpdateWeatherButtons();
@@ -906,6 +928,14 @@ public sealed partial class SettingsWindow : Window
         FinderHotkeyButton.Content = isEnabled ? "Enabled" : "Disabled";
         FinderHotkeyButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isEnabled ? (byte)48 : (byte)0, 255, 255, 255));
         FinderHotkeyButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isEnabled ? (byte)255 : (byte)214);
+    }
+
+    private void UpdateAppButtonOutlineButton()
+    {
+        bool isEnabled = _settings.ShowAppButtonOutline;
+        AppButtonOutlineButton.Content = isEnabled ? "Enabled" : "Hidden";
+        AppButtonOutlineButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isEnabled ? (byte)48 : (byte)0, 255, 255, 255));
+        AppButtonOutlineButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isEnabled ? (byte)255 : (byte)214);
     }
 
     private void UpdateRunCatButtons()
@@ -1023,5 +1053,23 @@ public sealed partial class SettingsWindow : Window
             ShortcutSlot3NameTextBox,
             ShortcutSlot4NameTextBox
         ];
+    }
+
+    private static bool TryGetCommittedHexColor(string? value, out string normalizedColor)
+    {
+        normalizedColor = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        string trimmed = value.Trim();
+        if (trimmed.Length is not 6 and not 7)
+        {
+            return false;
+        }
+
+        return AppSettings.TryNormalizeHexColor(trimmed, out normalizedColor);
     }
 }

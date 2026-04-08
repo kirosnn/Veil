@@ -33,11 +33,13 @@ internal sealed partial class AppSettings
         return slots;
     }
 
-    private static string NormalizeHexColor(string? value)
+    internal static bool TryNormalizeHexColor(string? value, out string normalizedColor)
     {
+        normalizedColor = "#000000";
+
         if (string.IsNullOrWhiteSpace(value))
         {
-            return "#000000";
+            return false;
         }
 
         value = value.Trim();
@@ -53,18 +55,26 @@ internal sealed partial class AppSettings
 
         if (value.Length != 7)
         {
-            return "#000000";
+            return false;
         }
 
         foreach (char c in value[1..])
         {
             if (!char.IsAsciiHexDigit(c))
             {
-                return "#000000";
+                return false;
             }
         }
 
-        return value.ToUpperInvariant();
+        normalizedColor = value.ToUpperInvariant();
+        return true;
+    }
+
+    private static string NormalizeHexColor(string? value)
+    {
+        return TryNormalizeHexColor(value, out string normalizedColor)
+            ? normalizedColor
+            : "#000000";
     }
 
     private static string NormalizeTopBarStyle(string? value)

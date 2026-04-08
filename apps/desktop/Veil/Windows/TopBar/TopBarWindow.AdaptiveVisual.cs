@@ -257,9 +257,13 @@ public sealed partial class TopBarWindow
             var foregroundColor = GetTopBarForegroundColor();
             ShortcutGlass.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(
                 18, foregroundColor.R, foregroundColor.G, foregroundColor.B));
-            ShortcutGlass.BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(
-                188, foregroundColor.R, foregroundColor.G, foregroundColor.B));
-            ShortcutGlass.BorderThickness = new Thickness(1.2);
+            ShortcutGlass.BorderBrush = _settings.ShowAppButtonOutline
+                ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(
+                    188, foregroundColor.R, foregroundColor.G, foregroundColor.B))
+                : new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
+            ShortcutGlass.BorderThickness = _settings.ShowAppButtonOutline
+                ? new Thickness(1.2)
+                : new Thickness(0);
             ShortcutGlass.Padding = new Thickness(3, 2, 3, 2);
         }
         else

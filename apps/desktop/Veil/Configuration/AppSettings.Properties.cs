@@ -428,6 +428,21 @@ internal sealed partial class AppSettings
 
     public IReadOnlyList<string> TopBarMonitorIds => _topBarMonitorIds;
 
+    public bool ShowAppButtonOutline
+    {
+        get => _showAppButtonOutline;
+        set
+        {
+            if (_showAppButtonOutline == value)
+            {
+                return;
+            }
+
+            _showAppButtonOutline = value;
+            PersistAndNotify();
+        }
+    }
+
     public string GameDetectionMode
     {
         get => _gameDetectionMode;

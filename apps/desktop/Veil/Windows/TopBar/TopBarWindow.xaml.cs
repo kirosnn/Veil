@@ -458,6 +458,7 @@ public sealed partial class TopBarWindow : Window
             _settings.WeatherPrimaryCity,
             string.Join(",", _settings.WeatherSecondaryCities),
             _settings.TopBarPanelTheme,
+            _settings.ShowAppButtonOutline,
             _settings.RunCatEnabled,
             _settings.RunCatRunner,
             _settings.BackgroundOptimizationEnabled,

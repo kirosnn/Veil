@@ -247,8 +247,23 @@
                                 <!-- App Buttons -->
                                 <TextBlock Text="App Buttons" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
                                 <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
-                                    <StackPanel Spacing="12">
+                                    <StackPanel Spacing="14">
                                         <TextBlock Text="Configure up to four buttons shown after Finder." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="App Button Outline" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock Text="Show the contour around the app buttons group in the topbar." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
+                                            </StackPanel>
+                                            <Button x:Name="AppButtonOutlineButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnAppButtonOutlineButtonClick" Content="Enabled" />
+                                        </Grid>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
                                         <Grid RowSpacing="10">
                                             <Grid.RowDefinitions>
                                                 <RowDefinition Height="Auto" />

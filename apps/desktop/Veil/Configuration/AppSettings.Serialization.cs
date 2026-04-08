@@ -38,6 +38,7 @@ internal sealed partial class AppSettings
             RunCatRunner = _runCatRunner,
             TopBarDisplayMode = _topBarDisplayMode,
             TopBarMonitorIds = _topBarMonitorIds,
+            ShowAppButtonOutline = _showAppButtonOutline,
             GameDetectionMode = _gameDetectionMode,
             GameProcessNames = _gameProcessNames,
             BackgroundOptimizationEnabled = _backgroundOptimizationEnabled,
@@ -113,6 +114,7 @@ internal sealed partial class AppSettings
                 settings._runCatRunner = dto.RunCatRunner is "Cat" or "Parrot" or "Horse" ? dto.RunCatRunner : "Cat";
                 settings._topBarDisplayMode = NormalizeTopBarDisplayMode(dto.TopBarDisplayMode);
                 settings._topBarMonitorIds = NormalizeTopBarMonitorIds(dto.TopBarMonitorIds);
+                settings._showAppButtonOutline = dto.ShowAppButtonOutline;
                 settings._gameDetectionMode = GameDetectionService.NormalizeDetectionMode(dto.GameDetectionMode);
                 settings._gameProcessNames = NormalizeGameProcessNames(dto.GameProcessNames);
                 settings._backgroundOptimizationEnabled = dto.BackgroundOptimizationEnabled;
@@ -162,6 +164,7 @@ internal sealed partial class AppSettings
         public string RunCatRunner { get; set; } = "Cat";
         public string TopBarDisplayMode { get; set; } = "Primary";
         public string[]? TopBarMonitorIds { get; set; }
+        public bool ShowAppButtonOutline { get; set; } = true;
         public string GameDetectionMode { get; set; } = GameDetectionService.HybridMode;
         public string[]? GameProcessNames { get; set; }
         public bool BackgroundOptimizationEnabled { get; set; } = true;

@@ -62,6 +62,7 @@ internal sealed partial class AppSettings
     private bool _systemPowerBoostEnabled = true;
     private string _topBarDisplayMode = "Primary";
     private string[] _topBarMonitorIds = [];
+    private bool _showAppButtonOutline = true;
     private AppShortcutSetting?[] _shortcutButtons = new AppShortcutSetting?[MaxShortcutButtons];
 
     public static AppSettings Current => _current.Value;
