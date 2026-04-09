@@ -658,11 +658,11 @@ function Queue-Restart {
         [string]$FullPath
     )
 
-    if ($FullPath -match "\\(bin|obj)(\\|$)") {
+    if ($FullPath -match "\\(bin|obj|Assets\\Web\\FinderAi\\dist)(\\|$)") {
         return
     }
 
-    if ($FullPath -notmatch "\.(cs|xaml|csproj|manifest)$") {
+    if ($FullPath -notmatch "\.(cs|xaml|csproj|manifest|ts|html|css|json)$") {
         return
     }
 

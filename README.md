@@ -61,6 +61,8 @@ dotnet restore Veil.sln
 dotnet build Veil.sln -c Debug -p:Platform=x64
 ```
 
+The Finder AI webview frontend is compiled from embedded TypeScript during `dotnet build`.
+
 Run the desktop app:
 
 ```powershell
@@ -72,6 +74,8 @@ Live development helper:
 ```powershell
 .\dev.cmd
 ```
+
+`dev.cmd` also watches Finder AI web sources under `apps/desktop/Veil/Assets/Web/FinderAi` and rebuilds the app when `.ts`, `.html`, `.css`, or the local `tsconfig.json` changes.
 
 ## Packaging
 

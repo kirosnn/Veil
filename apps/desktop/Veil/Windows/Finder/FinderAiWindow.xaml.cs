@@ -1,9 +1,8 @@
-using Microsoft.UI;
+using System.Text.Json;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Veil.Configuration;
 using Veil.Interop;
@@ -15,6 +14,7 @@ namespace Veil.Windows;
 
 public sealed partial class FinderAiWindow : Window
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly ScreenBounds _screen;
     private readonly AppSettings _settings = AppSettings.Current;
     private readonly AiAgentService _aiAgentService = new();
@@ -25,25 +25,30 @@ public sealed partial class FinderAiWindow : Window
     private readonly List<AiAgentTurn> _conversation = [];
     private IReadOnlyList<FinderAiConversationSession> _sessions = [];
     private IReadOnlyList<AiModelCatalogEntry> _modelOptions = [];
+    private WebView2? _aiWebView;
     private DesktopAcrylicController? _acrylicController;
     private SystemBackdropConfiguration? _backdropConfig;
     private CancellationTokenSource? _requestCts;
     private CancellationTokenSource? _modelCatalogCancellationSource;
+    private Task? _webViewInitializationTask;
+    private DispatcherTimer? _bridgeTimer;
     private IntPtr _hwnd;
     private bool _showRequested;
-    private string _pendingPrompt = string.Empty;
-    private bool _pendingAutoSubmit;
     private bool _isSidebarVisible = true;
+    private bool _isBusy;
+    private bool _isWebReady;
     private string? _activeConversationId;
     private string _providerStatusText = "Ready";
-    private SolidColorBrush _providerStatusBrush = new(global::Windows.UI.Color.FromArgb(186, 198, 255, 225));
+    private string _providerStatusTone = "valid";
+    private string _draftPrompt = string.Empty;
+    private int _draftVersion;
+    private bool _pendingAutoSubmit;
 
     internal FinderAiWindow(ScreenBounds screen, Action? returnToFinderAction = null)
     {
         _screen = screen;
         _returnToFinderAction = returnToFinderAction;
         InitializeComponent();
-        ApplyCustomControlStyling();
         Title = "Veil Halo";
         Activated += OnFirstActivated;
         Closed += OnClosed;
@@ -52,8 +57,9 @@ public sealed partial class FinderAiWindow : Window
 
     internal void ShowCentered(string? prompt = null, bool autoSubmit = false)
     {
-        _pendingPrompt = prompt?.Trim() ?? string.Empty;
-        _pendingAutoSubmit = autoSubmit && _pendingPrompt.Length > 0;
+        _draftPrompt = prompt?.Trim() ?? string.Empty;
+        _draftVersion++;
+        _pendingAutoSubmit = autoSubmit && _draftPrompt.Length > 0;
 
         if (_hwnd == IntPtr.Zero)
         {
@@ -65,7 +71,15 @@ public sealed partial class FinderAiWindow : Window
         ShowCenteredCore();
     }
 
-    private void OnFirstActivated(object sender, WindowActivatedEventArgs args)
+    internal void HideWindow()
+    {
+        if (_hwnd != IntPtr.Zero)
+        {
+            ShowWindowNative(_hwnd, SW_HIDE);
+        }
+    }
+
+    private async void OnFirstActivated(object sender, WindowActivatedEventArgs args)
     {
         Activated -= OnFirstActivated;
 
@@ -75,7 +89,17 @@ public sealed partial class FinderAiWindow : Window
         WindowHelper.PrepareForSystemBackdrop(this);
         SetupAcrylic();
         ApplyWindowSize();
-        UpdateSidebarState();
+        UpdateLoadingOverlay(isVisible: true, text: "Loading Finder AI");
+
+        try
+        {
+            _webViewInitializationTask ??= InitializeWebViewAsync();
+            await _webViewInitializationTask;
+        }
+        catch (Exception ex)
+        {
+            UpdateLoadingOverlay(isVisible: true, text: ex.Message);
+        }
 
         if (_showRequested)
         {
@@ -91,19 +115,14 @@ public sealed partial class FinderAiWindow : Window
         _modelCatalogCancellationSource?.Cancel();
         _modelCatalogCancellationSource?.Dispose();
         _modelCatalogCancellationSource = null;
+        _bridgeTimer?.Stop();
+        _bridgeTimer = null;
+
         _acrylicController?.Dispose();
         _acrylicController = null;
         _backdropConfig = null;
         _hwnd = IntPtr.Zero;
-    }
-
-    internal void HideWindow()
-    {
-        CloseModelPicker();
-        if (_hwnd != IntPtr.Zero)
-        {
-            ShowWindowNative(_hwnd, SW_HIDE);
-        }
+        _isWebReady = false;
     }
 
     private void ShowCenteredCore()
@@ -114,8 +133,6 @@ public sealed partial class FinderAiWindow : Window
         LoadSessions();
         ApplyModelCatalogPlaceholder();
         _ = LoadModelCatalogAsync();
-        CloseModelPicker();
-        UpdateSidebarState();
         Activate();
 
         if (_hwnd != IntPtr.Zero)
@@ -123,29 +140,17 @@ public sealed partial class FinderAiWindow : Window
             SetForegroundWindow(_hwnd);
         }
 
-        if (_pendingPrompt.Length > 0)
+        if (_draftPrompt.Length > 0)
         {
-            StartNewChat(clearComposer: false);
-            SetActiveComposerText(_pendingPrompt);
+            StartNewChat(clearDraft: false);
         }
         else if (_conversation.Count == 0 && _sessions.Count > 0 && string.IsNullOrWhiteSpace(_activeConversationId))
         {
             LoadConversation(_sessions[0]);
         }
-        else
-        {
-            UpdateConversationChrome();
-        }
 
-        FocusActiveComposer();
-
-        bool shouldAutoSubmit = _pendingAutoSubmit;
-        _pendingPrompt = string.Empty;
-        _pendingAutoSubmit = false;
-        if (shouldAutoSubmit)
-        {
-            DispatcherQueue.TryEnqueue(async () => await SendPromptAsync(_conversation.Count == 0 ? HomeComposerTextBox : ComposerTextBox));
-        }
+        _ = PublishStateAsync();
+        _ = TryAutoSubmitPendingPromptAsync();
     }
 
     private void ApplyWindowSize()
@@ -185,27 +190,178 @@ public sealed partial class FinderAiWindow : Window
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
     }
 
+    private async Task InitializeWebViewAsync()
+    {
+        string webRoot = Path.Combine(AppContext.BaseDirectory, "Assets", "Web", "FinderAi");
+        if (!Directory.Exists(webRoot))
+        {
+            throw new InvalidOperationException($"Finder AI web assets were not found at '{webRoot}'.");
+        }
+
+        _aiWebView ??= CreateWebView();
+        await _aiWebView.EnsureCoreWebView2Async();
+        _aiWebView.Source = new Uri(Path.Combine(webRoot, "index.html") + "?bridge=poll");
+        StartBridgeTimer();
+    }
+
+    private WebView2 CreateWebView()
+    {
+        var webView = new WebView2
+        {
+            DefaultBackgroundColor = global::Windows.UI.Color.FromArgb(0, 0, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+
+        WebViewHost.Children.Clear();
+        WebViewHost.Children.Add(webView);
+        return webView;
+    }
+
+    private void StartBridgeTimer()
+    {
+        _bridgeTimer?.Stop();
+        _bridgeTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(140)
+        };
+        _bridgeTimer.Tick += OnBridgeTimerTick;
+        _bridgeTimer.Start();
+    }
+
+    private async void OnBridgeTimerTick(object? sender, object e)
+    {
+        try
+        {
+            if (_aiWebView is null)
+            {
+                return;
+            }
+
+            if (!_isWebReady)
+            {
+                string readyResult = await _aiWebView.ExecuteScriptAsync("typeof window.__veilReceiveHostState === 'function'");
+                if (string.Equals(readyResult, "true", StringComparison.OrdinalIgnoreCase))
+                {
+                    _isWebReady = true;
+                    UpdateLoadingOverlay(isVisible: false, text: string.Empty);
+                    await PublishStateAsync();
+                    await TryAutoSubmitPendingPromptAsync();
+                }
+            }
+
+            if (!_isWebReady)
+            {
+                return;
+            }
+
+            string payload = await _aiWebView.ExecuteScriptAsync("(window.__veilCommandQueue || []).splice(0)");
+            if (string.IsNullOrWhiteSpace(payload) || string.Equals(payload, "[]", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            using JsonDocument document = JsonDocument.Parse(payload);
+            foreach (JsonElement command in document.RootElement.EnumerateArray())
+            {
+                await HandleCommandAsync(command);
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private async Task HandleCommandAsync(JsonElement root)
+    {
+        string command = root.TryGetProperty("command", out JsonElement commandElement)
+            ? commandElement.GetString() ?? string.Empty
+            : string.Empty;
+
+        switch (command)
+        {
+            case "ready":
+                _isWebReady = true;
+                UpdateLoadingOverlay(isVisible: false, text: string.Empty);
+                await PublishStateAsync();
+                await TryAutoSubmitPendingPromptAsync();
+                break;
+            case "newChat":
+                StartNewChat(clearDraft: true);
+                await PublishStateAsync();
+                break;
+            case "deleteChat":
+                DeleteCurrentConversation();
+                await PublishStateAsync();
+                break;
+            case "loadConversation":
+                if (TryGetString(root, "sessionId", out string? sessionId))
+                {
+                    LoadConversationById(sessionId!);
+                    await PublishStateAsync();
+                }
+
+                break;
+            case "toggleSidebar":
+                _isSidebarVisible = !_isSidebarVisible;
+                await PublishStateAsync();
+                break;
+            case "selectModel":
+                if (TryGetString(root, "modelId", out string? modelId) && !string.IsNullOrWhiteSpace(modelId))
+                {
+                    SetCurrentAiModel(modelId!);
+                    UpdateProviderState();
+                    await PublishStateAsync();
+                }
+
+                break;
+            case "refreshModels":
+                _ = LoadModelCatalogAsync(forceRefresh: true);
+                break;
+            case "submitPrompt":
+                if (TryGetString(root, "prompt", out string? prompt))
+                {
+                    await SubmitPromptAsync(prompt ?? string.Empty);
+                }
+
+                break;
+            case "cancelRequest":
+                _requestCts?.Cancel();
+                break;
+            case "openFinder":
+                HideWindow();
+                _returnToFinderAction?.Invoke();
+                break;
+        }
+    }
+
+    private static bool TryGetString(JsonElement element, string propertyName, out string? value)
+    {
+        if (element.TryGetProperty(propertyName, out JsonElement property) && property.ValueKind == JsonValueKind.String)
+        {
+            value = property.GetString();
+            return true;
+        }
+
+        value = null;
+        return false;
+    }
+
     private void UpdateProviderState()
     {
         AiProviderValidationResult validation = AiProviderValidationService.Validate(_settings, _secretStore);
         _providerStatusText = validation.Summary;
-        _providerStatusBrush = validation.State switch
+        _providerStatusTone = validation.State switch
         {
-            AiProviderValidationState.Valid => new SolidColorBrush(global::Windows.UI.Color.FromArgb(186, 198, 255, 225)),
-            AiProviderValidationState.Warning => new SolidColorBrush(global::Windows.UI.Color.FromArgb(186, 255, 226, 174)),
-            _ => new SolidColorBrush(global::Windows.UI.Color.FromArgb(186, 255, 173, 173))
+            AiProviderValidationState.Valid => "valid",
+            AiProviderValidationState.Warning => "warning",
+            _ => "invalid"
         };
-
-        StatusTextBlock.Text = string.Empty;
-        StatusTextBlock.Visibility = Visibility.Collapsed;
-        UpdateConversationChrome();
-        UpdateSurfaceState();
     }
 
     private void LoadSessions()
     {
         _sessions = _conversationStore.LoadSessions();
-        RefreshHistoryList();
 
         if (!string.IsNullOrWhiteSpace(_activeConversationId))
         {
@@ -215,30 +371,33 @@ public sealed partial class FinderAiWindow : Window
             {
                 _conversation.Clear();
                 _conversation.AddRange(currentSession.Turns);
-                RenderConversation();
             }
         }
-
-        UpdateConversationChrome();
     }
 
-    private void StartNewChat(bool clearComposer)
+    private void StartNewChat(bool clearDraft)
     {
         _requestCts?.Cancel();
         _activeConversationId = null;
         _conversation.Clear();
-        MessagesPanel.Children.Clear();
 
-        if (clearComposer)
+        if (clearDraft)
         {
-            HomeComposerTextBox.Text = string.Empty;
-            ComposerTextBox.Text = string.Empty;
+            _draftPrompt = string.Empty;
+            _draftVersion++;
         }
 
-        UpdateConversationChrome();
-        UpdateSurfaceState();
-        RefreshHistoryList();
         SetBusyState(false);
+    }
+
+    private void LoadConversationById(string sessionId)
+    {
+        FinderAiConversationSession? session = _sessions.FirstOrDefault(item =>
+            string.Equals(item.Id, sessionId, StringComparison.Ordinal));
+        if (session is not null)
+        {
+            LoadConversation(session);
+        }
     }
 
     private void LoadConversation(FinderAiConversationSession session)
@@ -247,94 +406,235 @@ public sealed partial class FinderAiWindow : Window
         _activeConversationId = session.Id;
         _conversation.Clear();
         _conversation.AddRange(session.Turns);
-        RenderConversation();
-        UpdateConversationChrome();
-        RefreshHistoryList();
-        ScrollToBottom();
+        _draftPrompt = string.Empty;
+        _draftVersion++;
     }
 
-    private void RenderConversation()
+    private void DeleteCurrentConversation()
     {
-        MessagesPanel.Children.Clear();
-        foreach (AiAgentTurn turn in _conversation)
+        if (string.IsNullOrWhiteSpace(_activeConversationId))
         {
-            AppendBubble(turn.Content, turn.Role.Equals("user", StringComparison.OrdinalIgnoreCase), isMuted: false);
+            StartNewChat(clearDraft: true);
+            return;
         }
 
-        UpdateSurfaceState();
-    }
+        _conversationStore.DeleteSession(_activeConversationId);
+        _activeConversationId = null;
+        _sessions = _conversationStore.LoadSessions();
 
-    private void RefreshHistoryList()
-    {
-        HistoryListPanel.Children.Clear();
-
-        foreach (FinderAiConversationSession session in _sessions)
+        if (_sessions.Count > 0)
         {
-            bool isSelected = string.Equals(session.Id, _activeConversationId, StringComparison.Ordinal);
-            var button = new Button
-            {
-                Padding = new Thickness(0),
-                Background = new SolidColorBrush(isSelected
-                    ? global::Windows.UI.Color.FromArgb(22, 94, 167, 255)
-                    : global::Windows.UI.Color.FromArgb(0, 0, 0, 0)),
-                BorderThickness = new Thickness(0),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                CornerRadius = new CornerRadius(10),
-                Tag = session.Id,
-                UseSystemFocusVisuals = false
-            };
-            PanelButtonFactory.ApplyInteraction(
-                button,
-                button.Background,
-                CreateBrush(240, 255, 255, 255),
-                CreateBrush(18, 255, 255, 255),
-                CreateBrush(12, 255, 255, 255));
-            button.Click += OnHistoryConversationClick;
-
-            var stack = new StackPanel
-            {
-                Spacing = 3,
-                Margin = new Thickness(10, 8, 10, 8)
-            };
-            stack.Children.Add(new TextBlock
-            {
-                Text = session.Title,
-                FontSize = 11,
-                FontFamily = (FontFamily)Application.Current.Resources["SfTextSemibold"],
-                Foreground = CreateBrush(240, 255, 255, 255),
-                TextTrimming = TextTrimming.CharacterEllipsis
-            });
-            stack.Children.Add(new TextBlock
-            {
-                Text = $"{AiProviderKind.ToDisplayName(session.Provider)}  •  {session.Model}",
-                FontSize = 9,
-                FontFamily = (FontFamily)Application.Current.Resources["SfTextMedium"],
-                Foreground = CreateBrush(168, 255, 255, 255),
-                TextTrimming = TextTrimming.CharacterEllipsis
-            });
-            stack.Children.Add(new TextBlock
-            {
-                Text = $"{BuildConversationPreview(session)}  •  {FormatRelativeTime(session.UpdatedAtUtc)}",
-                FontSize = 9,
-                FontFamily = (FontFamily)Application.Current.Resources["SfTextRegular"],
-                Foreground = CreateBrush(132, 255, 255, 255),
-                TextWrapping = TextWrapping.WrapWholeWords,
-                MaxLines = 2
-            });
-
-            button.Content = stack;
-            HistoryListPanel.Children.Add(button);
+            LoadConversation(_sessions[0]);
+            return;
         }
 
-        HistoryEmptyText.Visibility = _sessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        DeleteChatButton.IsEnabled = !string.IsNullOrWhiteSpace(_activeConversationId);
+        StartNewChat(clearDraft: true);
     }
 
-    private void OnBackToFinderClick(object sender, RoutedEventArgs e)
+    private async Task SubmitPromptAsync(string prompt)
     {
-        HideWindow();
-        _returnToFinderAction?.Invoke();
+        string normalizedPrompt = prompt.Trim();
+        if (normalizedPrompt.Length == 0 || _requestCts is not null)
+        {
+            return;
+        }
+
+        _draftPrompt = string.Empty;
+        _draftVersion++;
+        _pendingAutoSubmit = false;
+        _conversation.Add(new AiAgentTurn("user", normalizedPrompt));
+        PersistConversation();
+        SetBusyState(true);
+        await PublishStateAsync();
+
+        _requestCts = new CancellationTokenSource();
+
+        try
+        {
+            string reply = await _aiAgentService.GenerateReplyAsync(_conversation.ToArray(), _requestCts.Token);
+            _conversation.Add(new AiAgentTurn("assistant", reply));
+            PersistConversation();
+        }
+        catch (OperationCanceledException)
+        {
+            _conversation.Add(new AiAgentTurn("assistant", "Request cancelled."));
+            PersistConversation();
+        }
+        catch (Exception ex)
+        {
+            string errorMessage = ex.Message.Trim();
+            _conversation.Add(new AiAgentTurn("assistant", errorMessage.Length == 0 ? "The request failed." : errorMessage));
+            PersistConversation();
+        }
+        finally
+        {
+            _requestCts?.Dispose();
+            _requestCts = null;
+            SetBusyState(false);
+            await PublishStateAsync();
+        }
+    }
+
+    private async Task TryAutoSubmitPendingPromptAsync()
+    {
+        if (!_isWebReady || !_pendingAutoSubmit || _draftPrompt.Length == 0 || _requestCts is not null)
+        {
+            return;
+        }
+
+        string prompt = _draftPrompt;
+        _pendingAutoSubmit = false;
+        await SubmitPromptAsync(prompt);
+    }
+
+    private void PersistConversation()
+    {
+        if (_conversation.Count == 0)
+        {
+            return;
+        }
+
+        _activeConversationId ??= Guid.NewGuid().ToString("N");
+        var session = new FinderAiConversationSession(
+            _activeConversationId,
+            BuildConversationTitle(_conversation),
+            _settings.AiProvider,
+            GetCurrentAiModel(),
+            DateTime.UtcNow,
+            _conversation.ToArray());
+        _conversationStore.UpsertSession(session);
+        _sessions = _conversationStore.LoadSessions();
+    }
+
+    private void SetBusyState(bool isBusy)
+    {
+        _isBusy = isBusy;
+    }
+
+    private void ApplyModelCatalogPlaceholder()
+    {
+        string currentModel = GetCurrentAiModel();
+        _modelOptions = CreateModelOptions([], currentModel);
+    }
+
+    private async Task LoadModelCatalogAsync(bool forceRefresh = false)
+    {
+        _modelCatalogCancellationSource?.Cancel();
+        _modelCatalogCancellationSource?.Dispose();
+        _modelCatalogCancellationSource = new CancellationTokenSource();
+        CancellationToken cancellationToken = _modelCatalogCancellationSource.Token;
+        string currentModel = GetCurrentAiModel();
+
+        try
+        {
+            AiModelCatalogSnapshot snapshot = await _aiModelCatalogService.GetModelsForProviderAsync(
+                _settings.AiProvider,
+                forceRefresh,
+                cancellationToken);
+
+            _modelOptions = CreateModelOptions(snapshot.Models, currentModel);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch
+        {
+            _modelOptions = CreateModelOptions([], currentModel);
+        }
+
+        await PublishStateAsync();
+    }
+
+    private static IReadOnlyList<AiModelCatalogEntry> CreateModelOptions(
+        IReadOnlyList<AiModelCatalogEntry> catalog,
+        string currentModel)
+    {
+        var options = new List<AiModelCatalogEntry>();
+
+        if (!string.IsNullOrWhiteSpace(currentModel))
+        {
+            options.Add(new AiModelCatalogEntry(
+                string.Empty,
+                string.Empty,
+                currentModel,
+                currentModel,
+                $"{currentModel}  •  current",
+                "current"));
+        }
+
+        options.AddRange(catalog);
+        return options
+            .GroupBy(static item => item.ModelId, StringComparer.OrdinalIgnoreCase)
+            .Select(static group => group.First())
+            .OrderBy(item => string.Equals(item.ModelId, currentModel, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(static item => item.DisplayLabel, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private async Task PublishStateAsync()
+    {
+        if (!_isWebReady || _aiWebView is null)
+        {
+            return;
+        }
+
+        string json = JsonSerializer.Serialize(new
+        {
+            type = "hostState",
+            state = BuildUiState()
+        }, JsonOptions);
+        await _aiWebView.ExecuteScriptAsync($"window.__veilReceiveHostState({json})");
+    }
+
+    private object BuildUiState()
+    {
+        string currentModel = GetCurrentAiModel();
+        return new
+        {
+            providerLabel = _aiAgentService.ProviderDisplayName,
+            providerStatus = _providerStatusText,
+            providerStatusTone = _providerStatusTone,
+            activeConversationId = _activeConversationId,
+            busy = _isBusy,
+            canDelete = !string.IsNullOrWhiteSpace(_activeConversationId),
+            canCancel = _requestCts is not null,
+            sidebarVisible = _isSidebarVisible,
+            currentModel,
+            draftPrompt = _draftPrompt,
+            draftVersion = _draftVersion,
+            turns = _conversation.Select(static turn => new
+            {
+                role = turn.Role,
+                content = turn.Content
+            }).ToArray(),
+            sessions = _sessions.Select(session => new
+            {
+                id = session.Id,
+                title = session.Title,
+                provider = AiProviderKind.ToDisplayName(session.Provider),
+                model = session.Model,
+                preview = BuildConversationPreview(session),
+                updatedAtLabel = FormatRelativeTime(session.UpdatedAtUtc),
+                selected = string.Equals(session.Id, _activeConversationId, StringComparison.Ordinal)
+            }).ToArray(),
+            modelOptions = _modelOptions.Select(option => new
+            {
+                id = option.ModelId,
+                label = option.DisplayLabel,
+                badge = option.Summary ?? string.Empty,
+                selected = string.Equals(option.ModelId, currentModel, StringComparison.OrdinalIgnoreCase)
+            }).ToArray()
+        };
+    }
+
+    private void UpdateLoadingOverlay(bool isVisible, string text)
+    {
+        LoadingOverlay.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+        if (text.Length > 0)
+        {
+            LoadingTextBlock.Text = text;
+        }
     }
 
     private static string BuildConversationPreview(FinderAiConversationSession session)
@@ -342,11 +642,6 @@ public sealed partial class FinderAiWindow : Window
         string text = session.Turns.LastOrDefault()?.Content?.Trim() ?? string.Empty;
         text = text.ReplaceLineEndings(" ");
         return text.Length <= 68 ? text : $"{text[..68].TrimEnd()}...";
-    }
-
-    private void UpdateConversationChrome()
-    {
-        DeleteChatButton.IsEnabled = !string.IsNullOrWhiteSpace(_activeConversationId);
     }
 
     private static string BuildConversationTitle(IEnumerable<AiAgentTurn> turns)
@@ -381,485 +676,6 @@ public sealed partial class FinderAiWindow : Window
         }
 
         return updatedAtUtc.ToLocalTime().ToString("MMM d");
-    }
-
-    private async void OnSendClick(object sender, RoutedEventArgs e)
-    {
-        await SendPromptAsync(ComposerTextBox);
-    }
-
-    private async void OnHomeSendClick(object sender, RoutedEventArgs e)
-    {
-        await SendPromptAsync(HomeComposerTextBox);
-    }
-
-    private async void OnComposerKeyDown(object sender, KeyRoutedEventArgs e)
-    {
-        await TrySendFromComposerKeyDownAsync(e, ComposerTextBox);
-    }
-
-    private async void OnHomeComposerKeyDown(object sender, KeyRoutedEventArgs e)
-    {
-        await TrySendFromComposerKeyDownAsync(e, HomeComposerTextBox);
-    }
-
-    private void OnNewChatClick(object sender, RoutedEventArgs e)
-    {
-        StartNewChat(clearComposer: true);
-        FocusActiveComposer();
-    }
-
-    private void OnDeleteChatClick(object sender, RoutedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(_activeConversationId))
-        {
-            StartNewChat(clearComposer: true);
-            return;
-        }
-
-        _conversationStore.DeleteSession(_activeConversationId);
-        _activeConversationId = null;
-        _sessions = _conversationStore.LoadSessions();
-
-        if (_sessions.Count > 0)
-        {
-            LoadConversation(_sessions[0]);
-            return;
-        }
-
-        StartNewChat(clearComposer: true);
-    }
-
-    private void OnHistoryConversationClick(object sender, RoutedEventArgs e)
-    {
-        if (_requestCts is not null)
-        {
-            _requestCts.Cancel();
-        }
-
-        if (sender is not Button { Tag: string sessionId })
-        {
-            return;
-        }
-
-        FinderAiConversationSession? session = _sessions.FirstOrDefault(item =>
-            string.Equals(item.Id, sessionId, StringComparison.Ordinal));
-        if (session is not null)
-        {
-            LoadConversation(session);
-        }
-    }
-
-    private void OnToggleSidebarClick(object sender, RoutedEventArgs e)
-    {
-        _isSidebarVisible = !_isSidebarVisible;
-        UpdateSidebarState();
-    }
-
-    private void OnModelSelectorClick(object sender, RoutedEventArgs e)
-    {
-        ModelDropdownPanel.Visibility = ModelDropdownPanel.Visibility == Visibility.Visible
-            ? Visibility.Collapsed
-            : Visibility.Visible;
-        ModelSelectorChevronTextBlock.Text = ModelDropdownPanel.Visibility == Visibility.Visible ? "▴" : "▾";
-    }
-
-    private void OnHomeQuickActionClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: string prompt })
-        {
-            return;
-        }
-
-        SetActiveComposerText(prompt);
-        FocusActiveComposer();
-    }
-
-    private async Task TrySendFromComposerKeyDownAsync(KeyRoutedEventArgs e, TextBox composer)
-    {
-        if (e.Key != global::Windows.System.VirtualKey.Enter)
-        {
-            return;
-        }
-
-        bool ctrlDown = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(global::Windows.System.VirtualKey.Control)
-            .HasFlag(global::Windows.UI.Core.CoreVirtualKeyStates.Down);
-        if (!ctrlDown)
-        {
-            return;
-        }
-
-        e.Handled = true;
-        await SendPromptAsync(composer);
-    }
-
-    private async Task SendPromptAsync(TextBox composer)
-    {
-        string prompt = composer.Text.Trim();
-        if (prompt.Length == 0 || _requestCts is not null)
-        {
-            return;
-        }
-
-        CloseModelPicker();
-        HomeComposerTextBox.Text = string.Empty;
-        ComposerTextBox.Text = string.Empty;
-        UpdateSurfaceState();
-
-        var userTurn = new AiAgentTurn("user", prompt);
-        _conversation.Add(userTurn);
-        UpdateSurfaceState();
-        AppendBubble(prompt, isUser: true, isMuted: false);
-        PersistConversation();
-
-        TextBlock pendingBubble = AppendBubble("Thinking...", isUser: false, isMuted: true);
-        ScrollToBottom();
-
-        _requestCts = new CancellationTokenSource();
-        SetBusyState(true);
-
-        try
-        {
-            string reply = await _aiAgentService.GenerateReplyAsync(_conversation.ToArray(), _requestCts.Token);
-            pendingBubble.Text = reply;
-            pendingBubble.Foreground = CreateBrush(240, 255, 255, 255);
-            _conversation.Add(new AiAgentTurn("assistant", reply));
-            PersistConversation();
-        }
-        catch (OperationCanceledException)
-        {
-            const string cancelledMessage = "Request cancelled.";
-            pendingBubble.Text = cancelledMessage;
-            pendingBubble.Foreground = CreateBrush(186, 255, 210, 165);
-            _conversation.Add(new AiAgentTurn("assistant", cancelledMessage));
-            PersistConversation();
-        }
-        catch (Exception ex)
-        {
-            string errorMessage = ex.Message.Trim();
-            pendingBubble.Text = errorMessage;
-            pendingBubble.Foreground = CreateBrush(208, 255, 182, 182);
-            _conversation.Add(new AiAgentTurn("assistant", errorMessage));
-            PersistConversation();
-        }
-        finally
-        {
-            _requestCts?.Dispose();
-            _requestCts = null;
-            SetBusyState(false);
-            ScrollToBottom();
-        }
-    }
-
-    private void PersistConversation()
-    {
-        if (_conversation.Count == 0)
-        {
-            return;
-        }
-
-        _activeConversationId ??= Guid.NewGuid().ToString("N");
-        var session = new FinderAiConversationSession(
-            _activeConversationId,
-            BuildConversationTitle(_conversation),
-            _settings.AiProvider,
-            GetCurrentAiModel(),
-            DateTime.UtcNow,
-            _conversation.ToArray());
-        _conversationStore.UpsertSession(session);
-        _sessions = _conversationStore.LoadSessions();
-        RefreshHistoryList();
-        UpdateConversationChrome();
-    }
-
-    private TextBlock AppendBubble(string text, bool isUser, bool isMuted)
-    {
-        var textBlock = new TextBlock
-        {
-            Text = text,
-            TextWrapping = TextWrapping.WrapWholeWords,
-            FontSize = 12,
-            FontFamily = (FontFamily)Application.Current.Resources["SfTextRegular"],
-            Foreground = isUser
-                ? CreateBrush(244, 244, 248, 255)
-                : isMuted
-                    ? CreateBrush(172, 255, 255, 255)
-                    : CreateBrush(238, 255, 255, 255),
-            MaxWidth = 540
-        };
-
-        var bubble = new Border
-        {
-            MaxWidth = 580,
-            Padding = new Thickness(12, 9, 12, 9),
-            CornerRadius = new CornerRadius(8),
-            Background = isUser
-                ? CreateBrush(24, 64, 125, 255)
-                : CreateBrush(8, 255, 255, 255),
-            BorderThickness = new Thickness(1),
-            BorderBrush = isUser
-                ? CreateBrush(42, 93, 167, 255)
-                : CreateBrush(10, 255, 255, 255),
-            HorizontalAlignment = isUser ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-            Child = textBlock
-        };
-
-        MessagesPanel.Children.Add(bubble);
-        return textBlock;
-    }
-
-    private void SetBusyState(bool isBusy)
-    {
-        SendButton.IsEnabled = !isBusy;
-        HomeSendButton.IsEnabled = !isBusy;
-        HomeComposerTextBox.IsEnabled = !isBusy;
-        ComposerTextBox.IsEnabled = !isBusy;
-        ModelSelectorButton.IsEnabled = !isBusy;
-        NewChatButton.IsEnabled = !isBusy;
-        DeleteChatButton.IsEnabled = !isBusy && !string.IsNullOrWhiteSpace(_activeConversationId);
-        SendButton.Content = isBusy ? "..." : "\uE724";
-        HomeSendButton.Content = isBusy ? "..." : "\uE724";
-        StatusTextBlock.Text = isBusy ? $"Thinking with {GetProviderDisplayName()}..." : string.Empty;
-        StatusTextBlock.Foreground = isBusy ? CreateBrush(186, 196, 228, 255) : _providerStatusBrush;
-        StatusTextBlock.Visibility = isBusy ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void UpdateSidebarState()
-    {
-        SidebarPanel.Visibility = _isSidebarVisible ? Visibility.Visible : Visibility.Collapsed;
-        SidebarColumn.Width = _isSidebarVisible ? new GridLength(182) : new GridLength(0);
-    }
-
-    private void UpdateSurfaceState()
-    {
-        bool hasConversation = _conversation.Count > 0;
-        HomePagePanel.Visibility = hasConversation ? Visibility.Collapsed : Visibility.Visible;
-        ConversationPanel.Visibility = hasConversation ? Visibility.Visible : Visibility.Collapsed;
-        ConversationComposerPanel.Visibility = hasConversation ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private void SetActiveComposerText(string prompt)
-    {
-        if (_conversation.Count == 0)
-        {
-            HomeComposerTextBox.Text = prompt;
-            HomeComposerTextBox.SelectionStart = HomeComposerTextBox.Text.Length;
-            HomeComposerTextBox.SelectionLength = 0;
-            return;
-        }
-
-        ComposerTextBox.Text = prompt;
-        ComposerTextBox.SelectionStart = ComposerTextBox.Text.Length;
-        ComposerTextBox.SelectionLength = 0;
-    }
-
-    private void FocusActiveComposer()
-    {
-        if (_conversation.Count == 0)
-        {
-            HomeComposerTextBox.Focus(FocusState.Programmatic);
-            return;
-        }
-
-        ComposerTextBox.Focus(FocusState.Programmatic);
-    }
-
-    private void ScrollToBottom()
-    {
-        DispatcherQueue.TryEnqueue(() =>
-        {
-            MessagesScrollViewer.ChangeView(null, MessagesScrollViewer.ScrollableHeight, null, true);
-        });
-    }
-
-    private static SolidColorBrush CreateBrush(byte alpha, byte red, byte green, byte blue)
-    {
-        return new SolidColorBrush(global::Windows.UI.Color.FromArgb(alpha, red, green, blue));
-    }
-
-    private void ApplyModelCatalogPlaceholder()
-    {
-        string currentModel = GetCurrentAiModel();
-        _modelOptions = CreateModelOptions([], currentModel);
-        UpdateModelSelectionUi(currentModel);
-    }
-
-    private async Task LoadModelCatalogAsync(bool forceRefresh = false)
-    {
-        _modelCatalogCancellationSource?.Cancel();
-        _modelCatalogCancellationSource?.Dispose();
-        _modelCatalogCancellationSource = new CancellationTokenSource();
-        CancellationToken cancellationToken = _modelCatalogCancellationSource.Token;
-        string currentModel = GetCurrentAiModel();
-
-        try
-        {
-            AiModelCatalogSnapshot snapshot = await _aiModelCatalogService.GetModelsForProviderAsync(
-                _settings.AiProvider,
-                forceRefresh,
-                cancellationToken);
-
-            _modelOptions = CreateModelOptions(snapshot.Models, currentModel);
-            UpdateModelSelectionUi(currentModel);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception)
-        {
-            _modelOptions = CreateModelOptions([], currentModel);
-            UpdateModelSelectionUi(currentModel);
-        }
-    }
-
-    private string GetProviderDisplayName()
-    {
-        return _aiAgentService.ProviderDisplayName;
-    }
-
-    private static IReadOnlyList<AiModelCatalogEntry> CreateModelOptions(
-        IReadOnlyList<AiModelCatalogEntry> catalog,
-        string currentModel)
-    {
-        var options = new List<AiModelCatalogEntry>();
-
-        if (!string.IsNullOrWhiteSpace(currentModel))
-        {
-            options.Add(new AiModelCatalogEntry(
-                string.Empty,
-                string.Empty,
-                currentModel,
-                currentModel,
-                $"{currentModel}  •  current",
-                "current"));
-        }
-
-        options.AddRange(catalog);
-        return options
-            .GroupBy(static item => item.ModelId, StringComparer.OrdinalIgnoreCase)
-            .Select(static group => group.First())
-            .OrderBy(item => string.Equals(item.ModelId, currentModel, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-            .ThenBy(static item => item.DisplayLabel, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-    }
-
-    private void OnModelOptionClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: AiModelCatalogEntry entry })
-        {
-            return;
-        }
-
-        SetCurrentAiModel(entry.ModelId);
-        UpdateModelSelectionUi(entry.ModelId);
-        CloseModelPicker();
-        UpdateProviderState();
-        UpdateConversationChrome();
-    }
-
-    private void UpdateModelSelectionUi(string currentModel)
-    {
-        AiModelCatalogEntry? selected = _modelOptions.FirstOrDefault(item =>
-            string.Equals(item.ModelId, currentModel, StringComparison.OrdinalIgnoreCase));
-        ModelSelectionTextBlock.Text = selected?.DisplayLabel ?? "Select model";
-        RebuildModelOptionsPanel(currentModel);
-    }
-
-    private void RebuildModelOptionsPanel(string currentModel)
-    {
-        ModelOptionsPanel.Children.Clear();
-
-        foreach (AiModelCatalogEntry option in _modelOptions)
-        {
-            bool isSelected = string.Equals(option.ModelId, currentModel, StringComparison.OrdinalIgnoreCase);
-            var button = new Button
-            {
-                Height = 38,
-                Padding = new Thickness(10, 0, 10, 0),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                Background = isSelected ? CreateBrush(28, 108, 168, 255) : CreateBrush(0, 0, 0, 0),
-                Foreground = CreateBrush(242, 255, 255, 255),
-                Tag = option,
-                UseSystemFocusVisuals = false,
-                CornerRadius = new CornerRadius(10),
-                BorderThickness = new Thickness(0)
-            };
-            PanelButtonFactory.ApplyInteraction(
-                button,
-                button.Background,
-                CreateBrush(242, 255, 255, 255),
-                CreateBrush(18, 255, 255, 255),
-                CreateBrush(12, 255, 255, 255));
-            button.Click += OnModelOptionClick;
-
-            var row = new Grid();
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var label = new TextBlock
-            {
-                Text = option.DisplayLabel,
-                FontFamily = (FontFamily)Application.Current.Resources["SfTextMedium"],
-                FontSize = 11,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = CreateBrush(242, 255, 255, 255)
-            };
-
-            row.Children.Add(label);
-
-            if (isSelected)
-            {
-                var badge = new TextBlock
-                {
-                    Text = "Current",
-                    FontFamily = (FontFamily)Application.Current.Resources["SfTextSemibold"],
-                    FontSize = 9,
-                    Foreground = CreateBrush(200, 191, 224, 255),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(10, 0, 0, 0)
-                };
-                Grid.SetColumn(badge, 1);
-                row.Children.Add(badge);
-            }
-
-            button.Content = row;
-            ModelOptionsPanel.Children.Add(button);
-        }
-
-        ModelDropdownPanel.Visibility = Visibility.Collapsed;
-        ModelSelectorChevronTextBlock.Text = "▾";
-    }
-
-    private void CloseModelPicker()
-    {
-        ModelDropdownPanel.Visibility = Visibility.Collapsed;
-        ModelSelectorChevronTextBlock.Text = "▾";
-    }
-
-    private void ApplyCustomControlStyling()
-    {
-        ApplyButtonStyle(BackToFinderButton, CreateBrush(20, 255, 255, 255));
-        ApplyButtonStyle(SidebarToggleButton, CreateBrush(16, 255, 255, 255));
-        ApplyButtonStyle(ModelSelectorButton, CreateBrush(16, 255, 255, 255));
-        ApplyButtonStyle(NewChatButton, CreateBrush(18, 255, 255, 255));
-        ApplyButtonStyle(DeleteChatButton, CreateBrush(0, 0, 0, 0));
-        ApplyButtonStyle(HomeSendButton, CreateBrush(34, 255, 255, 255));
-        ApplyButtonStyle(SendButton, CreateBrush(34, 255, 255, 255));
-    }
-
-    private void ApplyButtonStyle(Button button, Brush background)
-    {
-        button.UseSystemFocusVisuals = false;
-        button.BorderThickness = new Thickness(0);
-        button.Background = background;
-        PanelButtonFactory.ApplyInteraction(
-            button,
-            background,
-            button.Foreground ?? CreateBrush(242, 255, 255, 255),
-            CreateBrush(22, 255, 255, 255),
-            CreateBrush(14, 255, 255, 255));
     }
 
     private string GetCurrentAiModel()
