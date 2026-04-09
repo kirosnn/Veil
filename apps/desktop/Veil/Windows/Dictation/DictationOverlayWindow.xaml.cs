@@ -37,15 +37,11 @@ public sealed partial class DictationOverlayWindow : Window
     private const int OverlayContentChromeWidth = 72;
     private const int OverlayHorizontalMargin = 12;
     private const int OverlayMinimumWidth = 132;
+    private const int OverlayUniformWidth = 216;
     private const int OverlayStatusChromeWidth = 80;
     private const int OverlayTranscribingWaveSpacingWidth = 8;
     private const double StatusTextDefaultFontSize = 12.5;
     private const double TranscribingWaveFontSize = 13;
-    private const int ListeningOverlayWidth = 184;
-    private const int TranscribingOverlayWidth = 216;
-    private const int InsertedOverlayWidth = 160;
-    private const int CopiedOverlayWidth = 160;
-    private const int ErrorOverlayWidth = 160;
     private static readonly Spinner TranscribingWaveAnimation = SpinnerRegistry.All.First(static entry => entry.Name == "waverows").Spinner;
     private readonly DispatcherTimer _spectrumTimer;
     private readonly DispatcherTimer _transcribingWaveTimer;
@@ -59,7 +55,7 @@ public sealed partial class DictationOverlayWindow : Window
     private bool _useLiveSpectrum;
     private string _dismissHoverHex = "#26FFFFFF";
     private OverlayCenterMode _centerMode = OverlayCenterMode.Spectrum;
-    private int _overlayWidth = ListeningOverlayWidth;
+    private int _overlayWidth = OverlayUniformWidth;
 
     internal event Action? DismissRequested;
 
@@ -377,24 +373,7 @@ public sealed partial class DictationOverlayWindow : Window
 
     private OverlayLayoutMetrics GetLayoutMetrics(string title, int availableWidth)
     {
-        int preferredWidth = ListeningOverlayWidth;
-
-        if (title.Equals("Inserted", StringComparison.OrdinalIgnoreCase))
-        {
-            preferredWidth = InsertedOverlayWidth;
-        }
-        else if (title.Equals("Copied", StringComparison.OrdinalIgnoreCase))
-        {
-            preferredWidth = CopiedOverlayWidth;
-        }
-        else if (title.Equals("Transcribing", StringComparison.OrdinalIgnoreCase))
-        {
-            preferredWidth = TranscribingOverlayWidth;
-        }
-        else if (title.Contains("Error", StringComparison.OrdinalIgnoreCase))
-        {
-            preferredWidth = ErrorOverlayWidth;
-        }
+        int preferredWidth = OverlayUniformWidth;
 
         int requiredWidth = preferredWidth;
         if (title.Equals("Transcribing", StringComparison.OrdinalIgnoreCase))
@@ -414,7 +393,7 @@ public sealed partial class DictationOverlayWindow : Window
         int safeAvailableWidth = Math.Max(1, availableWidth);
         int minimumWidth = Math.Min(OverlayMinimumWidth, safeAvailableWidth);
         int clampedWidth = Math.Clamp(requiredWidth, minimumWidth, safeAvailableWidth);
-        int contentWidth = Math.Max(1, requiredWidth - OverlayContentWidthPadding);
+        int contentWidth = Math.Max(1, clampedWidth - OverlayContentWidthPadding);
         return new OverlayLayoutMetrics(clampedWidth, contentWidth);
     }
 
