@@ -199,6 +199,9 @@ internal sealed class GameDetectionService
             ? processInfo.ProcessId
             : null;
 
+    internal bool IsForegroundWindowFullscreenForScreen(ForegroundProcessInfo processInfo, ScreenBounds screen)
+        => IsWindowFullscreenLike(processInfo.WindowRect, screen);
+
     private static bool MatchesConfiguredList(string processName, IReadOnlyList<string> configuredProcessNames)
     {
         if (configuredProcessNames.Count == 0)

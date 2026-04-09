@@ -165,6 +165,23 @@ internal sealed partial class AppSettings
         return value is "Primary" or "All" or "Custom" ? value : "Primary";
     }
 
+    private static string NormalizeAiProvider(string? value)
+    {
+        return AiProviderKind.Normalize(value);
+    }
+
+    private static string NormalizeAiSettingText(string? value, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? fallback
+            : value.Trim();
+    }
+
+    private static string NormalizeLocalSpeechModelId(string? value)
+    {
+        return LocalSpeechModelCatalog.Normalize(value);
+    }
+
     private static string[] NormalizeTopBarMonitorIds(string[]? monitorIds)
     {
         if (monitorIds == null)

@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.IO;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -256,6 +257,17 @@ internal static class WindowHelper
     {
         var appWindow = GetAppWindow(window);
         appWindow.SetIcon(icoPath);
+    }
+
+    internal static void ApplyAppIcon(Window window)
+    {
+        string icoPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Logo", "veil.ico");
+        if (!File.Exists(icoPath))
+        {
+            return;
+        }
+
+        SetWindowIcon(window, icoPath);
     }
 
     internal static bool IsForegroundFullscreen(ScreenBounds screen, IntPtr excludeHwnd)

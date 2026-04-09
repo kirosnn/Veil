@@ -70,4 +70,27 @@ public sealed class GameDetectionServiceTests
 
         Assert.IsNull(processId);
     }
+
+    [TestMethod]
+    public void IsForegroundWindowFullscreenForScreen_returns_true_for_non_game_fullscreen_process()
+    {
+        var service = new GameDetectionService();
+        var processInfo = new GameDetectionService.ForegroundProcessInfo(
+            7,
+            "chrome",
+            @"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            new Rect
+            {
+                Left = 0,
+                Top = 0,
+                Right = 1920,
+                Bottom = 1080
+            });
+
+        bool isFullscreen = service.IsForegroundWindowFullscreenForScreen(
+            processInfo,
+            new ScreenBounds(0, 0, 1920, 1080));
+
+        Assert.IsTrue(isFullscreen);
+    }
 }

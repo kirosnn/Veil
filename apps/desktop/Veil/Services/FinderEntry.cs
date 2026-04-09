@@ -10,6 +10,7 @@ internal sealed record FinderEntry(
     string? IconGlyph)
 {
     internal string CategoryLower { get; } = Category.ToLowerInvariant();
+    internal string? ActionId { get; init; }
     internal string? LaunchUri { get; init; }
     internal string? LaunchCommand { get; init; }
     internal string? LaunchArgs { get; init; }
@@ -42,4 +43,9 @@ internal sealed record FinderEntry(
             });
         }
     }
+}
+
+internal static class FinderActionIds
+{
+    public const string AiAgent = "ai-agent";
 }

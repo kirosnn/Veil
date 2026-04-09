@@ -95,11 +95,13 @@ public sealed partial class TopBarWindow
         if (_ownsGlobalHotkeys)
         {
             InitializeFinderHotkey();
+            InitializeDictationHotkey();
             _finderHotkeyService?.SetEnabled(_settings.FinderHotkeyEnabled);
             return;
         }
 
         DisposeFinderHotkey();
+        DisposeDictationHotkey();
     }
 
     internal void SetOwnsGlobalHotkeys(bool ownsGlobalHotkeys)

@@ -24,12 +24,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="UIAutomationClient">
-      <HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1\UIAutomationClient.dll</HintPath>
-    </Reference>
-    <Reference Include="UIAutomationTypes">
-      <HintPath>C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1\UIAutomationTypes.dll</HintPath>
-    </Reference>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\..\UnicodeAnimations\Models\BrailleUtils.cs" Link="UnicodeAnimations\Models\BrailleUtils.cs" />
+    <Compile Include="..\..\..\UnicodeAnimations\Models\Spinner.cs" Link="UnicodeAnimations\Models\Spinner.cs" />
+    <Compile Include="..\..\..\UnicodeAnimations\Models\SpinnerRegistry.cs" Link="UnicodeAnimations\Models\SpinnerRegistry.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -46,5 +47,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <Target Name="BuildVeilSpeechCli"
+          BeforeTargets="BeforeBuild"
+          Inputs="..\VeilSpeechCli\Cargo.toml;..\VeilSpeechCli\src\main.rs"
+          Outputs="..\VeilSpeechCli\target\release\veil-speech-cli.exe">
+    <Exec Command='cargo build --manifest-path "..\VeilSpeechCli\Cargo.toml" --release' />
+  </Target>
 
 </Project>

@@ -18,9 +18,15 @@ internal sealed record MonitorSelectionOption(string Id, string Label, bool IsPr
 
 public sealed partial class SettingsWindow : Window
 {
+    private static readonly TimeSpan SessionKeepAliveDuration = TimeSpan.FromMinutes(10);
     private readonly ScreenBounds _screen;
     private readonly string _preferredMonitorId;
     private readonly AppSettings _settings;
+    private readonly AiSecretStore _aiSecretStore;
+    private readonly AiModelCatalogService _aiModelCatalogService;
+    private readonly LocalSpeechModelStore _localSpeechModelStore;
+    private readonly DispatcherTimer _sessionKeepAliveTimer;
+    private FinderAiWindow? _finderAiWindow;
     private IntPtr _hwnd;
     private DesktopAcrylicController? _acrylicController;
     private SystemBackdropConfiguration? _backdropConfig;
@@ -34,19 +40,38 @@ public sealed partial class SettingsWindow : Window
         new ShortcutOption("None", string.Empty)
     ];
     private IReadOnlyList<MonitorSelectionOption> _monitorOptions = [];
+    private CancellationTokenSource? _speechModelDownloadCancellationSource;
+    private CancellationTokenSource? _aiModelCatalogCancellationSource;
+    private string? _activeSpeechModelDownloadId;
+    private string? _speechModelMessageModelId;
+    private string _speechModelMessage = string.Empty;
+    private double _speechModelProgressPercent;
+    private IReadOnlyList<AiModelCatalogEntry> _aiModelOptions = [];
+
+    internal event EventHandler? SessionExpired;
 
     internal SettingsWindow(ScreenBounds screen, string preferredMonitorId)
     {
         _screen = screen;
         _preferredMonitorId = preferredMonitorId;
         _settings = AppSettings.Current;
+        _aiSecretStore = new AiSecretStore();
+        _aiModelCatalogService = new AiModelCatalogService();
+        _localSpeechModelStore = new LocalSpeechModelStore();
 
         InitializeComponent();
         Title = "Veil Settings";
 
+        _sessionKeepAliveTimer = new DispatcherTimer
+        {
+            Interval = SessionKeepAliveDuration
+        };
+        _sessionKeepAliveTimer.Tick += OnSessionKeepAliveElapsed;
+
         Activated += OnFirstActivated;
         Activated += OnWindowActivated;
         Closed += OnClosed;
+        SizeChanged += OnSettingsWindowSizeChanged;
     }
 
     private void OnFirstActivated(object sender, WindowActivatedEventArgs args)
@@ -102,6 +127,7 @@ public sealed partial class SettingsWindow : Window
 
     private void ConfigureWindowChrome()
     {
+        WindowHelper.ApplyAppIcon(this);
         WindowHelper.RemoveTitleBar(this);
 
         int rounded = DWMWCP_ROUND;
@@ -112,7 +138,7 @@ public sealed partial class SettingsWindow : Window
     {
         if (args.WindowActivationState != WindowActivationState.Deactivated) return;
         if ((DateTime.UtcNow - _openedAtUtc).TotalMilliseconds < 300) return;
-        ShowWindowNative(_hwnd, SW_HIDE);
+        HideWindow();
     }
 
     private void LoadSettings()
@@ -156,10 +182,12 @@ public sealed partial class SettingsWindow : Window
         TopBarForegroundColorTextBox.Text = _settings.TopBarForegroundColor;
         WeatherPrimaryCityTextBox.Text = _settings.WeatherPrimaryCity;
         WeatherSecondaryCitiesTextBox.Text = string.Join(Environment.NewLine, _settings.WeatherSecondaryCities);
+        InitializeAiSpeechModelPicker();
 
         SyncLabels();
         UpdateSectionUi();
         ApplyShortcutSelections();
+        UpdateContentHostWidth();
         _isInitializing = false;
     }
 
@@ -193,6 +221,7 @@ public sealed partial class SettingsWindow : Window
         }
 
         _showRequested = false;
+        CancelSessionKeepAlive();
         _openedAtUtc = DateTime.UtcNow;
         ApplyWindowSize();
         Activate();
@@ -557,6 +586,7 @@ public sealed partial class SettingsWindow : Window
 
     private void SyncLabels()
     {
+        AiProviderValueText.Text = AiProviderKind.ToDisplayName(_settings.AiProvider);
         TopBarDisplayModeValueText.Text = _settings.TopBarDisplayMode;
         TopBarStyleValueText.Text = _settings.TopBarStyle == "Transparent" ? "Clear" : _settings.TopBarStyle;
         TopBarOpacityValueText.Text = $"{Math.Round(_settings.TopBarOpacity * 100):0}%";
@@ -766,7 +796,7 @@ public sealed partial class SettingsWindow : Window
 
     private void OnDoneClick(object sender, RoutedEventArgs e)
     {
-        Close();
+        HideWindow();
     }
 
     private void OnSectionButtonClick(object sender, RoutedEventArgs e)
@@ -790,9 +820,52 @@ public sealed partial class SettingsWindow : Window
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
+        CancelSessionKeepAlive();
+        _sessionKeepAliveTimer.Stop();
+        _aiModelCatalogCancellationSource?.Cancel();
+        _aiModelCatalogCancellationSource?.Dispose();
+        _aiModelCatalogCancellationSource = null;
+        SizeChanged -= OnSettingsWindowSizeChanged;
+        _speechModelDownloadCancellationSource?.Cancel();
+        _speechModelDownloadCancellationSource?.Dispose();
+        _speechModelDownloadCancellationSource = null;
         _acrylicController?.Dispose();
         _acrylicController = null;
         _backdropConfig = null;
+        if (_finderAiWindow is not null)
+        {
+            _finderAiWindow.Close();
+            _finderAiWindow = null;
+        }
+    }
+
+    private void OnSettingsWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)
+    {
+        UpdateContentHostWidth();
+    }
+
+    internal void HideWindow(bool keepSessionWarm = true)
+    {
+        if (keepSessionWarm)
+        {
+            ScheduleSessionKeepAlive();
+        }
+        else
+        {
+            CancelSessionKeepAlive();
+        }
+
+        if (_hwnd != IntPtr.Zero)
+        {
+            ShowWindowNative(_hwnd, SW_HIDE);
+        }
+    }
+
+    internal void Destroy()
+    {
+        CancelSessionKeepAlive();
+        _sessionKeepAliveTimer.Stop();
+        Close();
     }
 
     private void ApplyWindowSize()
@@ -812,12 +885,28 @@ public sealed partial class SettingsWindow : Window
             _screen.Top + ((screenHeight - height) / 2),
             width,
             height);
+
+        DispatcherQueue.TryEnqueue(UpdateContentHostWidth);
+    }
+
+    private void UpdateContentHostWidth()
+    {
+        double horizontalPadding = ContentScrollViewer.Padding.Left + ContentScrollViewer.Padding.Right;
+        double availableWidth = Math.Max(0, ContentScrollViewer.ActualWidth - horizontalPadding);
+
+        if (availableWidth <= 0)
+        {
+            return;
+        }
+
+        ContentHost.MinWidth = availableWidth;
     }
 
     private void UpdateSectionUi()
     {
         LoadMonitorOptions();
         TopBarSectionPanel.Visibility = _selectedSection == "TopBar" ? Visibility.Visible : Visibility.Collapsed;
+        AiSectionPanel.Visibility = _selectedSection == "AI" ? Visibility.Visible : Visibility.Collapsed;
         DiscordSectionPanel.Visibility = _selectedSection == "Discord" ? Visibility.Visible : Visibility.Collapsed;
         MusicSectionPanel.Visibility = _selectedSection == "Music" ? Visibility.Visible : Visibility.Collapsed;
         WeatherSectionPanel.Visibility = _selectedSection == "Weather" ? Visibility.Visible : Visibility.Collapsed;
@@ -826,6 +915,7 @@ public sealed partial class SettingsWindow : Window
         RunCatSectionPanel.Visibility = _selectedSection == "RunCat" ? Visibility.Visible : Visibility.Collapsed;
 
         UpdateSectionButton(TopBarSectionButton, _selectedSection == "TopBar");
+        UpdateSectionButton(AiSectionButton, _selectedSection == "AI");
         UpdateSectionButton(DiscordSectionButton, _selectedSection == "Discord");
         UpdateSectionButton(MusicSectionButton, _selectedSection == "Music");
         UpdateSectionButton(WeatherSectionButton, _selectedSection == "Weather");
@@ -845,6 +935,8 @@ public sealed partial class SettingsWindow : Window
         BlurIntensityPanel.Visibility = _settings.TopBarStyle == "Blur" ? Visibility.Visible : Visibility.Collapsed;
         TopBarOpacityPanel.Visibility = _settings.TopBarStyle is "Solid" or "Blur"
             ? Visibility.Visible : Visibility.Collapsed;
+        UpdateAiProviderButtons();
+        ApplyAiProviderInputs();
         SyncSolidColorPreview();
         SyncTopBarForegroundColorPreview();
         UpdateFinderBubbleButton();
@@ -904,6 +996,761 @@ public sealed partial class SettingsWindow : Window
             };
             TopBarMonitorSelectionPanel.Children.Add(button);
         }
+    }
+
+    private void OnAiProviderButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string provider })
+        {
+            return;
+        }
+
+        _settings.AiProvider = provider;
+        SyncLabels();
+        UpdateSectionUi();
+    }
+
+    private void UpdateAiProviderButtons()
+    {
+        UpdateTopBarStyleButton(AiProviderChatGptButton, _settings.AiProvider == AiProviderKind.ChatGptPremium);
+        UpdateTopBarStyleButton(AiProviderOpenAiButton, _settings.AiProvider == AiProviderKind.OpenAi);
+        UpdateTopBarStyleButton(AiProviderAnthropicButton, _settings.AiProvider == AiProviderKind.Anthropic);
+        UpdateTopBarStyleButton(AiProviderMistralButton, _settings.AiProvider == AiProviderKind.Mistral);
+        UpdateTopBarStyleButton(AiProviderOllamaButton, _settings.AiProvider == AiProviderKind.Ollama);
+        UpdateTopBarStyleButton(AiProviderOllamaCloudButton, _settings.AiProvider == AiProviderKind.OllamaCloud);
+    }
+
+    private void ApplyAiProviderInputs()
+    {
+        _isInitializing = true;
+
+        string provider = _settings.AiProvider;
+        bool isChatGpt = provider == AiProviderKind.ChatGptPremium;
+        bool showsBaseUrl = provider != AiProviderKind.ChatGptPremium;
+        bool showsCredential = provider is AiProviderKind.OpenAi or AiProviderKind.Anthropic or AiProviderKind.Mistral or AiProviderKind.OllamaCloud;
+
+        AiChatGptPanel.Visibility = isChatGpt ? Visibility.Visible : Visibility.Collapsed;
+        AiBaseUrlPanel.Visibility = showsBaseUrl ? Visibility.Visible : Visibility.Collapsed;
+        AiCredentialPanel.Visibility = showsCredential ? Visibility.Visible : Visibility.Collapsed;
+        AiModelPanel.Visibility = Visibility.Visible;
+
+        ChatGptAuthFilePathTextBox.Text = string.IsNullOrWhiteSpace(_settings.ChatGptAuthFilePath)
+            ? AiSecretStore.DetectDefaultChatGptAuthPath() ?? string.Empty
+            : _settings.ChatGptAuthFilePath;
+        AiBaseUrlTextBox.Text = GetCurrentAiBaseUrl();
+        AiBaseUrlTextBox.PlaceholderText = GetCurrentAiBaseUrlPlaceholder();
+        AiBaseUrlLabelText.Text = provider switch
+        {
+            AiProviderKind.Ollama => "Ollama Endpoint",
+            AiProviderKind.OllamaCloud => "Ollama Cloud Base URL",
+            _ => "Base URL"
+        };
+        AiModelLabelText.Text = isChatGpt ? "Preferred Model" : "Default Model";
+        AiCredentialLabelText.Text = provider == AiProviderKind.OllamaCloud ? "Cloud API Key" : "API Key";
+        AiCredentialPasswordBox.Password = string.Empty;
+        AiProviderStatusText.Text = GetAiProviderStatusText(provider);
+        UpdateAiHeroCard();
+        UpdateAiValidationUi();
+        ApplyAiSpeechModelInputs();
+
+        _isInitializing = false;
+        ApplyAiModelCatalogPlaceholder();
+        _ = LoadAiModelCatalogAsync();
+    }
+
+    private void InitializeAiSpeechModelPicker()
+    {
+        _isInitializing = true;
+        AiSpeechModelComboBox.ItemsSource = LocalSpeechModelCatalog.GetAll();
+        AiSpeechModelComboBox.SelectedItem = LocalSpeechModelCatalog.GetById(_settings.LocalSpeechModelId)
+            ?? LocalSpeechModelCatalog.GetDefault();
+        _isInitializing = false;
+        ApplyAiSpeechModelInputs();
+    }
+
+    private void ApplyAiSpeechModelInputs()
+    {
+        LocalSpeechModelDefinition model = LocalSpeechModelCatalog.GetById(_settings.LocalSpeechModelId)
+            ?? LocalSpeechModelCatalog.GetDefault();
+
+        _isInitializing = true;
+        if (AiSpeechModelComboBox.SelectedItem is not LocalSpeechModelDefinition selectedModel ||
+            !string.Equals(selectedModel.Id, model.Id, StringComparison.Ordinal))
+        {
+            AiSpeechModelComboBox.SelectedItem = model;
+        }
+        _isInitializing = false;
+
+        bool isInstalled = _localSpeechModelStore.IsInstalled(model);
+        bool isDownloadingSelectedModel = string.Equals(_activeSpeechModelDownloadId, model.Id, StringComparison.Ordinal);
+        bool hasActiveDownload = !string.IsNullOrWhiteSpace(_activeSpeechModelDownloadId);
+        bool hasOtherActiveDownload = hasActiveDownload && !isDownloadingSelectedModel;
+
+        AiSpeechModelLibraryBadgeText.Text = model.IsRecommended ? "Recommended" : model.Family;
+        AiSpeechModelTitleText.Text = model.DisplayName;
+        AiSpeechModelDescriptionText.Text = model.Description;
+        AiSpeechModelMetaText.Text = $"Family: {model.Family}  •  Size: ~{model.SizeMb} MB  •  Speed: {model.SpeedLabel}  •  Accuracy: {model.AccuracyLabel}";
+        AiSpeechModelCapabilitiesText.Text = $"Languages: {model.LanguagesLabel}  •  Translation: {(model.SupportsTranslation ? "Yes" : "No")}  •  Language selection: {(model.SupportsLanguageSelection ? "Supported" : "Auto only")}";
+        AiSpeechModelOutputText.Text = model.OutputStyle;
+        AiSpeechModelStoragePathText.Text = $"Storage: {Path.Combine(_localSpeechModelStore.ModelsDirectoryPath, model.StorageName)}";
+        AiSpeechModelStatusText.Text = GetAiSpeechModelStatusText(model, isInstalled, isDownloadingSelectedModel, hasOtherActiveDownload);
+        AiSpeechModelProgressBar.Visibility = isDownloadingSelectedModel ? Visibility.Visible : Visibility.Collapsed;
+        AiSpeechModelProgressBar.Value = isDownloadingSelectedModel ? Math.Clamp(_speechModelProgressPercent, 0, 100) : 0;
+
+        AiSpeechModelPrimaryActionButton.Content = isDownloadingSelectedModel
+            ? "Downloading..."
+            : isInstalled
+                ? "Redownload"
+                : "Download";
+        AiSpeechModelPrimaryActionButton.IsEnabled = !hasActiveDownload;
+
+        AiSpeechModelSecondaryActionButton.Content = isDownloadingSelectedModel ? "Cancel" : "Delete";
+        AiSpeechModelSecondaryActionButton.IsEnabled = isDownloadingSelectedModel || (isInstalled && !hasActiveDownload);
+    }
+
+    private string GetAiSpeechModelStatusText(
+        LocalSpeechModelDefinition model,
+        bool isInstalled,
+        bool isDownloadingSelectedModel,
+        bool hasOtherActiveDownload)
+    {
+        if (string.Equals(_speechModelMessageModelId, model.Id, StringComparison.Ordinal) &&
+            !string.IsNullOrWhiteSpace(_speechModelMessage))
+        {
+            return _speechModelMessage;
+        }
+
+        if (isDownloadingSelectedModel)
+        {
+            return "Downloading model files into Veil's local speech library.";
+        }
+
+        if (hasOtherActiveDownload)
+        {
+            LocalSpeechModelDefinition? activeModel = LocalSpeechModelCatalog.GetById(_activeSpeechModelDownloadId);
+            return $"{activeModel?.DisplayName ?? "Another model"} is downloading right now.";
+        }
+
+        return isInstalled
+            ? "Stored locally and ready for future integration inside Veil."
+            : "Not downloaded yet. Veil will keep this model only in local app data.";
+    }
+
+    private void OnAiSpeechModelSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isInitializing || AiSpeechModelComboBox.SelectedItem is not LocalSpeechModelDefinition model)
+        {
+            return;
+        }
+
+        _settings.LocalSpeechModelId = model.Id;
+        ApplyAiSpeechModelInputs();
+    }
+
+    private async void OnAiSpeechModelPrimaryActionClick(object sender, RoutedEventArgs e)
+    {
+        if (AiSpeechModelComboBox.SelectedItem is not LocalSpeechModelDefinition model ||
+            !string.IsNullOrWhiteSpace(_activeSpeechModelDownloadId))
+        {
+            return;
+        }
+
+        try
+        {
+            if (_localSpeechModelStore.IsInstalled(model))
+            {
+                _localSpeechModelStore.DeleteModel(model);
+            }
+
+            _speechModelDownloadCancellationSource?.Dispose();
+            _speechModelDownloadCancellationSource = new CancellationTokenSource();
+            _activeSpeechModelDownloadId = model.Id;
+            _speechModelMessageModelId = model.Id;
+            _speechModelMessage = $"Starting download for {model.DisplayName}.";
+            _speechModelProgressPercent = 0;
+            ApplyAiSpeechModelInputs();
+
+            var progress = new Progress<LocalSpeechModelDownloadProgress>(update =>
+            {
+                if (!string.Equals(update.ModelId, model.Id, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                switch (update.Stage)
+                {
+                    case LocalSpeechModelDownloadStage.Downloading:
+                        _speechModelProgressPercent = update.TotalBytes > 0
+                            ? (update.DownloadedBytes * 100d) / update.TotalBytes
+                            : 0;
+                        _speechModelMessage = $"Downloading {model.DisplayName}: {FormatMegabytes(update.DownloadedBytes)} / {(update.TotalBytes > 0 ? FormatMegabytes(update.TotalBytes) : $"~{model.SizeMb} MB")}.";
+                        break;
+                    case LocalSpeechModelDownloadStage.Verifying:
+                        _speechModelProgressPercent = 100;
+                        _speechModelMessage = $"Verifying checksum for {model.DisplayName}.";
+                        break;
+                    case LocalSpeechModelDownloadStage.Extracting:
+                        _speechModelProgressPercent = 100;
+                        _speechModelMessage = $"Extracting {model.DisplayName} into Veil's local speech library.";
+                        break;
+                    case LocalSpeechModelDownloadStage.Completed:
+                        _speechModelProgressPercent = 100;
+                        _speechModelMessage = $"{model.DisplayName} was downloaded and stored locally.";
+                        break;
+                }
+
+                _speechModelMessageModelId = model.Id;
+                ApplyAiSpeechModelInputs();
+            });
+
+            await _localSpeechModelStore.DownloadModelAsync(
+                model,
+                progress,
+                _speechModelDownloadCancellationSource.Token);
+
+            _speechModelMessageModelId = model.Id;
+            _speechModelMessage = $"{model.DisplayName} is ready for future local use in Veil.";
+            _speechModelProgressPercent = 100;
+        }
+        catch (OperationCanceledException)
+        {
+            _speechModelMessageModelId = model.Id;
+            _speechModelMessage = $"{model.DisplayName} download was cancelled.";
+            _speechModelProgressPercent = 0;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error($"Failed to download speech model {model.Id}.", ex);
+            _speechModelMessageModelId = model.Id;
+            _speechModelMessage = $"Download failed: {ex.Message}";
+            _speechModelProgressPercent = 0;
+        }
+        finally
+        {
+            _activeSpeechModelDownloadId = null;
+            _speechModelDownloadCancellationSource?.Dispose();
+            _speechModelDownloadCancellationSource = null;
+            ApplyAiSpeechModelInputs();
+        }
+    }
+
+    private void OnAiSpeechModelSecondaryActionClick(object sender, RoutedEventArgs e)
+    {
+        if (AiSpeechModelComboBox.SelectedItem is not LocalSpeechModelDefinition model)
+        {
+            return;
+        }
+
+        if (string.Equals(_activeSpeechModelDownloadId, model.Id, StringComparison.Ordinal))
+        {
+            _speechModelDownloadCancellationSource?.Cancel();
+            return;
+        }
+
+        try
+        {
+            _localSpeechModelStore.DeleteModel(model);
+            _speechModelMessageModelId = model.Id;
+            _speechModelMessage = $"{model.DisplayName} was removed from Veil's local storage.";
+            _speechModelProgressPercent = 0;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error($"Failed to delete speech model {model.Id}.", ex);
+            _speechModelMessageModelId = model.Id;
+            _speechModelMessage = $"Delete failed: {ex.Message}";
+        }
+
+        ApplyAiSpeechModelInputs();
+    }
+
+    private static string FormatMegabytes(long bytes)
+    {
+        double value = bytes / (1024d * 1024d);
+        return $"{Math.Max(0, value):0} MB";
+    }
+
+    private void OnValidateAiProviderClick(object sender, RoutedEventArgs e)
+    {
+        UpdateAiValidationUi();
+    }
+
+    private void OnOpenAiWindowClick(object sender, RoutedEventArgs e)
+    {
+        if (_finderAiWindow is null)
+        {
+            _finderAiWindow = new FinderAiWindow(_screen);
+            _finderAiWindow.Closed += OnFinderAiWindowClosed;
+        }
+
+        _finderAiWindow.ShowCentered();
+    }
+
+    private void OnFinderAiWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (sender is FinderAiWindow aiWindow)
+        {
+            aiWindow.Closed -= OnFinderAiWindowClosed;
+            if (ReferenceEquals(_finderAiWindow, aiWindow))
+            {
+                _finderAiWindow = null;
+            }
+        }
+    }
+
+    private void OnChatGptAuthFilePathChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _settings.ChatGptAuthFilePath = ChatGptAuthFilePathTextBox.Text;
+    }
+
+    private void OnUseDetectedChatGptAuthPathClick(object sender, RoutedEventArgs e)
+    {
+        string? detectedPath = AiSecretStore.DetectDefaultChatGptAuthPath();
+        if (string.IsNullOrWhiteSpace(detectedPath))
+        {
+            AiProviderStatusText.Text = "No local Codex or ChatGPT auth file was detected on this machine.";
+            return;
+        }
+
+        _settings.ChatGptAuthFilePath = detectedPath;
+        _isInitializing = true;
+        ChatGptAuthFilePathTextBox.Text = detectedPath;
+        _isInitializing = false;
+        UpdateSectionUi();
+    }
+
+    private void OnImportChatGptAuthClick(object sender, RoutedEventArgs e)
+    {
+        string authFilePath = ChatGptAuthFilePathTextBox.Text.Trim();
+        if (!_aiSecretStore.TryImportChatGptAuth(authFilePath, out string errorMessage))
+        {
+            AiProviderStatusText.Text = errorMessage;
+            return;
+        }
+
+        _settings.ChatGptAuthFilePath = authFilePath;
+        UpdateSectionUi();
+    }
+
+    private void OnClearChatGptAuthClick(object sender, RoutedEventArgs e)
+    {
+        _aiSecretStore.DeleteSecret(AiSecretNames.ChatGptOAuthPayload);
+        UpdateSectionUi();
+    }
+
+    private void OnAiBaseUrlChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        SetCurrentAiBaseUrl(AiBaseUrlTextBox.Text);
+    }
+
+    private void OnAiModelSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isInitializing || AiModelComboBox.SelectedItem is not AiModelCatalogEntry entry)
+        {
+            return;
+        }
+
+        SetCurrentAiModel(entry.ModelId);
+        UpdateAiHeroCard();
+        UpdateAiValidationUi();
+    }
+
+    private async void OnRefreshAiModelCatalogClick(object sender, RoutedEventArgs e)
+    {
+        await LoadAiModelCatalogAsync(forceRefresh: true);
+    }
+
+    private void OnSaveAiCredentialClick(object sender, RoutedEventArgs e)
+    {
+        string? secretName = GetCurrentAiSecretName();
+        if (string.IsNullOrWhiteSpace(secretName))
+        {
+            AiProviderStatusText.Text = "This provider does not need a separate API secret in Veil.";
+            return;
+        }
+
+        string secretValue = AiCredentialPasswordBox.Password.Trim();
+        if (string.IsNullOrWhiteSpace(secretValue))
+        {
+            AiProviderStatusText.Text = "Paste a credential before saving it.";
+            return;
+        }
+
+        _aiSecretStore.SaveSecret(secretName, secretValue);
+        AiCredentialPasswordBox.Password = string.Empty;
+        UpdateSectionUi();
+    }
+
+    private void OnClearAiCredentialClick(object sender, RoutedEventArgs e)
+    {
+        string? secretName = GetCurrentAiSecretName();
+        if (!string.IsNullOrWhiteSpace(secretName))
+        {
+            _aiSecretStore.DeleteSecret(secretName);
+        }
+
+        AiCredentialPasswordBox.Password = string.Empty;
+        UpdateSectionUi();
+    }
+
+    private string GetCurrentAiBaseUrl()
+    {
+        return _settings.AiProvider switch
+        {
+            AiProviderKind.OpenAi => _settings.OpenAiBaseUrl,
+            AiProviderKind.Anthropic => _settings.AnthropicBaseUrl,
+            AiProviderKind.Mistral => _settings.MistralBaseUrl,
+            AiProviderKind.Ollama => _settings.OllamaBaseUrl,
+            AiProviderKind.OllamaCloud => _settings.OllamaCloudBaseUrl,
+            _ => string.Empty
+        };
+    }
+
+    private string GetCurrentAiBaseUrlPlaceholder()
+    {
+        return _settings.AiProvider switch
+        {
+            AiProviderKind.OpenAi => "https://api.openai.com/v1",
+            AiProviderKind.Anthropic => "https://api.anthropic.com",
+            AiProviderKind.Mistral => "https://api.mistral.ai/v1",
+            AiProviderKind.Ollama => "http://127.0.0.1:11434/api",
+            AiProviderKind.OllamaCloud => "https://ollama.com/api",
+            _ => string.Empty
+        };
+    }
+
+    private string GetCurrentAiModel()
+    {
+        return _settings.AiProvider switch
+        {
+            AiProviderKind.ChatGptPremium => _settings.ChatGptModel,
+            AiProviderKind.OpenAi => _settings.OpenAiModel,
+            AiProviderKind.Anthropic => _settings.AnthropicModel,
+            AiProviderKind.Mistral => _settings.MistralModel,
+            AiProviderKind.Ollama => _settings.OllamaModel,
+            AiProviderKind.OllamaCloud => _settings.OllamaCloudModel,
+            _ => string.Empty
+        };
+    }
+
+    private void ApplyAiModelCatalogPlaceholder()
+    {
+        string currentModel = GetCurrentAiModel();
+        _aiModelOptions = CreateAiModelOptions([], currentModel);
+
+        _isInitializing = true;
+        AiModelComboBox.ItemsSource = _aiModelOptions;
+        AiModelComboBox.SelectedItem = _aiModelOptions.FirstOrDefault(item =>
+            string.Equals(item.ModelId, currentModel, StringComparison.Ordinal));
+        AiModelCatalogStatusText.Text = $"Loading models.dev catalog for {AiProviderKind.ToDisplayName(_settings.AiProvider)}.";
+        _isInitializing = false;
+    }
+
+    private async Task LoadAiModelCatalogAsync(bool forceRefresh = false)
+    {
+        _aiModelCatalogCancellationSource?.Cancel();
+        _aiModelCatalogCancellationSource?.Dispose();
+        _aiModelCatalogCancellationSource = new CancellationTokenSource();
+        CancellationToken cancellationToken = _aiModelCatalogCancellationSource.Token;
+        string currentModel = GetCurrentAiModel();
+
+        _isInitializing = true;
+        AiModelRefreshButton.IsEnabled = false;
+        AiModelCatalogStatusText.Text = forceRefresh
+            ? "Refreshing models.dev catalog..."
+            : $"Loading models.dev catalog for {AiProviderKind.ToDisplayName(_settings.AiProvider)}.";
+        _isInitializing = false;
+
+        try
+        {
+            AiModelCatalogSnapshot snapshot = await _aiModelCatalogService.GetModelsForProviderAsync(
+                _settings.AiProvider,
+                forceRefresh,
+                cancellationToken);
+
+            _aiModelOptions = CreateAiModelOptions(snapshot.Models, currentModel);
+            _isInitializing = true;
+            AiModelComboBox.ItemsSource = _aiModelOptions;
+            AiModelComboBox.SelectedItem = _aiModelOptions.FirstOrDefault(item =>
+                string.Equals(item.ModelId, currentModel, StringComparison.Ordinal));
+            AiModelCatalogStatusText.Text = snapshot.StatusText;
+            _isInitializing = false;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to load AI model catalog.", ex);
+            _aiModelOptions = CreateAiModelOptions([], currentModel);
+            _isInitializing = true;
+            AiModelComboBox.ItemsSource = _aiModelOptions;
+            AiModelComboBox.SelectedItem = _aiModelOptions.FirstOrDefault(item =>
+                string.Equals(item.ModelId, currentModel, StringComparison.Ordinal));
+            AiModelCatalogStatusText.Text = $"Model catalog unavailable: {ex.Message}";
+            _isInitializing = false;
+        }
+        finally
+        {
+            AiModelRefreshButton.IsEnabled = true;
+        }
+    }
+
+    private static IReadOnlyList<AiModelCatalogEntry> CreateAiModelOptions(
+        IReadOnlyList<AiModelCatalogEntry> catalog,
+        string currentModel)
+    {
+        var options = new List<AiModelCatalogEntry>();
+
+        if (!string.IsNullOrWhiteSpace(currentModel))
+        {
+            options.Add(new AiModelCatalogEntry(
+                string.Empty,
+                string.Empty,
+                currentModel,
+                currentModel,
+                $"{currentModel}  •  current",
+                "current"));
+        }
+
+        options.AddRange(catalog);
+        return options
+            .GroupBy(static item => item.ModelId, StringComparer.OrdinalIgnoreCase)
+            .Select(static group => group.First())
+            .OrderBy(item => string.Equals(item.ModelId, currentModel, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(static item => item.DisplayLabel, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private string GetCurrentAiModelPlaceholder()
+    {
+        return _settings.AiProvider switch
+        {
+            AiProviderKind.ChatGptPremium => "gpt-5.4",
+            AiProviderKind.OpenAi => "gpt-5.4",
+            AiProviderKind.Anthropic => "claude-sonnet-4-20250514",
+            AiProviderKind.Mistral => "mistral-large-latest",
+            AiProviderKind.Ollama => "qwen3-coder",
+            AiProviderKind.OllamaCloud => "gpt-oss:120b",
+            _ => string.Empty
+        };
+    }
+
+    private void SetCurrentAiBaseUrl(string value)
+    {
+        switch (_settings.AiProvider)
+        {
+            case AiProviderKind.OpenAi:
+                _settings.OpenAiBaseUrl = value;
+                break;
+            case AiProviderKind.Anthropic:
+                _settings.AnthropicBaseUrl = value;
+                break;
+            case AiProviderKind.Mistral:
+                _settings.MistralBaseUrl = value;
+                break;
+            case AiProviderKind.Ollama:
+                _settings.OllamaBaseUrl = value;
+                break;
+            case AiProviderKind.OllamaCloud:
+                _settings.OllamaCloudBaseUrl = value;
+                break;
+        }
+    }
+
+    private void SetCurrentAiModel(string value)
+    {
+        switch (_settings.AiProvider)
+        {
+            case AiProviderKind.ChatGptPremium:
+                _settings.ChatGptModel = value;
+                break;
+            case AiProviderKind.OpenAi:
+                _settings.OpenAiModel = value;
+                break;
+            case AiProviderKind.Anthropic:
+                _settings.AnthropicModel = value;
+                break;
+            case AiProviderKind.Mistral:
+                _settings.MistralModel = value;
+                break;
+            case AiProviderKind.Ollama:
+                _settings.OllamaModel = value;
+                break;
+            case AiProviderKind.OllamaCloud:
+                _settings.OllamaCloudModel = value;
+                break;
+        }
+    }
+
+    private string? GetCurrentAiSecretName()
+    {
+        return _settings.AiProvider switch
+        {
+            AiProviderKind.OpenAi => AiSecretNames.OpenAiApiKey,
+            AiProviderKind.Anthropic => AiSecretNames.AnthropicApiKey,
+            AiProviderKind.Mistral => AiSecretNames.MistralApiKey,
+            AiProviderKind.OllamaCloud => AiSecretNames.OllamaCloudApiKey,
+            _ => null
+        };
+    }
+
+    private string GetAiProviderStatusText(string provider)
+    {
+        return provider switch
+        {
+            AiProviderKind.ChatGptPremium => _aiSecretStore.HasSecret(AiSecretNames.ChatGptOAuthPayload)
+                ? "Local OAuth payload imported and encrypted for the current Windows account."
+                : string.IsNullOrWhiteSpace(AiSecretStore.DetectDefaultChatGptAuthPath())
+                    ? "No local Codex or ChatGPT auth file detected yet."
+                    : "A local Codex or ChatGPT auth file is available and can be imported into Veil.",
+            AiProviderKind.OpenAi => _aiSecretStore.HasSecret(AiSecretNames.OpenAiApiKey)
+                ? "OpenAI API key is stored locally in encrypted form."
+                : "OpenAI API key has not been stored yet.",
+            AiProviderKind.Anthropic => _aiSecretStore.HasSecret(AiSecretNames.AnthropicApiKey)
+                ? "Anthropic API key is stored locally in encrypted form."
+                : "Anthropic API key has not been stored yet.",
+            AiProviderKind.Mistral => _aiSecretStore.HasSecret(AiSecretNames.MistralApiKey)
+                ? "Mistral API key is stored locally in encrypted form."
+                : "Mistral API key has not been stored yet.",
+            AiProviderKind.Ollama => "Ollama runs locally by default, so Veil only needs an endpoint and a model.",
+            AiProviderKind.OllamaCloud => _aiSecretStore.HasSecret(AiSecretNames.OllamaCloudApiKey)
+                ? "Ollama Cloud API key is stored locally in encrypted form."
+                : "Ollama Cloud API key has not been stored yet.",
+            _ => "Provider not configured."
+        };
+    }
+
+    private void UpdateAiValidationUi()
+    {
+        AiProviderValidationResult result = AiProviderValidationService.Validate(_settings, _aiSecretStore);
+
+        AiValidationSummaryText.Text = result.Summary;
+        UpdateAiHeroCard(result);
+        AiValidationMessagePanel.Children.Clear();
+
+        foreach (AiProviderValidationMessage message in result.Messages)
+        {
+            var rowBorder = new Border
+            {
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(12, 10, 12, 10),
+                Background = new SolidColorBrush(message.IsValid
+                    ? global::Windows.UI.Color.FromArgb(22, 118, 255, 168)
+                    : global::Windows.UI.Color.FromArgb(20, 255, 143, 143))
+            };
+
+            var rowStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 10
+            };
+
+            rowStack.Children.Add(new TextBlock
+            {
+                Text = message.IsValid ? "OK" : "Fix",
+                FontSize = 11,
+                FontFamily = (FontFamily)Application.Current.Resources["SfTextSemibold"],
+                Foreground = new SolidColorBrush(message.IsValid
+                    ? global::Windows.UI.Color.FromArgb(255, 162, 255, 211)
+                    : global::Windows.UI.Color.FromArgb(255, 255, 190, 190)),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            rowStack.Children.Add(new TextBlock
+            {
+                Text = message.Text,
+                TextWrapping = TextWrapping.WrapWholeWords,
+                FontSize = 11,
+                FontFamily = (FontFamily)Application.Current.Resources["SfTextRegular"],
+                Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, 220),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            rowBorder.Child = rowStack;
+            AiValidationMessagePanel.Children.Add(rowBorder);
+        }
+
+        switch (result.State)
+        {
+            case AiProviderValidationState.Valid:
+                AiValidationBadgeBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(32, 96, 220, 160));
+                AiValidationBadgeText.Text = "Ready";
+                AiValidationBadgeText.Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(255, 198, 255, 227));
+                break;
+            case AiProviderValidationState.Warning:
+                AiValidationBadgeBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(32, 255, 196, 92));
+                AiValidationBadgeText.Text = "Review";
+                AiValidationBadgeText.Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(255, 255, 231, 184));
+                break;
+            default:
+                AiValidationBadgeBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(32, 255, 120, 120));
+                AiValidationBadgeText.Text = "Not Ready";
+                AiValidationBadgeText.Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(255, 255, 214, 214));
+                break;
+        }
+    }
+
+    private void UpdateAiHeroCard(AiProviderValidationResult? validation = null)
+    {
+        string providerDisplayName = AiProviderKind.ToDisplayName(_settings.AiProvider);
+        string model = GetCurrentAiModel();
+
+        AiHeroProviderText.Text = providerDisplayName;
+        AiHeroModelText.Text = string.IsNullOrWhiteSpace(model) ? "No model selected" : model.Trim();
+
+        string runtimeTitle;
+        string runtimeSubtitle;
+
+        if (_settings.AiProvider == AiProviderKind.ChatGptPremium)
+        {
+            bool hasImportedAuth = _aiSecretStore.HasSecret(AiSecretNames.ChatGptOAuthPayload);
+            bool hasDetectedAuth = !string.IsNullOrWhiteSpace(_settings.ChatGptAuthFilePath)
+                || !string.IsNullOrWhiteSpace(AiSecretStore.DetectDefaultChatGptAuthPath());
+
+            runtimeTitle = hasImportedAuth
+                ? "Encrypted local bridge"
+                : hasDetectedAuth
+                    ? "Detected local bridge"
+                    : "Bridge not ready";
+            runtimeSubtitle = hasImportedAuth
+                ? "Veil can launch OpenAI OAuth from its encrypted local copy."
+                : hasDetectedAuth
+                    ? "A local Codex or ChatGPT auth file is available for direct use."
+                    : "Import or detect a local auth file to enable the native bridge.";
+        }
+        else if (_settings.AiProvider == AiProviderKind.Ollama)
+        {
+            runtimeTitle = "Local endpoint";
+            runtimeSubtitle = "Requests stay on your configured Ollama host.";
+        }
+        else
+        {
+            bool hasSecret = !string.IsNullOrWhiteSpace(GetCurrentAiSecretName()) &&
+                _aiSecretStore.HasSecret(GetCurrentAiSecretName()!);
+            runtimeTitle = hasSecret ? "Encrypted API secret" : "Credential required";
+            runtimeSubtitle = hasSecret
+                ? "Veil stores the provider secret in the Windows user vault."
+                : "Save a provider secret to complete the route.";
+        }
+
+        if (validation is { State: AiProviderValidationState.Valid })
+        {
+            runtimeTitle = "Ready";
+        }
+
+        AiHeroRuntimeText.Text = runtimeTitle;
+        AiHeroRuntimeSubtext.Text = validation?.Summary ?? runtimeSubtitle;
     }
 
     private static void UpdateToggleButton(Button button, bool isSelected, bool useDarkForeground)
@@ -1071,5 +1918,24 @@ public sealed partial class SettingsWindow : Window
         }
 
         return AppSettings.TryNormalizeHexColor(trimmed, out normalizedColor);
+    }
+
+    private void ScheduleSessionKeepAlive()
+    {
+        _sessionKeepAliveTimer.Stop();
+        _sessionKeepAliveTimer.Interval = SessionKeepAliveDuration;
+        _sessionKeepAliveTimer.Start();
+    }
+
+    private void CancelSessionKeepAlive()
+    {
+        _sessionKeepAliveTimer.Stop();
+    }
+
+    private void OnSessionKeepAliveElapsed(object? sender, object e)
+    {
+        _sessionKeepAliveTimer.Stop();
+        SessionExpired?.Invoke(this, EventArgs.Empty);
+        Destroy();
     }
 }

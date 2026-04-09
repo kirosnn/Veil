@@ -29,3 +29,6 @@ artifacts/
 # .NET tool cache
 .dotnet/
 .dotnet-cli/
+apps/desktop/VeilSpeechCli/target/
+target/
+

@@ -8,6 +8,7 @@ internal static partial class NativeMethods
     internal const int GWL_STYLE = -16;
     internal const int GWL_EXSTYLE = -20;
     internal const uint GW_OWNER = 4;
+    internal const uint GA_ROOT = 2;
     internal const uint GA_ROOTOWNER = 3;
 
     internal const int WS_THICKFRAME = 0x00040000;
@@ -155,6 +156,13 @@ internal static partial class NativeMethods
     internal static partial bool SetForegroundWindow(IntPtr hWnd);
 
     [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool PrintWindow(
+        IntPtr hwnd,
+        IntPtr hdcBlt,
+        uint nFlags);
+
+    [LibraryImport("user32.dll")]
     internal static partial IntPtr GetWindowDC(IntPtr hWnd);
 
     [LibraryImport("user32.dll")]
@@ -210,6 +218,23 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetCurrentThreadId();
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool fAttach);
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr SetFocus(IntPtr hWnd);
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr GetFocus();
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetGUIThreadInfo(uint idThread, ref GuiThreadInfo lpgui);
+
     [LibraryImport("shell32.dll")]
     internal static partial uint SHAppBarMessage(uint dwMessage, ref AppBarData pData);
 
@@ -253,6 +278,8 @@ internal static partial class NativeMethods
     internal const uint DWM_TNP_OPACITY = 0x00000004;
     internal const uint DWM_TNP_VISIBLE = 0x00000008;
     internal const uint DWM_TNP_SOURCECLIENTAREAONLY = 0x00000010;
+    internal const uint PW_CLIENTONLY = 0x00000001;
+    internal const uint PW_RENDERFULLCONTENT = 0x00000002;
 
     [LibraryImport("dwmapi.dll")]
     internal static partial int DwmSetWindowAttribute(
@@ -318,6 +345,8 @@ internal static partial class NativeMethods
     internal const int WM_KEYUP = 0x0101;
     internal const int WM_SYSKEYDOWN = 0x0104;
     internal const int WM_SYSKEYUP = 0x0105;
+    internal const int WM_PASTE = 0x0302;
+    internal const int EM_REPLACESEL = 0x00C2;
 
     internal const uint MOD_ALT = 0x0001;
     internal const uint MOD_CONTROL = 0x0002;
@@ -327,16 +356,23 @@ internal static partial class NativeMethods
     internal const uint VK_TAB = 0x09;
     internal const uint VK_ESCAPE = 0x1B;
     internal const uint VK_SPACE = 0x20;
+    internal const uint VK_CAPITAL = 0x14;
+    internal const uint VK_CONTROL = 0x11;
+    internal const uint VK_V = 0x56;
     internal const uint VK_SHIFT = 0x10;
     internal const uint VK_LSHIFT = 0xA0;
     internal const uint VK_RSHIFT = 0xA1;
     internal const uint VK_MENU = 0x12;
     internal const uint VK_LMENU = 0xA4;
     internal const uint VK_RMENU = 0xA5;
+    internal const uint KEYEVENTF_KEYUP = 0x0002;
+    internal const uint KEYEVENTF_UNICODE = 0x0004;
+    internal const uint INPUT_KEYBOARD = 1;
     internal const int HTCAPTION = 2;
 
     internal const int WH_KEYBOARD_LL = 13;
     internal const int HC_ACTION = 0;
+    internal const uint LLKHF_INJECTED = 0x00000010;
 
     internal const uint NIF_MESSAGE = 0x00000001;
     internal const uint NIF_ICON = 0x00000002;
@@ -442,6 +478,52 @@ internal static partial class NativeMethods
         public nuint dwExtraInfo;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Input
+    {
+        public uint type;
+        public InputUnion Anonymous;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    internal struct InputUnion
+    {
+        [FieldOffset(0)]
+        public KeybdInput ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct KeybdInput
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct GuiThreadInfo
+    {
+        public uint cbSize;
+        public uint flags;
+        public IntPtr hwndActive;
+        public IntPtr hwndFocus;
+        public IntPtr hwndCapture;
+        public IntPtr hwndMenuOwner;
+        public IntPtr hwndMoveSize;
+        public IntPtr hwndCaret;
+        public Rect rcCaret;
+
+        public static GuiThreadInfo Create()
+        {
+            return new GuiThreadInfo
+            {
+                cbSize = (uint)Marshal.SizeOf<GuiThreadInfo>()
+            };
+        }
+    }
+
     [DllImport("shell32.dll", EntryPoint = "Shell_NotifyIconW", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool Shell_NotifyIconW(uint dwMessage, ref NotifyIconData lpData);
@@ -509,8 +591,17 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool PostMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
+    [LibraryImport("user32.dll", EntryPoint = "keybd_event")]
+    internal static partial void KeybdEvent(byte bVk, byte bScan, uint dwFlags, nuint dwExtraInfo);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern uint SendInput(uint cInputs, [In] Input[] pInputs, int cbSize);
+
     [LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
     internal static partial IntPtr SendMessageW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial IntPtr SendMessageStringW(IntPtr hWnd, uint msg, IntPtr wParam, string lParam);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

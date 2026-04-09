@@ -223,6 +223,7 @@ public sealed partial class TopBarWindow : Window
         _finderWindow?.Destroy();
         _finderWindow = null;
         DisposeFinderHotkey();
+        DisposeDictationHotkey();
         _runCatService?.Dispose();
         _gamePerformanceService.RestoreNormalOptimizations();
         _gamePerformanceService.Dispose();

@@ -63,6 +63,20 @@ internal sealed partial class AppSettings
     private string _topBarDisplayMode = "Primary";
     private string[] _topBarMonitorIds = [];
     private bool _showAppButtonOutline = true;
+    private string _aiProvider = AiProviderKind.ChatGptPremium;
+    private string _chatGptAuthFilePath = string.Empty;
+    private string _chatGptModel = "gpt-5.4";
+    private string _openAiBaseUrl = "https://api.openai.com/v1";
+    private string _openAiModel = "gpt-5.4";
+    private string _anthropicBaseUrl = "https://api.anthropic.com";
+    private string _anthropicModel = "claude-sonnet-4-20250514";
+    private string _mistralBaseUrl = "https://api.mistral.ai/v1";
+    private string _mistralModel = "mistral-large-latest";
+    private string _ollamaBaseUrl = "http://127.0.0.1:11434/api";
+    private string _ollamaModel = "qwen3-coder";
+    private string _ollamaCloudBaseUrl = "https://ollama.com/api";
+    private string _ollamaCloudModel = "gpt-oss:120b";
+    private string _localSpeechModelId = LocalSpeechModelCatalog.DefaultModelId;
     private AppShortcutSetting?[] _shortcutButtons = new AppShortcutSetting?[MaxShortcutButtons];
 
     public static AppSettings Current => _current.Value;

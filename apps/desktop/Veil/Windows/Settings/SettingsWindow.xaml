@@ -32,6 +32,9 @@
                         <Button x:Name="TopBarSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="#20FFFFFF" IsTabStop="False" Tag="TopBar" Click="OnSectionButtonClick">
                             <TextBlock Text="Topbar" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" VerticalAlignment="Center" />
                         </Button>
+                        <Button x:Name="AiSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="AI" Click="OnSectionButtonClick">
+                            <TextBlock Text="AI" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
+                        </Button>
                         <Button x:Name="MenuSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="Menu" Click="OnSectionButtonClick">
                             <TextBlock Text="Menu" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
                         </Button>
@@ -58,16 +61,17 @@
 
                 <!-- ══ Content ══ -->
                 <ScrollViewer
+                    x:Name="ContentScrollViewer"
                     Grid.Column="1"
-                    Padding="28,28,28,28"
+                    Padding="56,28,56,28"
                     HorizontalScrollBarVisibility="Disabled"
                     HorizontalScrollMode="Disabled"
                     VerticalScrollBarVisibility="Auto"
                     VerticalScrollMode="Enabled">
 
-                    <Grid>
+                    <Grid x:Name="ContentHost" HorizontalAlignment="Stretch">
                         <!-- ── Topbar ── -->
-                        <Grid x:Name="TopBarSectionPanel">
+                        <Grid x:Name="TopBarSectionPanel" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
                                     <TextBlock Text="Topbar" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
@@ -293,8 +297,259 @@
                             </StackPanel>
                         </Grid>
 
+                        <!-- ── AI ── -->
+                        <Grid x:Name="AiSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
+                            <StackPanel Spacing="16">
+                                <StackPanel Spacing="4" Margin="0,0,0,4">
+                                    <TextBlock Text="AI" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
+                                    <TextBlock Text="Configure your local AI provider routing. Secrets are never written to settings.json and are encrypted locally with Windows DPAPI." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
+                                </StackPanel>
+
+                                <Border CornerRadius="24" Padding="1">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#2B5EA7FF" Offset="0" />
+                                            <GradientStop Color="#16284562" Offset="0.52" />
+                                            <GradientStop Color="#1B0A0E15" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <Border Background="#AC0A0D12" BorderBrush="#14FFFFFF" BorderThickness="1" CornerRadius="23" Padding="22,22">
+                                        <Grid RowSpacing="18">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Grid ColumnSpacing="16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="8">
+                                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                                        <Border Width="44" Height="44" Background="#18FFFFFF" BorderBrush="#16FFFFFF" BorderThickness="1" CornerRadius="22">
+                                                            <TextBlock Text="&#xE8A5;" FontFamily="{ThemeResource SymbolThemeFontFamily}" FontSize="18" Foreground="#F4FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" />
+                                                        </Border>
+                                                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                            <TextBlock Text="Native AI Control" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
+                                                            <TextBlock Text="Finder now talks to your selected provider through a real desktop window, with local-first secret handling." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#C8FFFFFF" MaxWidth="560" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <Border Background="#16FFFFFF" CornerRadius="999" Padding="10,5">
+                                                            <TextBlock Text="Native window" FontSize="11" FontFamily="{StaticResource SfTextMedium}" Foreground="#E6FFFFFF" />
+                                                        </Border>
+                                                        <Border Background="#14000000" CornerRadius="999" Padding="10,5">
+                                                            <TextBlock Text="Provider routed" FontSize="11" FontFamily="{StaticResource SfTextMedium}" Foreground="#E6FFFFFF" />
+                                                        </Border>
+                                                        <Border Background="#14000000" CornerRadius="999" Padding="10,5">
+                                                            <TextBlock Text="Encrypted local secrets" FontSize="11" FontFamily="{StaticResource SfTextMedium}" Foreground="#E6FFFFFF" />
+                                                        </Border>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Spacing="10" VerticalAlignment="Top">
+                                                    <Border x:Name="AiValidationBadgeBorder" Padding="12,6" CornerRadius="999" Background="#24FFFFFF" HorizontalAlignment="Right">
+                                                        <TextBlock x:Name="AiValidationBadgeText" Text="Not Ready" FontSize="12" FontFamily="{StaticResource SfTextSemibold}" Foreground="White" />
+                                                    </Border>
+                                                    <Button x:Name="AiOpenWindowButton" Height="34" Padding="16,0" CornerRadius="12" BorderThickness="0" FontFamily="{StaticResource SfTextSemibold}" FontSize="12" Click="OnOpenAiWindowClick" Content="Open AI Window" />
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <Grid Grid.Row="1" ColumnSpacing="12">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <Border Grid.Column="0" Background="#14FFFFFF" BorderBrush="#10FFFFFF" BorderThickness="1" CornerRadius="18" Padding="14,12">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBlock Text="Provider" FontSize="11" FontFamily="{StaticResource SfTextMedium}" Foreground="#90FFFFFF" />
+                                                        <TextBlock x:Name="AiHeroProviderText" Text="OpenAI OAuth" FontSize="16" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
+                                                        <TextBlock Text="Routing target used by Veil Halo." TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#A8FFFFFF" />
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <Border Grid.Column="1" Background="#14000000" BorderBrush="#10FFFFFF" BorderThickness="1" CornerRadius="18" Padding="14,12">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBlock Text="Model" FontSize="11" FontFamily="{StaticResource SfTextMedium}" Foreground="#90FFFFFF" />
+                                                        <TextBlock x:Name="AiHeroModelText" Text="gpt-5.4" FontSize="16" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
+                                                        <TextBlock Text="Default model used for new requests." TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#A8FFFFFF" />
+                                                    </StackPanel>
+                                                </Border>
+
+                                                <Border Grid.Column="2" Background="#14000000" BorderBrush="#10FFFFFF" BorderThickness="1" CornerRadius="18" Padding="14,12">
+                                                    <StackPanel Spacing="4">
+                                                        <TextBlock Text="Runtime" FontSize="11" FontFamily="{StaticResource SfTextMedium}" Foreground="#90FFFFFF" />
+                                                        <TextBlock x:Name="AiHeroRuntimeText" Text="Encrypted local vault" FontSize="16" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
+                                                        <TextBlock x:Name="AiHeroRuntimeSubtext" Text="Secrets stay on this Windows account." TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#A8FFFFFF" />
+                                                    </StackPanel>
+                                                </Border>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+                                </Border>
+
+                                <TextBlock Text="Provider" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,0,0,0" CharacterSpacing="40" />
+                                <Border Background="#0FFFFFFF" BorderBrush="#12FFFFFF" BorderThickness="1" CornerRadius="18" Padding="18,16">
+                                    <StackPanel Spacing="14">
+                                        <Grid>
+                                            <TextBlock Text="Current Provider" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" VerticalAlignment="Center" />
+                                            <TextBlock x:Name="AiProviderValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" VerticalAlignment="Center" />
+                                        </Grid>
+
+                                        <Grid RowSpacing="6" ColumnSpacing="6">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Button x:Name="AiProviderChatGptButton" Grid.Row="0" Grid.Column="0" Height="32" CornerRadius="8" BorderThickness="0" Background="#20FFFFFF" Foreground="White" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="ChatGptPremium" Click="OnAiProviderButtonClick" Content="OpenAI OAuth" />
+                                            <Button x:Name="AiProviderOpenAiButton" Grid.Row="0" Grid.Column="1" Height="32" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="OpenAI" Click="OnAiProviderButtonClick" Content="OpenAI" />
+                                            <Button x:Name="AiProviderAnthropicButton" Grid.Row="0" Grid.Column="2" Height="32" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="Anthropic" Click="OnAiProviderButtonClick" Content="Anthropic" />
+                                            <Button x:Name="AiProviderMistralButton" Grid.Row="1" Grid.Column="0" Height="32" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="Mistral" Click="OnAiProviderButtonClick" Content="Mistral" />
+                                            <Button x:Name="AiProviderOllamaButton" Grid.Row="1" Grid.Column="1" Height="32" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="Ollama" Click="OnAiProviderButtonClick" Content="Ollama" />
+                                            <Button x:Name="AiProviderOllamaCloudButton" Grid.Row="1" Grid.Column="2" Height="32" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="OllamaCloud" Click="OnAiProviderButtonClick" Content="Ollama Cloud" />
+                                        </Grid>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <TextBlock Text="Local-first security model: non-secret metadata is persisted in settings.json, while provider credentials are encrypted with the current Windows user profile and kept outside the normal config file." TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#78FFFFFF" />
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Connection" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
+                                <Border Background="#0FFFFFFF" BorderBrush="#12FFFFFF" BorderThickness="1" CornerRadius="18" Padding="18,16">
+                                    <StackPanel Spacing="14">
+                                        <StackPanel x:Name="AiChatGptPanel" Spacing="10">
+                                            <TextBlock Text="OpenAI OAuth reuses a local Codex or ChatGPT OAuth cache already present on this machine, then imports that payload into Veil's encrypted local secret store." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
+                                            <TextBox x:Name="ChatGptAuthFilePathTextBox" Header="Local OAuth File" PlaceholderText="C:\\Users\\you\\.codex\\auth.json" TextChanged="OnChatGptAuthFilePathChanged" />
+                                            <Grid ColumnSpacing="6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button Grid.Column="0" Height="30" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnUseDetectedChatGptAuthPathClick" Content="Use Detected" />
+                                                <Button Grid.Column="1" Height="30" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnImportChatGptAuthClick" Content="Import" />
+                                                <Button Grid.Column="2" Height="30" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnClearChatGptAuthClick" Content="Clear" />
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <StackPanel x:Name="AiBaseUrlPanel" Spacing="6">
+                                            <TextBlock x:Name="AiBaseUrlLabelText" Text="Base URL" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                            <TextBox x:Name="AiBaseUrlTextBox" PlaceholderText="https://api.openai.com/v1" TextChanged="OnAiBaseUrlChanged" />
+                                        </StackPanel>
+
+                                        <StackPanel x:Name="AiModelPanel" Spacing="6">
+                                            <TextBlock x:Name="AiModelLabelText" Text="Model" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <ComboBox x:Name="AiModelComboBox" DisplayMemberPath="DisplayLabel" PlaceholderText="Loading models..." SelectionChanged="OnAiModelSelectionChanged" />
+                                                <Button x:Name="AiModelRefreshButton" Grid.Column="1" Height="32" Padding="14,0" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnRefreshAiModelCatalogClick" Content="Refresh" />
+                                            </Grid>
+                                            <TextBlock x:Name="AiModelCatalogStatusText" Text="Loading models.dev catalog..." TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#7CFFFFFF" />
+                                        </StackPanel>
+
+                                        <StackPanel x:Name="AiCredentialPanel" Spacing="8">
+                                            <TextBlock x:Name="AiCredentialLabelText" Text="API Key" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                            <PasswordBox x:Name="AiCredentialPasswordBox" PlaceholderText="Paste a credential to encrypt locally" />
+                                            <Grid ColumnSpacing="6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button Grid.Column="0" Height="30" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnSaveAiCredentialClick" Content="Save Secret" />
+                                                <Button Grid.Column="1" Height="30" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnClearAiCredentialClick" Content="Clear Secret" />
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="Validation" FontSize="12" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock x:Name="AiValidationSummaryText" Text="Validation not run yet." TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#C8FFFFFF" />
+                                            </StackPanel>
+                                            <Button x:Name="AiProviderValidateButton" Grid.Column="1" Height="30" Padding="14,0" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnValidateAiProviderClick" Content="Validate" />
+                                        </Grid>
+
+                                        <StackPanel x:Name="AiValidationMessagePanel" Spacing="8" />
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Storage" FontSize="12" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                            <TextBlock x:Name="AiProviderStatusText" Text="Not configured." TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#7CFFFFFF" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <TextBlock Text="Speech Models" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
+                                <Border Background="#0FFFFFFF" BorderBrush="#12FFFFFF" BorderThickness="1" CornerRadius="18" Padding="18,16">
+                                    <StackPanel Spacing="14">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="Local Speech Model Library" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock Text="Download curated offline speech models for future use inside Veil. Files stay local under Veil's app data folder. Custom model sideloading is intentionally not supported." TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Padding="10,5" CornerRadius="8" Background="#18FFFFFF" VerticalAlignment="Top">
+                                                <TextBlock x:Name="AiSpeechModelLibraryBadgeText" Text="Catalog" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#E6FFFFFF" />
+                                            </Border>
+                                        </Grid>
+
+                                        <ComboBox x:Name="AiSpeechModelComboBox" Header="Preferred Local Speech Model" DisplayMemberPath="DisplayName" SelectionChanged="OnAiSpeechModelSelectionChanged" />
+
+                                        <Border Background="#12FFFFFF" BorderBrush="#10FFFFFF" BorderThickness="1" CornerRadius="14" Padding="14,12">
+                                            <StackPanel Spacing="10">
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock x:Name="AiSpeechModelTitleText" Text="Parakeet V3" FontSize="15" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
+                                                    <TextBlock x:Name="AiSpeechModelDescriptionText" TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#B8FFFFFF" />
+                                                </StackPanel>
+
+                                                <TextBlock x:Name="AiSpeechModelMetaText" TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
+                                                <TextBlock x:Name="AiSpeechModelCapabilitiesText" TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
+                                                <TextBlock x:Name="AiSpeechModelOutputText" TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
+                                                <TextBlock x:Name="AiSpeechModelStoragePathText" TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#72FFFFFF" />
+
+                                                <ProgressBar x:Name="AiSpeechModelProgressBar" Minimum="0" Maximum="100" Height="6" Visibility="Collapsed" />
+                                                <TextBlock x:Name="AiSpeechModelStatusText" TextWrapping="WrapWholeWords" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#C8FFFFFF" />
+
+                                                <Grid ColumnSpacing="6">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button x:Name="AiSpeechModelPrimaryActionButton" Grid.Column="0" Height="30" Padding="14,0" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnAiSpeechModelPrimaryActionClick" Content="Download" />
+                                                    <Button x:Name="AiSpeechModelSecondaryActionButton" Grid.Column="1" Height="30" Padding="14,0" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnAiSpeechModelSecondaryActionClick" Content="Delete" />
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
                         <!-- ── Games ── -->
-                        <Grid x:Name="GamesSectionPanel" Visibility="Collapsed">
+                        <Grid x:Name="GamesSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
                                     <TextBlock Text="Games" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
@@ -361,7 +616,7 @@
                         </Grid>
 
                         <!-- ── Discord ── -->
-                        <Grid x:Name="DiscordSectionPanel" Visibility="Collapsed">
+                        <Grid x:Name="DiscordSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
                                     <TextBlock Text="Discord" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
@@ -385,7 +640,7 @@
                         </Grid>
 
                         <!-- ── Music ── -->
-                        <Grid x:Name="MusicSectionPanel" Visibility="Collapsed">
+                        <Grid x:Name="MusicSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
                                     <TextBlock Text="Music" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
@@ -440,7 +695,7 @@
                         </Grid>
 
                         <!-- ── Weather ── -->
-                        <Grid x:Name="WeatherSectionPanel" Visibility="Collapsed">
+                        <Grid x:Name="WeatherSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
                                     <TextBlock Text="Weather" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
@@ -482,7 +737,7 @@
                         </Grid>
 
                         <!-- ── Menu ── -->
-                        <Grid x:Name="MenuSectionPanel" Visibility="Collapsed">
+                        <Grid x:Name="MenuSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
                                     <TextBlock Text="Menu" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
@@ -502,7 +757,7 @@
                         </Grid>
 
                         <!-- ── RunCat ── -->
-                        <Grid x:Name="RunCatSectionPanel" Visibility="Collapsed">
+                        <Grid x:Name="RunCatSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
                                     <TextBlock Text="RunCat" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />

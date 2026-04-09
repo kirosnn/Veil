@@ -25,6 +25,7 @@ public sealed partial class FinderWindow : Window
     private const int DebounceMilliseconds = 25;
     private const int WindowCornerRadius = 24;
     private const int MaxVisibleResults = 200;
+    private static readonly TimeSpan SessionKeepAliveDuration = TimeSpan.FromMinutes(10);
     private static readonly CornerRadius RowCornerRadius = new(14);
 
     private static readonly SolidColorBrush TransparentBrush = new(Colors.Transparent);
@@ -58,6 +59,7 @@ public sealed partial class FinderWindow : Window
     private DesktopAcrylicController? _acrylicController;
     private SystemBackdropConfiguration? _backdropConfig;
     private readonly DispatcherTimer _debounceTimer;
+    private readonly DispatcherTimer _sessionKeepAliveTimer;
     private FinderEntry[] _allEntries = [];
     private FinderEntry[] _appEntries = [];
     private FinderEntry[] _filteredEntries = [];
@@ -67,8 +69,13 @@ public sealed partial class FinderWindow : Window
     private bool _showRequested;
     private string _pendingQuery = string.Empty;
     private DateTime _openedAtUtc;
+    private DateTime _sessionKeepAliveUntilUtc = DateTime.MinValue;
     private int _selectedIndex = -1;
+    private double _retainedVerticalOffset;
+    private int _retainedSearchSelectionStart;
+    private int _retainedSearchSelectionLength;
     private Button[]? _cachedAppRows;
+    private FinderAiWindow? _aiWindow;
 
     // Pooled scoring buffer to avoid allocations per keystroke
     private (FinderEntry entry, int score)[] _scoreBuffer = [];
@@ -80,6 +87,8 @@ public sealed partial class FinderWindow : Window
     // Pooled StringBuilder for NormalizeSearch
     [ThreadStatic]
     private static StringBuilder? t_normalizeBuilder;
+
+    internal event EventHandler? SessionExpired;
 
     internal FinderWindow(ScreenBounds screen)
     {
@@ -95,8 +104,15 @@ public sealed partial class FinderWindow : Window
         };
         _debounceTimer.Tick += OnDebounceElapsed;
 
+        _sessionKeepAliveTimer = new DispatcherTimer
+        {
+            Interval = SessionKeepAliveDuration
+        };
+        _sessionKeepAliveTimer.Tick += OnSessionKeepAliveElapsed;
+
         Activated += OnFirstActivated;
         Activated += OnWindowActivated;
+        Closed += OnClosed;
     }
 
     /// <summary>
@@ -131,6 +147,7 @@ public sealed partial class FinderWindow : Window
 
     private void ConfigureWindowChrome()
     {
+        WindowHelper.ApplyAppIcon(this);
         WindowHelper.RemoveTitleBar(this);
 
         int exStyle = GetWindowLongW(_hwnd, GWL_EXSTYLE);
@@ -180,17 +197,31 @@ public sealed partial class FinderWindow : Window
     private void ShowCenteredCore()
     {
         _showRequested = false;
+        bool resumeSession = ShouldResumeSession();
+        CancelSessionKeepAlive();
         _openedAtUtc = DateTime.UtcNow;
         ApplyWindowSize();
-        SearchTextBox.Text = string.Empty;
-        UpdatePlaceholder();
-
-        // Restore default results instantly if apps are loaded
-        if (_allEntries.Length > 0)
+        if (!resumeSession)
         {
-            _filteredEntries = _appEntries;
-            RebuildResults();
-            UpdateStatusBar();
+            SearchTextBox.Text = string.Empty;
+            UpdatePlaceholder();
+
+            if (_allEntries.Length > 0)
+            {
+                _filteredEntries = _appEntries;
+                RebuildResults();
+                UpdateStatusBar();
+            }
+        }
+        else
+        {
+            UpdatePlaceholder();
+            if (_allEntries.Length > 0)
+            {
+                RebuildResults(preserveSelection: true);
+                UpdateStatusBar();
+                RestoreRetainedViewport();
+            }
         }
 
         ShowWindowNative(_hwnd, SW_SHOW);
@@ -220,15 +251,28 @@ public sealed partial class FinderWindow : Window
         HideWindow();
     }
 
-    internal void HideWindow()
+    internal void HideWindow(bool keepSessionWarm = true)
     {
         _debounceTimer.Stop();
+        _retainedVerticalOffset = ResultsScrollViewer.VerticalOffset;
+        _retainedSearchSelectionStart = SearchTextBox.SelectionStart;
+        _retainedSearchSelectionLength = SearchTextBox.SelectionLength;
         // Detach cached rows so they can be re-added on next show
         if (ReferenceEquals(_displayedEntries, _appEntries) && _cachedAppRows is not null)
         {
             ResultsPanel.Children.Clear();
             _displayedEntries = [];
         }
+
+        if (keepSessionWarm)
+        {
+            ScheduleSessionKeepAlive();
+        }
+        else
+        {
+            CancelSessionKeepAlive();
+        }
+
         if (_hwnd != IntPtr.Zero)
         {
             ShowWindowNative(_hwnd, SW_HIDE);
@@ -252,11 +296,23 @@ public sealed partial class FinderWindow : Window
 
     internal void Destroy()
     {
+        CancelSessionKeepAlive();
+        _sessionKeepAliveTimer.Stop();
         _debounceTimer.Stop();
         _acrylicController?.Dispose();
         _acrylicController = null;
         _backdropConfig = null;
+        _aiWindow?.Close();
+        _aiWindow = null;
         Close();
+    }
+
+    private void OnClosed(object sender, WindowEventArgs args)
+    {
+        _debounceTimer.Stop();
+        _sessionKeepAliveTimer.Stop();
+        _sessionKeepAliveUntilUtc = DateTime.MinValue;
+        _retainedVerticalOffset = 0;
     }
 
     private async Task EnsureAppsLoadedAsync()
@@ -375,9 +431,10 @@ public sealed partial class FinderWindow : Window
                 return;
             }
 
-            if (_fallbackActions.Length > 0 && _selectedIndex < _fallbackActions.Length)
+            int fallbackIndex = _selectedIndex - _filteredEntries.Length;
+            if (_fallbackActions.Length > 0 && fallbackIndex >= 0 && fallbackIndex < _fallbackActions.Length)
             {
-                ExecuteFallback(_fallbackActions[_selectedIndex]);
+                ExecuteFallback(_fallbackActions[fallbackIndex]);
                 e.Handled = true;
                 return;
             }
@@ -399,9 +456,9 @@ public sealed partial class FinderWindow : Window
 
         if (e.Key == global::Windows.System.VirtualKey.Tab && selectableCount > 0)
         {
-            if (_filteredEntries.Length > 0 && AutocompleteHint.Visibility == Visibility.Visible && AutocompleteHint.Inlines.Count == 2)
+            if (AutocompleteHint.Visibility == Visibility.Visible && AutocompleteHint.Inlines.Count == 2)
             {
-                string full = _filteredEntries[0].Name;
+                string full = string.Concat(AutocompleteHint.Inlines.OfType<Run>().Select(static inline => inline.Text));
                 SearchTextBox.Text = full;
                 SearchTextBox.SelectionStart = full.Length;
                 AutocompleteHint.Visibility = Visibility.Collapsed;
@@ -433,6 +490,7 @@ public sealed partial class FinderWindow : Window
     {
         using var perfScope = PerformanceLogger.Measure("Finder.ApplyFilter", 1.5);
         string raw = query ?? string.Empty;
+        string trimmedQuery = raw.Trim();
         string normalizedSearch = NormalizeSearch(raw);
 
         if (normalizedSearch.Length == 0)
@@ -470,6 +528,11 @@ public sealed partial class FinderWindow : Window
             }
 
             _filteredEntries = result;
+        }
+
+        if (trimmedQuery.Length > 0)
+        {
+            _filteredEntries = PrependAskAiEntry(trimmedQuery, _filteredEntries);
         }
 
         RebuildResults();
@@ -606,6 +669,8 @@ public sealed partial class FinderWindow : Window
 
     private void UpdateStatusBar()
     {
+        int nonAiResultCount = _filteredEntries.Count(static entry => entry.ActionId != FinderActionIds.AiAgent);
+
         if (_isLoadingApps)
         {
             SectionTitleText.Text = "Finder";
@@ -617,10 +682,14 @@ public sealed partial class FinderWindow : Window
 
         if (_fallbackActions.Length > 0)
         {
-            SectionTitleText.Text = "Quick actions";
-            SectionSubtitleText.Text = "Run the raw query in PowerShell, WSL, or your browser.";
-            ResultCountText.Text = $"{_fallbackActions.Length} quick actions";
-            HintText.Text = _selectedIndex >= 0 ? "Enter run  •  ↑↓ navigate" : string.Empty;
+            SectionTitleText.Text = nonAiResultCount == 0 ? "AI and quick actions" : "Results";
+            SectionSubtitleText.Text = nonAiResultCount == 0
+                ? "Ask the native AI agent or run the raw query in PowerShell, WSL, or your browser."
+                : "Ranked across AI, apps, settings, and system actions.";
+            ResultCountText.Text = nonAiResultCount == 0
+                ? $"{_fallbackActions.Length + _filteredEntries.Length} quick actions"
+                : $"{_filteredEntries.Length + _fallbackActions.Length} results";
+            HintText.Text = _selectedIndex >= 0 ? "Enter open  •  ↑↓ navigate" : string.Empty;
             return;
         }
 
@@ -633,7 +702,7 @@ public sealed partial class FinderWindow : Window
             return;
         }
 
-        if (_filteredEntries.Length == 0)
+        if (nonAiResultCount == 0 && _filteredEntries.Length == 0)
         {
             SectionTitleText.Text = "No matches";
             SectionSubtitleText.Text = "Try another name or use the quick actions below.";
@@ -649,15 +718,19 @@ public sealed partial class FinderWindow : Window
         }
     }
 
-    private void RebuildResults()
+    private void RebuildResults(bool preserveSelection = false)
     {
         if (ReferenceEquals(_filteredEntries, _displayedEntries) && _filteredEntries.Length > 0)
         {
-            SetSelectedIndex(0);
+            int target = preserveSelection && _selectedIndex >= 0
+                ? Math.Min(_selectedIndex, ResultsPanel.Children.Count - 1)
+                : 0;
+            SetSelectedIndex(target);
             UpdateStatusBar();
             return;
         }
 
+        int previousSelectedIndex = _selectedIndex;
         _displayedEntries = _filteredEntries;
         ResultsPanel.Children.Clear();
         _fallbackActions = [];
@@ -680,7 +753,8 @@ public sealed partial class FinderWindow : Window
             }
         }
 
-        bool showFallbacks = _filteredEntries.Length == 0
+        bool hasNonAiResults = _filteredEntries.Any(static entry => entry.ActionId != FinderActionIds.AiAgent);
+        bool showFallbacks = !hasNonAiResults
             && _allEntries.Length > 0
             && !_isLoadingApps
             && !string.IsNullOrWhiteSpace(SearchTextBox.Text);
@@ -699,7 +773,14 @@ public sealed partial class FinderWindow : Window
             ResultsPanel.Children.Add(CreateFallbackRow("\uE774", $"Search \"{query}\"", "Default browser", "web", false));
         }
 
-        _selectedIndex = ResultsPanel.Children.Count > 0 ? 0 : -1;
+        _selectedIndex = -1;
+        if (ResultsPanel.Children.Count > 0)
+        {
+            int targetIndex = preserveSelection && previousSelectedIndex >= 0
+                ? Math.Min(previousSelectedIndex, ResultsPanel.Children.Count - 1)
+                : 0;
+            SetSelectedIndex(targetIndex);
+        }
 
         EmptyStatePanel.Visibility = _filteredEntries.Length == 0 && _fallbackActions.Length == 0 && _allEntries.Length > 0
             && !_isLoadingApps
@@ -967,6 +1048,7 @@ public sealed partial class FinderWindow : Window
     {
         return category switch
         {
+            "Assistant" => "Veil Halo",
             "Settings" => "Windows setting",
             "System" => "System command",
             "Utility" => "Built-in utility",
@@ -1014,8 +1096,77 @@ public sealed partial class FinderWindow : Window
 
     private void ExecuteEntry(FinderEntry entry)
     {
+        if (entry.ActionId == FinderActionIds.AiAgent)
+        {
+            string prompt = SearchTextBox.Text.Trim();
+            OpenAiWindow(prompt, autoSubmit: prompt.Length > 0);
+            HideWindow();
+            return;
+        }
+
         entry.Execute();
         HideWindow();
+    }
+
+    private FinderEntry[] PrependAskAiEntry(string query, FinderEntry[] entries)
+    {
+        FinderEntry aiEntry = new(
+            TrimAskAiLabel(query),
+            "Assistant",
+            InstalledAppService.NormalizeText(query + " ai agent"),
+            null,
+            "\uE8A5")
+        {
+            ActionId = FinderActionIds.AiAgent
+        };
+
+        FinderEntry[] filtered = entries
+            .Where(static entry => entry.ActionId != FinderActionIds.AiAgent)
+            .ToArray();
+        var result = new FinderEntry[filtered.Length + 1];
+        result[0] = aiEntry;
+        filtered.CopyTo(result, 1);
+        return result;
+    }
+
+    private static string TrimAskAiLabel(string query)
+    {
+        string compact = query.Trim();
+        if (compact.Length > 52)
+        {
+            compact = compact[..52] + "...";
+        }
+
+        return $"Ask AI about \"{compact}\"";
+    }
+
+    private void EnsureAiWindowCreated()
+    {
+        if (_aiWindow is not null)
+        {
+            return;
+        }
+
+        _aiWindow = new FinderAiWindow(_screen);
+        _aiWindow.Closed += OnAiWindowClosed;
+    }
+
+    private void OnAiWindowClosed(object sender, WindowEventArgs args)
+    {
+        if (sender is FinderAiWindow aiWindow)
+        {
+            aiWindow.Closed -= OnAiWindowClosed;
+            if (ReferenceEquals(_aiWindow, aiWindow))
+            {
+                _aiWindow = null;
+            }
+        }
+    }
+
+    private void OpenAiWindow(string prompt, bool autoSubmit)
+    {
+        EnsureAiWindowCreated();
+        _aiWindow!.ShowCentered(prompt, autoSubmit);
     }
 
     private void ExecuteFallback(string action)
@@ -1250,5 +1401,44 @@ public sealed partial class FinderWindow : Window
         }
 
         return bestName;
+    }
+
+    private void ScheduleSessionKeepAlive()
+    {
+        _sessionKeepAliveUntilUtc = DateTime.UtcNow + SessionKeepAliveDuration;
+        _sessionKeepAliveTimer.Stop();
+        _sessionKeepAliveTimer.Interval = SessionKeepAliveDuration;
+        _sessionKeepAliveTimer.Start();
+    }
+
+    private void CancelSessionKeepAlive()
+    {
+        _sessionKeepAliveTimer.Stop();
+        _sessionKeepAliveUntilUtc = DateTime.MinValue;
+    }
+
+    private bool ShouldResumeSession()
+    {
+        return _sessionKeepAliveUntilUtc > DateTime.UtcNow;
+    }
+
+    private void OnSessionKeepAliveElapsed(object? sender, object e)
+    {
+        _sessionKeepAliveTimer.Stop();
+        _sessionKeepAliveUntilUtc = DateTime.MinValue;
+        SessionExpired?.Invoke(this, EventArgs.Empty);
+        Destroy();
+    }
+
+    private void RestoreRetainedViewport()
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            ResultsScrollViewer.ChangeView(null, _retainedVerticalOffset, null, true);
+            int selectionStart = Math.Min(_retainedSearchSelectionStart, SearchTextBox.Text.Length);
+            int selectionLength = Math.Min(_retainedSearchSelectionLength, SearchTextBox.Text.Length - selectionStart);
+            SearchTextBox.SelectionStart = selectionStart;
+            SearchTextBox.SelectionLength = selectionLength;
+        });
     }
 }
