@@ -21,6 +21,7 @@ public sealed partial class FinderAiWindow : Window
     private readonly AiSecretStore _secretStore = new();
     private readonly FinderAiConversationStore _conversationStore = new();
     private readonly AiModelCatalogService _aiModelCatalogService = new();
+    private readonly Action? _returnToFinderAction;
     private readonly List<AiAgentTurn> _conversation = [];
     private IReadOnlyList<FinderAiConversationSession> _sessions = [];
     private IReadOnlyList<AiModelCatalogEntry> _modelOptions = [];
@@ -30,7 +31,6 @@ public sealed partial class FinderAiWindow : Window
     private CancellationTokenSource? _modelCatalogCancellationSource;
     private IntPtr _hwnd;
     private bool _showRequested;
-    private bool _isModelPickerInitializing;
     private string _pendingPrompt = string.Empty;
     private bool _pendingAutoSubmit;
     private bool _isSidebarVisible = true;
@@ -38,10 +38,12 @@ public sealed partial class FinderAiWindow : Window
     private string _providerStatusText = "Ready";
     private SolidColorBrush _providerStatusBrush = new(global::Windows.UI.Color.FromArgb(186, 198, 255, 225));
 
-    internal FinderAiWindow(ScreenBounds screen)
+    internal FinderAiWindow(ScreenBounds screen, Action? returnToFinderAction = null)
     {
         _screen = screen;
+        _returnToFinderAction = returnToFinderAction;
         InitializeComponent();
+        ApplyCustomControlStyling();
         Title = "Veil Halo";
         Activated += OnFirstActivated;
         Closed += OnClosed;
@@ -95,6 +97,15 @@ public sealed partial class FinderAiWindow : Window
         _hwnd = IntPtr.Zero;
     }
 
+    internal void HideWindow()
+    {
+        CloseModelPicker();
+        if (_hwnd != IntPtr.Zero)
+        {
+            ShowWindowNative(_hwnd, SW_HIDE);
+        }
+    }
+
     private void ShowCenteredCore()
     {
         _showRequested = false;
@@ -103,6 +114,7 @@ public sealed partial class FinderAiWindow : Window
         LoadSessions();
         ApplyModelCatalogPlaceholder();
         _ = LoadModelCatalogAsync();
+        CloseModelPicker();
         UpdateSidebarState();
         Activate();
 
@@ -269,8 +281,15 @@ public sealed partial class FinderAiWindow : Window
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 CornerRadius = new CornerRadius(10),
-                Tag = session.Id
+                Tag = session.Id,
+                UseSystemFocusVisuals = false
             };
+            PanelButtonFactory.ApplyInteraction(
+                button,
+                button.Background,
+                CreateBrush(240, 255, 255, 255),
+                CreateBrush(18, 255, 255, 255),
+                CreateBrush(12, 255, 255, 255));
             button.Click += OnHistoryConversationClick;
 
             var stack = new StackPanel
@@ -310,6 +329,12 @@ public sealed partial class FinderAiWindow : Window
 
         HistoryEmptyText.Visibility = _sessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         DeleteChatButton.IsEnabled = !string.IsNullOrWhiteSpace(_activeConversationId);
+    }
+
+    private void OnBackToFinderClick(object sender, RoutedEventArgs e)
+    {
+        HideWindow();
+        _returnToFinderAction?.Invoke();
     }
 
     private static string BuildConversationPreview(FinderAiConversationSession session)
@@ -431,6 +456,14 @@ public sealed partial class FinderAiWindow : Window
         UpdateSidebarState();
     }
 
+    private void OnModelSelectorClick(object sender, RoutedEventArgs e)
+    {
+        ModelDropdownPanel.Visibility = ModelDropdownPanel.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        ModelSelectorChevronTextBlock.Text = ModelDropdownPanel.Visibility == Visibility.Visible ? "▴" : "▾";
+    }
+
     private void OnHomeQuickActionClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string prompt })
@@ -468,6 +501,7 @@ public sealed partial class FinderAiWindow : Window
             return;
         }
 
+        CloseModelPicker();
         HomeComposerTextBox.Text = string.Empty;
         ComposerTextBox.Text = string.Empty;
         UpdateSurfaceState();
@@ -580,7 +614,7 @@ public sealed partial class FinderAiWindow : Window
         HomeSendButton.IsEnabled = !isBusy;
         HomeComposerTextBox.IsEnabled = !isBusy;
         ComposerTextBox.IsEnabled = !isBusy;
-        ModelComboBox.IsEnabled = !isBusy;
+        ModelSelectorButton.IsEnabled = !isBusy;
         NewChatButton.IsEnabled = !isBusy;
         DeleteChatButton.IsEnabled = !isBusy && !string.IsNullOrWhiteSpace(_activeConversationId);
         SendButton.Content = isBusy ? "..." : "\uE724";
@@ -647,11 +681,7 @@ public sealed partial class FinderAiWindow : Window
     {
         string currentModel = GetCurrentAiModel();
         _modelOptions = CreateModelOptions([], currentModel);
-        _isModelPickerInitializing = true;
-        ModelComboBox.ItemsSource = _modelOptions;
-        ModelComboBox.SelectedItem = _modelOptions.FirstOrDefault(item =>
-            string.Equals(item.ModelId, currentModel, StringComparison.Ordinal));
-        _isModelPickerInitializing = false;
+        UpdateModelSelectionUi(currentModel);
     }
 
     private async Task LoadModelCatalogAsync(bool forceRefresh = false)
@@ -670,11 +700,7 @@ public sealed partial class FinderAiWindow : Window
                 cancellationToken);
 
             _modelOptions = CreateModelOptions(snapshot.Models, currentModel);
-            _isModelPickerInitializing = true;
-            ModelComboBox.ItemsSource = _modelOptions;
-            ModelComboBox.SelectedItem = _modelOptions.FirstOrDefault(item =>
-                string.Equals(item.ModelId, currentModel, StringComparison.Ordinal));
-            _isModelPickerInitializing = false;
+            UpdateModelSelectionUi(currentModel);
         }
         catch (OperationCanceledException)
         {
@@ -682,11 +708,7 @@ public sealed partial class FinderAiWindow : Window
         catch (Exception)
         {
             _modelOptions = CreateModelOptions([], currentModel);
-            _isModelPickerInitializing = true;
-            ModelComboBox.ItemsSource = _modelOptions;
-            ModelComboBox.SelectedItem = _modelOptions.FirstOrDefault(item =>
-                string.Equals(item.ModelId, currentModel, StringComparison.Ordinal));
-            _isModelPickerInitializing = false;
+            UpdateModelSelectionUi(currentModel);
         }
     }
 
@@ -721,16 +743,123 @@ public sealed partial class FinderAiWindow : Window
             .ToArray();
     }
 
-    private void OnModelSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void OnModelOptionClick(object sender, RoutedEventArgs e)
     {
-        if (_isModelPickerInitializing || ModelComboBox.SelectedItem is not AiModelCatalogEntry entry)
+        if (sender is not Button { Tag: AiModelCatalogEntry entry })
         {
             return;
         }
 
         SetCurrentAiModel(entry.ModelId);
+        UpdateModelSelectionUi(entry.ModelId);
+        CloseModelPicker();
         UpdateProviderState();
         UpdateConversationChrome();
+    }
+
+    private void UpdateModelSelectionUi(string currentModel)
+    {
+        AiModelCatalogEntry? selected = _modelOptions.FirstOrDefault(item =>
+            string.Equals(item.ModelId, currentModel, StringComparison.OrdinalIgnoreCase));
+        ModelSelectionTextBlock.Text = selected?.DisplayLabel ?? "Select model";
+        RebuildModelOptionsPanel(currentModel);
+    }
+
+    private void RebuildModelOptionsPanel(string currentModel)
+    {
+        ModelOptionsPanel.Children.Clear();
+
+        foreach (AiModelCatalogEntry option in _modelOptions)
+        {
+            bool isSelected = string.Equals(option.ModelId, currentModel, StringComparison.OrdinalIgnoreCase);
+            var button = new Button
+            {
+                Height = 38,
+                Padding = new Thickness(10, 0, 10, 0),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                Background = isSelected ? CreateBrush(28, 108, 168, 255) : CreateBrush(0, 0, 0, 0),
+                Foreground = CreateBrush(242, 255, 255, 255),
+                Tag = option,
+                UseSystemFocusVisuals = false,
+                CornerRadius = new CornerRadius(10),
+                BorderThickness = new Thickness(0)
+            };
+            PanelButtonFactory.ApplyInteraction(
+                button,
+                button.Background,
+                CreateBrush(242, 255, 255, 255),
+                CreateBrush(18, 255, 255, 255),
+                CreateBrush(12, 255, 255, 255));
+            button.Click += OnModelOptionClick;
+
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var label = new TextBlock
+            {
+                Text = option.DisplayLabel,
+                FontFamily = (FontFamily)Application.Current.Resources["SfTextMedium"],
+                FontSize = 11,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = CreateBrush(242, 255, 255, 255)
+            };
+
+            row.Children.Add(label);
+
+            if (isSelected)
+            {
+                var badge = new TextBlock
+                {
+                    Text = "Current",
+                    FontFamily = (FontFamily)Application.Current.Resources["SfTextSemibold"],
+                    FontSize = 9,
+                    Foreground = CreateBrush(200, 191, 224, 255),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(10, 0, 0, 0)
+                };
+                Grid.SetColumn(badge, 1);
+                row.Children.Add(badge);
+            }
+
+            button.Content = row;
+            ModelOptionsPanel.Children.Add(button);
+        }
+
+        ModelDropdownPanel.Visibility = Visibility.Collapsed;
+        ModelSelectorChevronTextBlock.Text = "▾";
+    }
+
+    private void CloseModelPicker()
+    {
+        ModelDropdownPanel.Visibility = Visibility.Collapsed;
+        ModelSelectorChevronTextBlock.Text = "▾";
+    }
+
+    private void ApplyCustomControlStyling()
+    {
+        ApplyButtonStyle(BackToFinderButton, CreateBrush(20, 255, 255, 255));
+        ApplyButtonStyle(SidebarToggleButton, CreateBrush(16, 255, 255, 255));
+        ApplyButtonStyle(ModelSelectorButton, CreateBrush(16, 255, 255, 255));
+        ApplyButtonStyle(NewChatButton, CreateBrush(18, 255, 255, 255));
+        ApplyButtonStyle(DeleteChatButton, CreateBrush(0, 0, 0, 0));
+        ApplyButtonStyle(HomeSendButton, CreateBrush(34, 255, 255, 255));
+        ApplyButtonStyle(SendButton, CreateBrush(34, 255, 255, 255));
+    }
+
+    private void ApplyButtonStyle(Button button, Brush background)
+    {
+        button.UseSystemFocusVisuals = false;
+        button.BorderThickness = new Thickness(0);
+        button.Background = background;
+        PanelButtonFactory.ApplyInteraction(
+            button,
+            background,
+            button.Foreground ?? CreateBrush(242, 255, 255, 255),
+            CreateBrush(22, 255, 255, 255),
+            CreateBrush(14, 255, 255, 255));
     }
 
     private string GetCurrentAiModel()

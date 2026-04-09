@@ -1147,7 +1147,7 @@ public sealed partial class FinderWindow : Window
             return;
         }
 
-        _aiWindow = new FinderAiWindow(_screen);
+        _aiWindow = new FinderAiWindow(_screen, ShowCentered);
         _aiWindow.Closed += OnAiWindowClosed;
     }
 

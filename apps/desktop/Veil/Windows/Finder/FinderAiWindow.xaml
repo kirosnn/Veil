@@ -87,45 +87,100 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Grid ColumnSpacing="10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="220" />
-                        </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="8">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="220" />
+                            </Grid.ColumnDefinitions>
 
-                        <Button
-                            x:Name="SidebarToggleButton"
-                            Width="28"
-                            Height="28"
-                            Padding="0"
-                            VerticalAlignment="Top"
-                            HorizontalAlignment="Left"
-                            CornerRadius="7"
-                            BorderThickness="0"
-                            Background="#10FFFFFF"
-                            Foreground="#F0FFFFFF"
-                            Click="OnToggleSidebarClick">
-                            <Viewbox Width="14" Height="14">
-                                <Canvas Width="20" Height="20">
-                                    <Path
-                                        Fill="#F0FFFFFF"
-                                        Data="M16.5 4A1.5 1.5 0 0 1 18 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5v-9A1.5 1.5 0 0 1 3.5 4zM7 15h9.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5H7zM3.5 5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5H6V5z" />
-                                </Canvas>
-                            </Viewbox>
-                        </Button>
+                            <Button
+                                x:Name="BackToFinderButton"
+                                Width="94"
+                                Height="32"
+                                Padding="0"
+                                VerticalAlignment="Top"
+                                HorizontalAlignment="Left"
+                                Background="#14FFFFFF"
+                                Click="OnBackToFinderClick">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <TextBlock Text="←" FontSize="14" FontFamily="{StaticResource SfTextMedium}" />
+                                    <TextBlock Text="Finder" FontSize="11.5" FontFamily="{StaticResource SfTextSemibold}" />
+                                </StackPanel>
+                            </Button>
 
-                        <Grid Grid.Column="1" />
+                            <Button
+                                x:Name="SidebarToggleButton"
+                                Grid.Column="1"
+                                Width="32"
+                                Height="32"
+                                Padding="0"
+                                VerticalAlignment="Top"
+                                HorizontalAlignment="Left"
+                                Background="#10FFFFFF"
+                                Foreground="#F0FFFFFF"
+                                Click="OnToggleSidebarClick">
+                                <Viewbox Width="14" Height="14">
+                                    <Canvas Width="20" Height="20">
+                                        <Path
+                                            Fill="#F0FFFFFF"
+                                            Data="M16.5 4A1.5 1.5 0 0 1 18 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 2 14.5v-9A1.5 1.5 0 0 1 3.5 4zM7 15h9.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5H7zM3.5 5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5H6V5z" />
+                                    </Canvas>
+                                </Viewbox>
+                            </Button>
 
-                        <ComboBox
-                            x:Name="ModelComboBox"
-                            Grid.Column="2"
-                            Height="30"
-                            VerticalAlignment="Top"
-                            DisplayMemberPath="DisplayLabel"
-                            PlaceholderText="Select model"
-                            SelectionChanged="OnModelSelectionChanged" />
-                    </Grid>
+                            <Grid Grid.Column="2" />
+
+                            <StackPanel Grid.Column="3" Spacing="6">
+                                <Button
+                                    x:Name="ModelSelectorButton"
+                                    Height="32"
+                                    Padding="12,0"
+                                    HorizontalAlignment="Stretch"
+                                    Background="#10FFFFFF"
+                                    Click="OnModelSelectorClick">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock
+                                            x:Name="ModelSelectionTextBlock"
+                                            VerticalAlignment="Center"
+                                            Text="Select model"
+                                            TextTrimming="CharacterEllipsis"
+                                            FontFamily="{StaticResource SfTextSemibold}"
+                                            FontSize="11.5" />
+
+                                        <TextBlock
+                                            x:Name="ModelSelectorChevronTextBlock"
+                                            Grid.Column="1"
+                                            Margin="8,0,0,0"
+                                            VerticalAlignment="Center"
+                                            Text="▾"
+                                            FontSize="12"
+                                            FontFamily="{StaticResource SfTextMedium}" />
+                                    </Grid>
+                                </Button>
+
+                                <Border
+                                    x:Name="ModelDropdownPanel"
+                                    Visibility="Collapsed"
+                                    Background="#141A22"
+                                    CornerRadius="12"
+                                    BorderBrush="#16FFFFFF"
+                                    BorderThickness="1"
+                                    Padding="6">
+                                    <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto" VerticalScrollMode="Enabled">
+                                        <StackPanel x:Name="ModelOptionsPanel" Spacing="4" />
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
 
                     <Grid Grid.Row="1" Margin="0,12,0,12">
                         <Grid x:Name="ConversationPanel">
