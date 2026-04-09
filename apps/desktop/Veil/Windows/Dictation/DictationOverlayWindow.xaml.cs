@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using UnicodeAnimations.Models;
 using Veil.Interop;
 using WinRT;
@@ -32,14 +33,13 @@ public sealed partial class DictationOverlayWindow : Window
     }
 
     private const int OverlayHeight = 40;
-    private const int OverlayCornerRadius = 20;
+    private const int OverlayCornerRadius = 16;
     private const int OverlayContentWidthPadding = 14;
     private const int OverlayContentChromeWidth = 72;
     private const int OverlayHorizontalMargin = 12;
     private const int OverlayMinimumWidth = 132;
     private const int OverlayUniformWidth = 216;
     private const int OverlayStatusChromeWidth = 80;
-    private const int OverlayTranscribingWaveSpacingWidth = 8;
     private const double StatusTextDefaultFontSize = 12.5;
     private const double TranscribingWaveFontSize = 13;
     private static readonly Spinner TranscribingWaveAnimation = SpinnerRegistry.All.First(static entry => entry.Name == "waverows").Spinner;
@@ -240,14 +240,14 @@ public sealed partial class DictationOverlayWindow : Window
 
     private void ApplyVisualState(string title, int availableWidth)
     {
-        string backgroundHex = "#9013181D";
-        string foregroundHex = "#FFF4FBFF";
-        string buttonForegroundHex = "#DDF4FBFF";
-        string accentHex = "#FFF4FBFF";
-        global::Windows.UI.Color acrylicTintColor = global::Windows.UI.Color.FromArgb(255, 28, 32, 40);
-        global::Windows.UI.Color acrylicFallbackColor = global::Windows.UI.Color.FromArgb(216, 19, 22, 27);
-        float acrylicTintOpacity = 0.2f;
-        float acrylicLuminosityOpacity = 0.52f;
+        string backgroundHex = "#88131B22";
+        string foregroundHex = "#FFF2F8FC";
+        string buttonForegroundHex = "#DDF2F8FC";
+        string accentHex = "#FFB7E3FF";
+        global::Windows.UI.Color acrylicTintColor = global::Windows.UI.Color.FromArgb(255, 23, 29, 36);
+        global::Windows.UI.Color acrylicFallbackColor = global::Windows.UI.Color.FromArgb(214, 16, 20, 26);
+        float acrylicTintOpacity = 0.18f;
+        float acrylicLuminosityOpacity = 0.56f;
         OverlayLeftVisual leftVisual = OverlayLeftVisual.ListeningIcon;
         OverlayCenterMode centerMode = OverlayCenterMode.Spectrum;
         bool showDismiss = true;
@@ -255,14 +255,9 @@ public sealed partial class DictationOverlayWindow : Window
         if (title.Contains("Error", StringComparison.OrdinalIgnoreCase))
         {
             _useLiveSpectrum = false;
-            backgroundHex = "#90171518";
-            foregroundHex = "#FFFFE1E1";
-            buttonForegroundHex = "#FFFFE1E1";
-            accentHex = "#FFFFB4B4";
-            acrylicTintColor = global::Windows.UI.Color.FromArgb(255, 52, 24, 29);
-            acrylicFallbackColor = global::Windows.UI.Color.FromArgb(214, 34, 19, 22);
-            acrylicTintOpacity = 0.24f;
-            acrylicLuminosityOpacity = 0.48f;
+            accentHex = "#FFFFB8C9";
+            acrylicTintColor = global::Windows.UI.Color.FromArgb(255, 33, 26, 31);
+            acrylicFallbackColor = global::Windows.UI.Color.FromArgb(214, 22, 18, 23);
             leftVisual = OverlayLeftVisual.ErrorIcon;
             centerMode = OverlayCenterMode.StatusText;
             showDismiss = false;
@@ -270,13 +265,9 @@ public sealed partial class DictationOverlayWindow : Window
         else if (title.Equals("Inserted", StringComparison.OrdinalIgnoreCase))
         {
             _useLiveSpectrum = false;
-            foregroundHex = "#FFE9FFF4";
-            buttonForegroundHex = "#FFE9FFF4";
-            accentHex = "#FFA8FFD6";
-            acrylicTintColor = global::Windows.UI.Color.FromArgb(255, 24, 37, 34);
-            acrylicFallbackColor = global::Windows.UI.Color.FromArgb(210, 18, 28, 26);
-            acrylicTintOpacity = 0.22f;
-            acrylicLuminosityOpacity = 0.5f;
+            accentHex = "#FFAEEFD5";
+            acrylicTintColor = global::Windows.UI.Color.FromArgb(255, 23, 31, 30);
+            acrylicFallbackColor = global::Windows.UI.Color.FromArgb(212, 16, 22, 22);
             leftVisual = OverlayLeftVisual.InsertedIcon;
             centerMode = OverlayCenterMode.StatusText;
             showDismiss = false;
@@ -284,13 +275,9 @@ public sealed partial class DictationOverlayWindow : Window
         else if (title.Equals("Copied", StringComparison.OrdinalIgnoreCase))
         {
             _useLiveSpectrum = false;
-            foregroundHex = "#FFEBF4FF";
-            buttonForegroundHex = "#FFEBF4FF";
-            accentHex = "#FFB8D9FF";
-            acrylicTintColor = global::Windows.UI.Color.FromArgb(255, 27, 32, 41);
-            acrylicFallbackColor = global::Windows.UI.Color.FromArgb(210, 20, 23, 29);
-            acrylicTintOpacity = 0.22f;
-            acrylicLuminosityOpacity = 0.5f;
+            accentHex = "#FFBBD9FF";
+            acrylicTintColor = global::Windows.UI.Color.FromArgb(255, 23, 29, 36);
+            acrylicFallbackColor = global::Windows.UI.Color.FromArgb(212, 16, 20, 26);
             leftVisual = OverlayLeftVisual.CopiedIcon;
             centerMode = OverlayCenterMode.StatusText;
             showDismiss = false;
@@ -298,13 +285,9 @@ public sealed partial class DictationOverlayWindow : Window
         else if (title.Equals("Transcribing", StringComparison.OrdinalIgnoreCase))
         {
             _useLiveSpectrum = false;
-            foregroundHex = "#FFE8F6FF";
-            buttonForegroundHex = "#FFE8F6FF";
-            accentHex = "#FFA3D4FF";
-            acrylicTintColor = global::Windows.UI.Color.FromArgb(255, 28, 34, 44);
-            acrylicFallbackColor = global::Windows.UI.Color.FromArgb(212, 20, 24, 31);
-            acrylicTintOpacity = 0.22f;
-            acrylicLuminosityOpacity = 0.52f;
+            accentHex = "#FFA9D8FF";
+            acrylicTintColor = global::Windows.UI.Color.FromArgb(255, 24, 31, 39);
+            acrylicFallbackColor = global::Windows.UI.Color.FromArgb(212, 17, 21, 28);
             leftVisual = OverlayLeftVisual.None;
             centerMode = OverlayCenterMode.TranscribingWave;
             showDismiss = false;
@@ -339,20 +322,13 @@ public sealed partial class DictationOverlayWindow : Window
             bar.Background = CreateBrush(accentHex);
         }
 
-        _dismissHoverHex = title.Contains("Error", StringComparison.OrdinalIgnoreCase)
-            ? "#22FF8F8F"
-            : title.Equals("Inserted", StringComparison.OrdinalIgnoreCase)
-                ? "#22A8FFD6"
-                : title.Equals("Copied", StringComparison.OrdinalIgnoreCase)
-                    ? "#2295BDFF"
-                    : title.Equals("Transcribing", StringComparison.OrdinalIgnoreCase)
-                        ? "#227CB8FF"
-                        : "#20F1FAFF";
+        _dismissHoverHex = "#24FFFFFF";
 
         SetLeftVisualState(leftVisual);
         SetCenterVisualState(centerMode);
         DismissButtonContainer.Visibility = showDismiss ? Visibility.Visible : Visibility.Collapsed;
         SetDismissButtonVisual(isHovered: false, isPressed: false);
+        AnimateStateTransition();
 
         if (!_useLiveSpectrum)
         {
@@ -373,26 +349,9 @@ public sealed partial class DictationOverlayWindow : Window
 
     private OverlayLayoutMetrics GetLayoutMetrics(string title, int availableWidth)
     {
-        int preferredWidth = OverlayUniformWidth;
-
-        int requiredWidth = preferredWidth;
-        if (title.Equals("Transcribing", StringComparison.OrdinalIgnoreCase))
-        {
-            double labelWidth = MeasureTextWidth(TranscribingLabelTextBlock, StatusTextDefaultFontSize);
-            double waveWidth = MeasureTranscribingWaveWidth();
-            requiredWidth = Math.Max(
-                preferredWidth,
-                (int)Math.Ceiling(labelWidth + waveWidth + OverlayTranscribingWaveSpacingWidth + OverlayStatusChromeWidth));
-        }
-        else if (!title.Equals("Listening", StringComparison.OrdinalIgnoreCase))
-        {
-            double textWidth = MeasureTextWidth(StatusTextBlock, StatusTextDefaultFontSize);
-            requiredWidth = Math.Max(preferredWidth, (int)Math.Ceiling(textWidth + OverlayStatusChromeWidth));
-        }
-
         int safeAvailableWidth = Math.Max(1, availableWidth);
         int minimumWidth = Math.Min(OverlayMinimumWidth, safeAvailableWidth);
-        int clampedWidth = Math.Clamp(requiredWidth, minimumWidth, safeAvailableWidth);
+        int clampedWidth = Math.Clamp(OverlayUniformWidth, minimumWidth, safeAvailableWidth);
         int contentWidth = Math.Max(1, clampedWidth - OverlayContentWidthPadding);
         return new OverlayLayoutMetrics(clampedWidth, contentWidth);
     }
@@ -537,6 +496,57 @@ public sealed partial class DictationOverlayWindow : Window
         TranscribingWaveTextBlock.Text = TranscribingWaveAnimation.Frames[_transcribingWaveFrameIndex];
     }
 
+    private void AnimateStateTransition()
+    {
+        var storyboard = new Storyboard();
+
+        var panelOpacityAnimation = new DoubleAnimation
+        {
+            From = 0.88,
+            To = 1,
+            Duration = TimeSpan.FromMilliseconds(180),
+            EnableDependentAnimation = true
+        };
+        Storyboard.SetTarget(panelOpacityAnimation, PanelBorder);
+        Storyboard.SetTargetProperty(panelOpacityAnimation, "Opacity");
+
+        var contentOpacityAnimation = new DoubleAnimation
+        {
+            From = 0.72,
+            To = 1,
+            Duration = TimeSpan.FromMilliseconds(140),
+            EnableDependentAnimation = true
+        };
+        Storyboard.SetTarget(contentOpacityAnimation, ContentGrid);
+        Storyboard.SetTargetProperty(contentOpacityAnimation, "Opacity");
+
+        var scaleXAnimation = new DoubleAnimation
+        {
+            From = 0.985,
+            To = 1,
+            Duration = TimeSpan.FromMilliseconds(210),
+            EnableDependentAnimation = true
+        };
+        Storyboard.SetTarget(scaleXAnimation, PanelScaleTransform);
+        Storyboard.SetTargetProperty(scaleXAnimation, nameof(ScaleTransform.ScaleX));
+
+        var scaleYAnimation = new DoubleAnimation
+        {
+            From = 0.985,
+            To = 1,
+            Duration = TimeSpan.FromMilliseconds(210),
+            EnableDependentAnimation = true
+        };
+        Storyboard.SetTarget(scaleYAnimation, PanelScaleTransform);
+        Storyboard.SetTargetProperty(scaleYAnimation, nameof(ScaleTransform.ScaleY));
+
+        storyboard.Children.Add(panelOpacityAnimation);
+        storyboard.Children.Add(contentOpacityAnimation);
+        storyboard.Children.Add(scaleXAnimation);
+        storyboard.Children.Add(scaleYAnimation);
+        storyboard.Begin();
+    }
+
     private double MeasureTextWidth(TextBlock textBlock, double fontSize)
     {
         double previousFontSize = textBlock.FontSize;
@@ -556,24 +566,4 @@ public sealed partial class DictationOverlayWindow : Window
         }
     }
 
-    private double MeasureTranscribingWaveWidth()
-    {
-        string previousText = TranscribingWaveTextBlock.Text;
-        double maxWidth = 0;
-
-        try
-        {
-            foreach (string frame in TranscribingWaveAnimation.Frames)
-            {
-                TranscribingWaveTextBlock.Text = frame;
-                maxWidth = Math.Max(maxWidth, MeasureTextWidth(TranscribingWaveTextBlock, TranscribingWaveFontSize));
-            }
-
-            return Math.Ceiling(maxWidth);
-        }
-        finally
-        {
-            TranscribingWaveTextBlock.Text = previousText;
-        }
-    }
 }

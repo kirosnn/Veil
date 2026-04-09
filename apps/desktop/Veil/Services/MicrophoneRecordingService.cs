@@ -46,6 +46,7 @@ internal sealed class AudioMmDeviceEnumerator
 internal sealed class MicrophoneRecordingService : IDisposable
 {
     private const int SpectrumBarCount = 12;
+    private static readonly float[] SilenceLevels = new float[SpectrumBarCount];
     private readonly float[] _smoothedLevels = new float[SpectrumBarCount];
     private static readonly Guid AudioMeterInformationIid = new("C02216F6-8C67-4B5B-9D00-D008E73E0064");
     private global::Windows.Media.Audio.AudioGraph? _audioGraph;
@@ -180,7 +181,7 @@ internal sealed class MicrophoneRecordingService : IDisposable
                 DisposeCaptureMeter();
                 DisposeAudioGraph();
                 Array.Fill(_smoothedLevels, 0);
-                SpectrumChanged?.Invoke(CreateSilenceLevels());
+                SpectrumChanged?.Invoke(SilenceLevels);
             }
 
             return _currentRecordingPath;
@@ -202,7 +203,7 @@ internal sealed class MicrophoneRecordingService : IDisposable
         try
         {
             float[] levels = GetMeterLevels();
-            if (levels.All(static value => value <= 0f))
+            if (IsSilent(levels))
             {
                 using var frame = frameOutputNode.GetFrame();
                 levels = ComputeSpectrumLevels(frame, _frameBitsPerSample, _frameChannelCount, _frameSubtype);
@@ -236,7 +237,7 @@ internal sealed class MicrophoneRecordingService : IDisposable
 
         if (!TryGetBuffer(reference, out byte* dataInBytes, out _))
         {
-            return CreateSilenceLevels();
+            return SilenceLevels;
         }
 
         uint lengthInBytes = buffer.Length;
@@ -250,7 +251,7 @@ internal sealed class MicrophoneRecordingService : IDisposable
 
         if (sampleFrames < SpectrumBarCount / 2)
         {
-            return CreateSilenceLevels();
+            return SilenceLevels;
         }
 
         float[] levels = new float[SpectrumBarCount];
@@ -299,12 +300,12 @@ internal sealed class MicrophoneRecordingService : IDisposable
         }
         else
         {
-            return CreateSilenceLevels();
+            return SilenceLevels;
         }
 
         if (globalCount == 0)
         {
-            return CreateSilenceLevels();
+            return SilenceLevels;
         }
 
         float globalRms = (float)Math.Sqrt(globalEnergy / globalCount);
@@ -394,24 +395,19 @@ internal sealed class MicrophoneRecordingService : IDisposable
         return levels;
     }
 
-    private static float[] CreateSilenceLevels()
-    {
-        return new float[SpectrumBarCount];
-    }
-
     private float[] GetMeterLevels()
     {
         try
         {
             if (_captureMeter is null)
             {
-                return CreateSilenceLevels();
+                return SilenceLevels;
             }
 
             int hr = _captureMeter.GetPeakValue(out float peak);
             if (hr != 0)
             {
-                return CreateSilenceLevels();
+                return SilenceLevels;
             }
 
             peak = Math.Clamp(peak, 0f, 1f);
@@ -420,7 +416,7 @@ internal sealed class MicrophoneRecordingService : IDisposable
         }
         catch
         {
-            return CreateSilenceLevels();
+            return SilenceLevels;
         }
     }
 
@@ -531,6 +527,19 @@ internal sealed class MicrophoneRecordingService : IDisposable
         _smoothedLevels[rightIndex] = smoothed;
         levels[leftIndex] = smoothed;
         levels[rightIndex] = smoothed;
+    }
+
+    private static bool IsSilent(IReadOnlyList<float> levels)
+    {
+        for (int index = 0; index < levels.Count; index++)
+        {
+            if (levels[index] > 0f)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     internal void DeleteRecording(string? filePath)

@@ -1137,7 +1137,7 @@ public sealed partial class FinderWindow : Window
             compact = compact[..52] + "...";
         }
 
-        return $"Ask AI about \"{compact}\"";
+        return $"Ask Halo about \"{compact}\"";
     }
 
     private void EnsureAiWindowCreated()

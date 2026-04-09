@@ -21,6 +21,7 @@ internal sealed class LocalSpeechTranscriptionService
     };
 
     private readonly LocalSpeechModelStore _modelStore = new();
+    private readonly SemaphoreSlim _helperBinaryGate = new(1, 1);
     private string? _cachedRepoRoot;
     private string? _cachedHelperPath;
 
@@ -78,9 +79,14 @@ internal sealed class LocalSpeechTranscriptionService
             {
             }
         });
-        string standardOutput = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        string standardError = await process.StandardError.ReadToEndAsync(cancellationToken);
+
+        Task<string> standardOutputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        Task<string> standardErrorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        await Task.WhenAll(standardOutputTask, standardErrorTask);
         await process.WaitForExitAsync(cancellationToken);
+
+        string standardOutput = standardOutputTask.Result;
+        string standardError = standardErrorTask.Result;
 
         if (process.ExitCode != 0)
         {
@@ -95,63 +101,76 @@ internal sealed class LocalSpeechTranscriptionService
 
     private async Task<string> EnsureHelperBinaryAsync(CancellationToken cancellationToken)
     {
-        string? repoRoot = _cachedRepoRoot ??= FindRepoRoot();
-        if (repoRoot is null)
+        await _helperBinaryGate.WaitAsync(cancellationToken);
+        try
         {
-            throw new InvalidOperationException("Veil speech helper source was not found.");
-        }
+            string? repoRoot = _cachedRepoRoot ??= FindRepoRoot();
+            if (repoRoot is null)
+            {
+                throw new InvalidOperationException("Veil speech helper source was not found.");
+            }
 
-        string manifestPath = Path.Combine(repoRoot, "apps", "desktop", "VeilSpeechCli", "Cargo.toml");
-        string helperPath = _cachedHelperPath ?? Path.Combine(
-            repoRoot,
-            "apps",
-            "desktop",
-            "VeilSpeechCli",
-            "target",
-            "release",
-            "veil-speech-cli.exe");
+            string manifestPath = Path.Combine(repoRoot, "apps", "desktop", "VeilSpeechCli", "Cargo.toml");
+            string helperPath = _cachedHelperPath ?? Path.Combine(
+                repoRoot,
+                "apps",
+                "desktop",
+                "VeilSpeechCli",
+                "target",
+                "release",
+                "veil-speech-cli.exe");
 
-        if (File.Exists(helperPath))
-        {
+            if (File.Exists(helperPath))
+            {
+                _cachedHelperPath = helperPath;
+                return helperPath;
+            }
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "cargo",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            startInfo.ArgumentList.Add("build");
+            startInfo.ArgumentList.Add("--manifest-path");
+            startInfo.ArgumentList.Add(manifestPath);
+            startInfo.ArgumentList.Add("--release");
+
+            using var process = new Process
+            {
+                StartInfo = startInfo
+            };
+
+            process.Start();
+
+            Task<string> standardOutputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            Task<string> standardErrorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await Task.WhenAll(standardOutputTask, standardErrorTask);
+            await process.WaitForExitAsync(cancellationToken);
+
+            string standardOutput = standardOutputTask.Result;
+            string standardError = standardErrorTask.Result;
+
+            if (process.ExitCode != 0 || !File.Exists(helperPath))
+            {
+                string error = string.IsNullOrWhiteSpace(standardError) ? standardOutput : standardError;
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
+                    ? "Failed to build the local speech helper."
+                    : error.Trim());
+            }
+
             _cachedHelperPath = helperPath;
             return helperPath;
         }
-
-        var startInfo = new ProcessStartInfo
+        finally
         {
-            FileName = "cargo",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        startInfo.ArgumentList.Add("build");
-        startInfo.ArgumentList.Add("--manifest-path");
-        startInfo.ArgumentList.Add(manifestPath);
-        startInfo.ArgumentList.Add("--release");
-
-        using var process = new Process
-        {
-            StartInfo = startInfo
-        };
-
-        process.Start();
-        string standardOutput = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-        string standardError = await process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
-
-        if (process.ExitCode != 0 || !File.Exists(helperPath))
-        {
-            string error = string.IsNullOrWhiteSpace(standardError) ? standardOutput : standardError;
-            throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
-                ? "Failed to build the local speech helper."
-                : error.Trim());
+            _helperBinaryGate.Release();
         }
-
-        _cachedHelperPath = helperPath;
-        return helperPath;
     }
 
     private static string? FindRepoRoot()
