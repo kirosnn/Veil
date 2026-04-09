@@ -173,31 +173,25 @@
                             Visibility="Collapsed"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            Orientation="Horizontal"
-                            Spacing="8">
-                            <TextBlock
-                                x:Name="TranscribingWaveTextBlock"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                FontSize="13"
-                                FontFamily="Consolas"
-                                Foreground="#FFA6D4FF"
-                                TextAlignment="Center"
-                                TextTrimming="None"
-                                TextWrapping="NoWrap"
-                                Text="⣀⣠⣄⣀" />
-
+                            Orientation="Horizontal">
                             <TextBlock
                                 x:Name="TranscribingLabelTextBlock"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 FontSize="12.5"
                                 FontFamily="{StaticResource SfTextMedium}"
-                                Foreground="#FFE8F6FF"
                                 TextAlignment="Center"
                                 TextTrimming="None"
                                 TextWrapping="NoWrap"
-                                Text="Transcribing" />
+                                Text="Transcribing">
+                                <TextBlock.Foreground>
+                                    <LinearGradientBrush StartPoint="-1,0.5" EndPoint="2,0.5">
+                                        <GradientStop x:Name="TranscribingShimmerStop01" Color="#FFB7D7EE" Offset="0" />
+                                        <GradientStop x:Name="TranscribingShimmerStop02" Color="#FFFFFFFF" Offset="0.18" />
+                                        <GradientStop x:Name="TranscribingShimmerStop03" Color="#FFB7D7EE" Offset="0.36" />
+                                    </LinearGradientBrush>
+                                </TextBlock.Foreground>
+                            </TextBlock>
                         </StackPanel>
 
                         <TextBlock

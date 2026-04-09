@@ -5,7 +5,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
-using UnicodeAnimations.Models;
 using Veil.Interop;
 using WinRT;
 using static Veil.Interop.NativeMethods;
@@ -41,21 +40,18 @@ public sealed partial class DictationOverlayWindow : Window
     private const int OverlayUniformWidth = 216;
     private const int OverlayStatusChromeWidth = 80;
     private const double StatusTextDefaultFontSize = 12.5;
-    private const double TranscribingWaveFontSize = 13;
-    private static readonly Spinner TranscribingWaveAnimation = SpinnerRegistry.All.First(static entry => entry.Name == "waverows").Spinner;
     private readonly DispatcherTimer _spectrumTimer;
-    private readonly DispatcherTimer _transcribingWaveTimer;
     private readonly Border[] _spectrumBars;
     private readonly Random _random = new();
     private DesktopAcrylicController? _acrylicController;
     private SystemBackdropConfiguration? _backdropConfig;
     private IntPtr _hwnd;
     private int _animationStep;
-    private int _transcribingWaveFrameIndex;
     private bool _useLiveSpectrum;
     private string _dismissHoverHex = "#26FFFFFF";
     private OverlayCenterMode _centerMode = OverlayCenterMode.Spectrum;
     private int _overlayWidth = OverlayUniformWidth;
+    private Storyboard? _transcribingShimmerStoryboard;
 
     internal event Action? DismissRequested;
 
@@ -79,14 +75,9 @@ public sealed partial class DictationOverlayWindow : Window
             Interval = TimeSpan.FromMilliseconds(90)
         };
         _spectrumTimer.Tick += OnSpectrumTick;
-        _transcribingWaveTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(TranscribingWaveAnimation.Interval)
-        };
-        _transcribingWaveTimer.Tick += OnTranscribingWaveTick;
-        TranscribingWaveTextBlock.Text = TranscribingWaveAnimation.Frames[0];
         Activated += OnActivated;
         Closed += OnClosed;
+        InitializeTranscribingShimmerAnimation();
     }
 
     private void OnActivated(object sender, WindowActivatedEventArgs args)
@@ -110,7 +101,7 @@ public sealed partial class DictationOverlayWindow : Window
     private void OnClosed(object sender, WindowEventArgs args)
     {
         _spectrumTimer.Stop();
-        _transcribingWaveTimer.Stop();
+        StopTranscribingWaveAnimation();
         _acrylicController?.Dispose();
         _acrylicController = null;
         _backdropConfig = null;
@@ -227,17 +218,6 @@ public sealed partial class DictationOverlayWindow : Window
         }
     }
 
-    private void OnTranscribingWaveTick(object? sender, object e)
-    {
-        if (_centerMode != OverlayCenterMode.TranscribingWave)
-        {
-            return;
-        }
-
-        _transcribingWaveFrameIndex = (_transcribingWaveFrameIndex + 1) % TranscribingWaveAnimation.Frames.Length;
-        TranscribingWaveTextBlock.Text = TranscribingWaveAnimation.Frames[_transcribingWaveFrameIndex];
-    }
-
     private void ApplyVisualState(string title, int availableWidth)
     {
         string backgroundHex = "#88131B22";
@@ -305,8 +285,6 @@ public sealed partial class DictationOverlayWindow : Window
         PanelBorder.Background = CreateBrush(backgroundHex);
         PanelBorder.BorderBrush = CreateBrush("#00000000");
         StatusTextBlock.Foreground = CreateBrush(foregroundHex);
-        TranscribingLabelTextBlock.Foreground = CreateBrush(foregroundHex);
-        TranscribingWaveTextBlock.Foreground = CreateBrush(accentHex);
         DismissIconPath.Stroke = CreateBrush(buttonForegroundHex);
         ListeningIconBodyPath.Stroke = CreateBrush(foregroundHex);
         ListeningIconStemPath.Stroke = CreateBrush(foregroundHex);
@@ -343,7 +321,6 @@ public sealed partial class DictationOverlayWindow : Window
         ContentGrid.Width = metrics.ContentWidth;
         StatusTextBlock.FontSize = StatusTextDefaultFontSize;
         TranscribingLabelTextBlock.FontSize = StatusTextDefaultFontSize;
-        TranscribingWaveTextBlock.FontSize = TranscribingWaveFontSize;
         StatusTextBlock.MaxWidth = Math.Max(0, metrics.ContentWidth - OverlayContentChromeWidth);
     }
 
@@ -484,16 +461,14 @@ public sealed partial class DictationOverlayWindow : Window
 
     private void StartTranscribingWaveAnimation()
     {
-        _transcribingWaveFrameIndex = 0;
-        TranscribingWaveTextBlock.Text = TranscribingWaveAnimation.Frames[_transcribingWaveFrameIndex];
-        _transcribingWaveTimer.Start();
+        ResetTranscribingShimmerOffsets();
+        _transcribingShimmerStoryboard?.Begin();
     }
 
     private void StopTranscribingWaveAnimation()
     {
-        _transcribingWaveTimer.Stop();
-        _transcribingWaveFrameIndex = 0;
-        TranscribingWaveTextBlock.Text = TranscribingWaveAnimation.Frames[_transcribingWaveFrameIndex];
+        _transcribingShimmerStoryboard?.Stop();
+        ResetTranscribingShimmerOffsets();
     }
 
     private void AnimateStateTransition()
@@ -564,6 +539,42 @@ public sealed partial class DictationOverlayWindow : Window
             textBlock.FontSize = previousFontSize;
             textBlock.MaxWidth = previousMaxWidth;
         }
+    }
+
+    private void InitializeTranscribingShimmerAnimation()
+    {
+        var storyboard = new Storyboard
+        {
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+
+        storyboard.Children.Add(CreateShimmerAnimation(TranscribingShimmerStop01, -1.2, 1.8, 1100));
+        storyboard.Children.Add(CreateShimmerAnimation(TranscribingShimmerStop02, -1.0, 2.0, 1100));
+        storyboard.Children.Add(CreateShimmerAnimation(TranscribingShimmerStop03, -0.8, 2.2, 1100));
+
+        _transcribingShimmerStoryboard = storyboard;
+    }
+
+    private static DoubleAnimation CreateShimmerAnimation(DependencyObject target, double from, double to, int durationMs)
+    {
+        var animation = new DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = TimeSpan.FromMilliseconds(durationMs),
+            EnableDependentAnimation = true
+        };
+
+        Storyboard.SetTarget(animation, target);
+        Storyboard.SetTargetProperty(animation, "Offset");
+        return animation;
+    }
+
+    private void ResetTranscribingShimmerOffsets()
+    {
+        TranscribingShimmerStop01.Offset = 0;
+        TranscribingShimmerStop02.Offset = 0.18;
+        TranscribingShimmerStop03.Offset = 0.36;
     }
 
 }
