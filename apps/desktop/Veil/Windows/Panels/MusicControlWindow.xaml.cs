@@ -1028,42 +1028,42 @@ public sealed partial class MusicControlWindow : Window
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(236, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(245, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(248, 255, 255, 255));
     }
 
     private SolidColorBrush CreateArtistBrush()
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(176, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(190, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(214, 255, 255, 255));
     }
 
     private SolidColorBrush CreateIconBrush()
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(228, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(238, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(245, 255, 255, 255));
     }
 
     private SolidColorBrush CreateIconMutedBrush()
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(128, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(125, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(184, 255, 255, 255));
     }
 
     private SolidColorBrush CreateAccentBrush()
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(224, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(235, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(245, 255, 255, 255));
     }
 
     private SolidColorBrush CreateTimeBrush()
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(156, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(140, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(184, 255, 255, 255));
     }
 
     private SolidColorBrush CreateTrackBackgroundBrush()
