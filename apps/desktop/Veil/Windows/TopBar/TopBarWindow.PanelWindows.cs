@@ -366,12 +366,16 @@ public sealed partial class TopBarWindow
     private void RebuildShortcutButtons()
     {
         ShortcutButtonsPanel.Children.Clear();
+        List<Button> shortcutButtons = [];
 
         foreach (var shortcut in _settings.ShortcutButtons.Where(setting => setting is not null).Cast<AppShortcutSetting>())
         {
-            ShortcutButtonsPanel.Children.Add(CreateShortcutButton(shortcut));
+            Button button = CreateShortcutButton(shortcut);
+            shortcutButtons.Add(button);
+            ShortcutButtonsPanel.Children.Add(button);
         }
 
+        _shortcutButtons = shortcutButtons.ToArray();
         UpdateGlassPanels(true);
         UpdateTopBarLayout();
     }

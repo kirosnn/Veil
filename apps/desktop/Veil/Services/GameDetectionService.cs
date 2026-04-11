@@ -93,6 +93,9 @@ internal sealed class GameDetectionService
     internal bool IsConfiguredGameRunning(IReadOnlyList<string> configuredProcessNames)
         => GameProcessMonitor.IsAnyConfiguredGameRunning(configuredProcessNames);
 
+    internal bool IsConfiguredGameRunning(IReadOnlySet<string> configuredProcessNames)
+        => GameProcessMonitor.IsAnyConfiguredGameRunning(configuredProcessNames);
+
     internal int? TryGetActiveGameProcessId(string detectionMode, IReadOnlyList<string> configuredProcessNames, ScreenBounds screen, IntPtr veilWindowHandle)
     {
         detectionMode = NormalizeDetectionMode(detectionMode);
@@ -183,6 +186,9 @@ internal sealed class GameDetectionService
     }
 
     internal bool IsGameForegroundForScreen(ForegroundProcessInfo processInfo, ScreenBounds screen, IReadOnlyList<string> configuredProcessNames)
+        => IsGameForegroundForScreen(processInfo, screen, GameProcessMonitor.CreateNormalizedProcessNameSet(configuredProcessNames));
+
+    internal bool IsGameForegroundForScreen(ForegroundProcessInfo processInfo, ScreenBounds screen, IReadOnlySet<string> configuredProcessNames)
     {
         if (!IsWindowFullscreenLike(processInfo.WindowRect, screen))
         {
@@ -195,6 +201,9 @@ internal sealed class GameDetectionService
     }
 
     internal int? TryGetForegroundGameProcessIdForScreen(ForegroundProcessInfo processInfo, ScreenBounds screen, IReadOnlyList<string> configuredProcessNames)
+        => TryGetForegroundGameProcessIdForScreen(processInfo, screen, GameProcessMonitor.CreateNormalizedProcessNameSet(configuredProcessNames));
+
+    internal int? TryGetForegroundGameProcessIdForScreen(ForegroundProcessInfo processInfo, ScreenBounds screen, IReadOnlySet<string> configuredProcessNames)
         => IsGameForegroundForScreen(processInfo, screen, configuredProcessNames)
             ? processInfo.ProcessId
             : null;
@@ -202,16 +211,14 @@ internal sealed class GameDetectionService
     internal bool IsForegroundWindowFullscreenForScreen(ForegroundProcessInfo processInfo, ScreenBounds screen)
         => IsWindowFullscreenLike(processInfo.WindowRect, screen);
 
-    private static bool MatchesConfiguredList(string processName, IReadOnlyList<string> configuredProcessNames)
+    private static bool MatchesConfiguredList(string processName, IReadOnlySet<string> configuredProcessNames)
     {
         if (configuredProcessNames.Count == 0)
         {
             return false;
         }
 
-        return configuredProcessNames
-            .Select(GameProcessMonitor.NormalizeProcessName)
-            .Any(configuredName => string.Equals(configuredName, processName, StringComparison.OrdinalIgnoreCase));
+        return configuredProcessNames.Contains(processName);
     }
 
     private void EnsureCatalogRefreshScheduled(bool force)

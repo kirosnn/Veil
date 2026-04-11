@@ -24,6 +24,8 @@ public partial class App : Application
     private int _windowSwitchSelectedIndex = -1;
     private DispatcherTimer? _monitorRefreshTimer;
     private DispatcherTimer? _topBarActivityTimer;
+    private HashSet<string> _normalizedConfiguredGameProcessNames = new(StringComparer.OrdinalIgnoreCase);
+    private IntPtr[] _topBarWindowHandles = [];
     private string _lastTopologySignature = string.Empty;
     private bool _isSyncingTopBars;
     private int _emptyMonitorRefreshCount;
@@ -33,6 +35,7 @@ public partial class App : Application
     {
         InitializeComponent();
         _settings = AppSettings.Current;
+        RefreshCachedGameDetectionConfiguration();
         UnhandledException += OnUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnCurrentDomainUnhandledException;
         _settings.Changed += OnSettingsChanged;
@@ -213,7 +216,13 @@ public partial class App : Application
 
     private void OnSettingsChanged()
     {
+        RefreshCachedGameDetectionConfiguration();
         SyncTopBarWindows();
+    }
+
+    private void RefreshCachedGameDetectionConfiguration()
+    {
+        _normalizedConfiguredGameProcessNames = GameProcessMonitor.CreateNormalizedProcessNameSet(_settings.GameProcessNames);
     }
 
     private void StartMonitorRefresh()
@@ -273,16 +282,11 @@ public partial class App : Application
             }
 
             string detectionMode = GameDetectionService.NormalizeDetectionMode(_settings.GameDetectionMode);
-            IReadOnlyList<string> configuredProcessNames = _settings.GameProcessNames;
-            bool configuredGameRunning = _gameDetectionService.IsConfiguredGameRunning(configuredProcessNames);
-            IntPtr[] ignoredWindows = _topBarWindows.Values
-                .Select(static window => window.WindowHandle)
-                .Where(static handle => handle != IntPtr.Zero)
-                .ToArray();
+            bool configuredGameRunning = _gameDetectionService.IsConfiguredGameRunning(_normalizedConfiguredGameProcessNames);
             GameDetectionService.ForegroundProcessInfo foregroundProcessInfo = default;
 
             bool hasForegroundProcess = detectionMode == GameDetectionService.HybridMode &&
-                _gameDetectionService.TryGetForegroundProcessInfo(ignoredWindows, out foregroundProcessInfo, out _);
+                _gameDetectionService.TryGetForegroundProcessInfo(_topBarWindowHandles, out foregroundProcessInfo, out _);
 
             foreach (TopBarWindow topBarWindow in _topBarWindows.Values)
             {
@@ -297,7 +301,7 @@ public partial class App : Application
                         activeGameProcessId = _gameDetectionService.TryGetForegroundGameProcessIdForScreen(
                             foregroundProcessInfo,
                             topBarWindow.ScreenBounds,
-                            configuredProcessNames);
+                            _normalizedConfiguredGameProcessNames);
                         shouldHideForForegroundWindow = activeGameProcessId.HasValue;
 
                         if (!gameRunning)
@@ -364,8 +368,9 @@ public partial class App : Application
                 return;
             }
 
+            HashSet<string> enabledMonitorIdSet = enabledMonitorIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
             string hotkeyOwnerId = monitors
-                .FirstOrDefault(monitor => monitor.IsPrimary && enabledMonitorIds.Contains(monitor.Id, StringComparer.OrdinalIgnoreCase))?.Id
+                .FirstOrDefault(monitor => monitor.IsPrimary && enabledMonitorIdSet.Contains(monitor.Id))?.Id
                 ?? enabledMonitorIds.FirstOrDefault()
                 ?? monitors[0].Id;
 
@@ -378,7 +383,7 @@ public partial class App : Application
 
             foreach (string existingMonitorId in _topBarWindows.Keys.ToArray())
             {
-                if (enabledMonitorIds.Contains(existingMonitorId, StringComparer.OrdinalIgnoreCase))
+                if (enabledMonitorIdSet.Contains(existingMonitorId))
                 {
                     continue;
                 }
@@ -398,7 +403,7 @@ public partial class App : Application
                 }
             }
 
-            foreach (MonitorInfo2 monitor in monitors.Where(monitor => enabledMonitorIds.Contains(monitor.Id, StringComparer.OrdinalIgnoreCase)))
+            foreach (MonitorInfo2 monitor in monitors.Where(monitor => enabledMonitorIdSet.Contains(monitor.Id)))
             {
                 bool ownsGlobalHotkeys = string.Equals(monitor.Id, hotkeyOwnerId, StringComparison.OrdinalIgnoreCase);
 
@@ -439,6 +444,11 @@ public partial class App : Application
             {
                 _startTopBarsHiddenUntilReady = false;
             }
+
+            _topBarWindowHandles = _topBarWindows.Values
+                .Select(static window => window.WindowHandle)
+                .Where(static handle => handle != IntPtr.Zero)
+                .ToArray();
         }
         catch (Exception ex)
         {
@@ -489,6 +499,7 @@ public partial class App : Application
         }
 
         _topBarWindows.Clear();
+        _topBarWindowHandles = [];
     }
 
     private void InitializeDesktopContextMenu()

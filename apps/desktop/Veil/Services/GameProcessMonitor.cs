@@ -4,26 +4,32 @@ namespace Veil.Services;
 
 internal static class GameProcessMonitor
 {
+    internal static HashSet<string> CreateNormalizedProcessNameSet(IReadOnlyList<string> configuredProcessNames)
+    {
+        if (configuredProcessNames.Count == 0)
+        {
+            return [];
+        }
+
+        return configuredProcessNames
+            .Select(NormalizeProcessName)
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
     internal static bool IsAnyConfiguredGameRunning(IReadOnlyList<string> configuredProcessNames)
+        => IsAnyConfiguredGameRunning(CreateNormalizedProcessNameSet(configuredProcessNames));
+
+    internal static bool IsAnyConfiguredGameRunning(IReadOnlySet<string> configuredProcessNames)
     {
         if (configuredProcessNames.Count == 0)
         {
             return false;
         }
 
-        HashSet<string> configuredNames = configuredProcessNames
-            .Select(NormalizeProcessName)
-            .Where(static name => !string.IsNullOrWhiteSpace(name))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        if (configuredNames.Count == 0)
-        {
-            return false;
-        }
-
         try
         {
-            foreach (string configuredName in configuredNames)
+            foreach (string configuredName in configuredProcessNames)
             {
                 Process[] matchingProcesses = Process.GetProcessesByName(configuredName);
                 foreach (Process process in matchingProcesses)

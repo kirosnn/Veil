@@ -115,7 +115,7 @@ public sealed partial class TopBarWindow
         AddElementRegion(regions, ClockText, paddingX: 1, paddingY: 1);
         AddElementRegion(regions, ShortcutGlass, paddingX: 0, paddingY: 0);
 
-        foreach (Button shortcutButton in ShortcutButtonsPanel.Children.OfType<Button>())
+        foreach (Button shortcutButton in _shortcutButtons)
         {
             AddContentRegion(regions, shortcutButton, useElementBounds: true, paddingX: 8, paddingY: 5);
         }

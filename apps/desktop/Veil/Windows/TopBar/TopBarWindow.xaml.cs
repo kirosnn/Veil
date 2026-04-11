@@ -78,6 +78,7 @@ public sealed partial class TopBarWindow : Window
     private readonly WeatherService _weatherService = new();
     private RunCatService? _runCatService;
     private readonly GamePerformanceService _gamePerformanceService;
+    private Button[] _shortcutButtons = [];
     private ImageSource?[]? _runCatFrames;
     private int _runCatLoadVersion;
     private int _musicAlbumArtLoadVersion;
@@ -501,8 +502,7 @@ public sealed partial class TopBarWindow : Window
         FinderButton.MaxWidth = finderMaxWidth;
         FinderButtonText.MaxWidth = Math.Max(24, finderMaxWidth - FinderButton.Padding.Left - FinderButton.Padding.Right);
 
-        Button[] shortcutButtons = ShortcutButtonsPanel.Children.OfType<Button>().ToArray();
-        if (shortcutButtons.Length == 0)
+        if (_shortcutButtons.Length == 0)
         {
             ShortcutButtonsPanel.MaxWidth = 0;
             return;
@@ -515,11 +515,11 @@ public sealed partial class TopBarWindow : Window
 
         double availablePerButtonWidth = Math.Max(
             0,
-            (availableShortcutWidth - (Math.Max(0, shortcutButtons.Length - 1) * ShortcutButtonsPanel.Spacing)) / shortcutButtons.Length);
+            (availableShortcutWidth - (Math.Max(0, _shortcutButtons.Length - 1) * ShortcutButtonsPanel.Spacing)) / _shortcutButtons.Length);
         double buttonMaxWidth = Math.Min(130, availablePerButtonWidth);
         double textMaxWidth = Math.Max(0, buttonMaxWidth - 20);
 
-        foreach (Button button in shortcutButtons)
+        foreach (Button button in _shortcutButtons)
         {
             button.MaxWidth = buttonMaxWidth;
 

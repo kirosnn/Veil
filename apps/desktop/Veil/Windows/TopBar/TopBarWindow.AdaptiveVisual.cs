@@ -229,7 +229,7 @@ public sealed partial class TopBarWindow
         FinderButton.Resources["ButtonBackgroundPressed"] = new SolidColorBrush(global::Windows.UI.Color.FromArgb(28, foregroundColor.R, foregroundColor.G, foregroundColor.B));
 
         FinderButton.CornerRadius = new CornerRadius(11);
-        foreach (Button shortcutButton in ShortcutButtonsPanel.Children.OfType<Button>())
+        foreach (Button shortcutButton in _shortcutButtons)
         {
             var fc = foregroundColor;
             shortcutButton.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(
