@@ -134,7 +134,6 @@ public sealed partial class SystemStatsWindow : Window
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
-
         PanelBorder.Background = PanelGlassPalette.CreateFrameBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 10);
     }
 
@@ -527,21 +526,21 @@ public sealed partial class SystemStatsWindow : Window
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(lightAlpha, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(darkAlpha, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb((byte)Math.Max((int)darkAlpha, 214), 255, 255, 255));
     }
 
     private SolidColorBrush CreateValueBrush(byte darkAlpha, byte lightAlpha)
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(lightAlpha, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(darkAlpha, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb((byte)Math.Max((int)darkAlpha, 248), 255, 255, 255));
     }
 
     private SolidColorBrush CreateSubValueBrush(byte darkAlpha, byte lightAlpha)
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(lightAlpha, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(darkAlpha, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb((byte)Math.Max((int)darkAlpha, 184), 255, 255, 255));
     }
 
     private SolidColorBrush CreateBarBackgroundBrush()
