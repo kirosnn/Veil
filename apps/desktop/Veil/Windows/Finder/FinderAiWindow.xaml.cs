@@ -174,10 +174,10 @@ public sealed partial class FinderAiWindow : Window
 
         _acrylicController = new DesktopAcrylicController
         {
-            TintColor = global::Windows.UI.Color.FromArgb(245, 14, 18, 26),
-            TintOpacity = 0.22f,
-            LuminosityOpacity = 0.12f,
-            FallbackColor = global::Windows.UI.Color.FromArgb(225, 12, 16, 22)
+            TintColor = global::Windows.UI.Color.FromArgb(255, 30, 36, 46),
+            TintOpacity = 0.18f,
+            LuminosityOpacity = 0.58f,
+            FallbackColor = global::Windows.UI.Color.FromArgb(216, 20, 25, 32)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
@@ -188,6 +188,9 @@ public sealed partial class FinderAiWindow : Window
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
+        PanelBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, 255, 255, 255));
+        PanelBorder.BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, 255, 255, 255));
+        PanelBorder.BorderThickness = new Thickness(1);
     }
 
     private async Task InitializeWebViewAsync()
