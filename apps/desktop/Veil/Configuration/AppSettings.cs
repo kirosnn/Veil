@@ -60,6 +60,7 @@ internal sealed partial class AppSettings
     private string[] _gameProcessNames = [];
     private bool _backgroundOptimizationEnabled = true;
     private bool _systemPowerBoostEnabled = true;
+    private bool _quietLaptopOutsideGamesEnabled = true;
     private string _topBarDisplayMode = "Primary";
     private string[] _topBarMonitorIds = [];
     private bool _showAppButtonOutline = true;
