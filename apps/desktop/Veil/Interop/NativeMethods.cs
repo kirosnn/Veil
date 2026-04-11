@@ -255,6 +255,43 @@ internal static partial class NativeMethods
     [DllImport("dwmapi.dll")]
     internal static extern int DwmEnableBlurBehindWindow(IntPtr hwnd, ref DwmBlurBehind pBlurBehind);
 
+    internal enum WindowCompositionAttribute
+    {
+        WcaAccentPolicy = 19
+    }
+
+    internal enum AccentState
+    {
+        Disabled = 0,
+        EnableGradient = 1,
+        EnableTransparentGradient = 2,
+        EnableBlurBehind = 3,
+        EnableAcrylicBlurBehind = 4
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct AccentPolicy
+    {
+        public AccentState AccentState;
+        public int AccentFlags;
+        public uint GradientColor;
+        public int AnimationId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct WindowCompositionAttributeData
+    {
+        public WindowCompositionAttribute Attribute;
+        public IntPtr Data;
+        public int SizeOfData;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetWindowCompositionAttribute(
+        IntPtr hwnd,
+        ref WindowCompositionAttributeData data);
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool GetClientRect(IntPtr hWnd, out Rect lpRect);
