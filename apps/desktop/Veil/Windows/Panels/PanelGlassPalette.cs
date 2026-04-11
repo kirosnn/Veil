@@ -9,24 +9,24 @@ internal static class PanelGlassPalette
     {
         return useLightTheme
             ? global::Windows.UI.Color.FromArgb(255, 255, 255, 255)
-            : global::Windows.UI.Color.FromArgb(255, 28, 28, 34);
+            : global::Windows.UI.Color.FromArgb(255, 34, 40, 50);
     }
 
     internal static float GetAcrylicTintOpacity(bool useLightTheme)
     {
-        return useLightTheme ? 0.06f : 0.12f;
+        return useLightTheme ? 0.06f : 0.16f;
     }
 
     internal static float GetAcrylicLuminosityOpacity(bool useLightTheme)
     {
-        return useLightTheme ? 0.78f : 0.32f;
+        return useLightTheme ? 0.78f : 0.56f;
     }
 
     internal static global::Windows.UI.Color GetAcrylicFallbackColor(bool useLightTheme)
     {
         return useLightTheme
             ? global::Windows.UI.Color.FromArgb(216, 255, 255, 255)
-            : global::Windows.UI.Color.FromArgb(56, 28, 28, 34);
+            : global::Windows.UI.Color.FromArgb(214, 22, 27, 34);
     }
 
     internal static SystemBackdropTheme GetBackdropTheme(bool useLightTheme)
