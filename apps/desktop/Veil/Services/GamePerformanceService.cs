@@ -1051,7 +1051,7 @@ internal sealed class GamePerformanceService : IDisposable
 
     private void RefreshBackgroundPowerProfile()
     {
-        if (ShouldUseLaptopBatteryQuietProfile())
+        if (ShouldUseLaptopQuietProfileOutsideGames())
         {
             if (_powerProfileService.TryApplyQuietProfile())
             {
@@ -1061,25 +1061,24 @@ internal sealed class GamePerformanceService : IDisposable
             return;
         }
 
-        if (_powerProfileService.IsLaptopDevice && _powerProfileService.IsOnAcPowerNow)
-        {
-            RefreshSystemPowerBoost(forGameMode: false);
-            return;
-        }
-
         ReleaseSystemPowerBoostIfIdle();
     }
 
     private bool ShouldPreferQuietBackgroundPower()
     {
-        return ShouldUseLaptopBatteryQuietProfile();
+        return ShouldUseLaptopQuietProfileOutsideGames();
     }
 
-    private bool ShouldUseLaptopBatteryQuietProfile()
+    internal static bool ShouldUseLaptopQuietProfileOutsideGames(bool quietLaptopOutsideGamesEnabled, bool isLaptopDevice)
     {
-        return AppSettings.Current.QuietLaptopOutsideGamesEnabled &&
-            _powerProfileService.IsLaptopDevice &&
-            !_powerProfileService.IsOnAcPowerNow;
+        return quietLaptopOutsideGamesEnabled && isLaptopDevice;
+    }
+
+    private bool ShouldUseLaptopQuietProfileOutsideGames()
+    {
+        return ShouldUseLaptopQuietProfileOutsideGames(
+            AppSettings.Current.QuietLaptopOutsideGamesEnabled,
+            _powerProfileService.IsLaptopDevice);
     }
 
     private void CloseXboxProcessesOutsideGames()

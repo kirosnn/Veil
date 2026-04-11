@@ -77,7 +77,7 @@ public sealed partial class TopBarWindow : Window
     private readonly MediaControlService _mediaControlService = new();
     private readonly WeatherService _weatherService = new();
     private RunCatService? _runCatService;
-    private readonly GamePerformanceService _gamePerformanceService = new();
+    private readonly GamePerformanceService _gamePerformanceService;
     private ImageSource?[]? _runCatFrames;
     private int _runCatLoadVersion;
     private int _musicAlbumArtLoadVersion;
@@ -100,10 +100,11 @@ public sealed partial class TopBarWindow : Window
     private DateTime _lastBackgroundMaintenanceBoostUtc = DateTime.MinValue;
     private double _lastAppliedBlurIntensity = -1;
 
-    internal TopBarWindow(string monitorId, ScreenBounds screen, bool ownsGlobalHotkeys, bool startHiddenUntilReady = false)
+    internal TopBarWindow(string monitorId, ScreenBounds screen, GamePerformanceService gamePerformanceService, bool ownsGlobalHotkeys, bool startHiddenUntilReady = false)
     {
         _monitorId = monitorId;
         _screen = screen;
+        _gamePerformanceService = gamePerformanceService;
         _settings = AppSettings.Current;
         _startHiddenUntilReady = startHiddenUntilReady;
         _ownsGlobalHotkeys = ownsGlobalHotkeys;
@@ -226,7 +227,6 @@ public sealed partial class TopBarWindow : Window
         DisposeDictationHotkey();
         _runCatService?.Dispose();
         _gamePerformanceService.RestoreNormalOptimizations();
-        _gamePerformanceService.Dispose();
         _runCatService = null;
         if (_appBarRegistered)
         {

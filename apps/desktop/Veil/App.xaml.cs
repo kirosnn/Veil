@@ -13,6 +13,7 @@ public partial class App : Application
     private static readonly TimeSpan TopBarActivityInterval = TimeSpan.FromMilliseconds(1000);
     private readonly AppSettings _settings;
     private readonly GameDetectionService _gameDetectionService = new();
+    private readonly GamePerformanceService _gamePerformanceService = new();
     private readonly Dictionary<string, TopBarWindow> _topBarWindows = new(StringComparer.OrdinalIgnoreCase);
     private DesktopIconVisibilityService? _desktopIconVisibilityService;
     private DesktopContextMenuService? _desktopContextMenu;
@@ -203,6 +204,8 @@ public partial class App : Application
         _trayIcon?.Dispose();
         _trayIcon = null;
         CloseAllTopBarWindows();
+        _gamePerformanceService.RestoreNormalOptimizations();
+        _gamePerformanceService.Dispose();
         _desktopIconVisibilityService?.RestoreLaunchState();
         _desktopIconVisibilityService = null;
         PerformanceLogger.Stop();
@@ -406,6 +409,7 @@ public partial class App : Application
                         TopBarWindow createdWindow = new(
                             monitor.Id,
                             monitor.ToScreenBounds(),
+                            _gamePerformanceService,
                             ownsGlobalHotkeys,
                             _startTopBarsHiddenUntilReady);
                         createdWindow.Activate();

@@ -33,4 +33,34 @@ public sealed class GamePerformanceServiceTests
         Assert.IsFalse(GamePerformanceService.IsXboxBackgroundProcessName("steam"));
         Assert.IsFalse(GamePerformanceService.IsXboxBackgroundProcessName("widgetservice"));
     }
+
+    [TestMethod]
+    public void ShouldUseLaptopQuietProfileOutsideGames_returns_true_for_laptop_when_enabled()
+    {
+        bool shouldUseQuietProfile = GamePerformanceService.ShouldUseLaptopQuietProfileOutsideGames(
+            quietLaptopOutsideGamesEnabled: true,
+            isLaptopDevice: true);
+
+        Assert.IsTrue(shouldUseQuietProfile);
+    }
+
+    [TestMethod]
+    public void ShouldUseLaptopQuietProfileOutsideGames_returns_false_when_disabled()
+    {
+        bool shouldUseQuietProfile = GamePerformanceService.ShouldUseLaptopQuietProfileOutsideGames(
+            quietLaptopOutsideGamesEnabled: false,
+            isLaptopDevice: true);
+
+        Assert.IsFalse(shouldUseQuietProfile);
+    }
+
+    [TestMethod]
+    public void ShouldUseLaptopQuietProfileOutsideGames_returns_false_for_desktop_devices()
+    {
+        bool shouldUseQuietProfile = GamePerformanceService.ShouldUseLaptopQuietProfileOutsideGames(
+            quietLaptopOutsideGamesEnabled: true,
+            isLaptopDevice: false);
+
+        Assert.IsFalse(shouldUseQuietProfile);
+    }
 }

@@ -104,9 +104,7 @@ internal sealed class WindowsPowerProfileService : IDisposable
 
     internal static Guid ResolveQuietSchemeGuid(bool onAcPower)
     {
-        return onAcPower
-            ? BalancedScheme
-            : PowerSaverScheme;
+        return PowerSaverScheme;
     }
 
     internal static Guid ResolveQuietSchemeGuid(bool onAcPower, int logicalProcessorCount, double totalMemoryGb)
@@ -123,7 +121,7 @@ internal sealed class WindowsPowerProfileService : IDisposable
     {
         if (onAcPower)
         {
-            return BalancedScheme;
+            return PowerSaverScheme;
         }
 
         bool constrainedCpu = hardwareProfile.LogicalProcessorCount <= 6;

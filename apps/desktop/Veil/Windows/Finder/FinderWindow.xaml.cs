@@ -27,6 +27,7 @@ public sealed partial class FinderWindow : Window
     private const int MaxVisibleResults = 200;
     private static readonly TimeSpan SessionKeepAliveDuration = TimeSpan.FromMinutes(10);
     private static readonly CornerRadius RowCornerRadius = new(14);
+    private static FinderSessionSnapshot? s_lastSessionSnapshot;
 
     private static readonly SolidColorBrush TransparentBrush = new(Colors.Transparent);
     private static readonly SolidColorBrush SelectedBrush = new(
@@ -67,15 +68,18 @@ public sealed partial class FinderWindow : Window
     private string[] _fallbackActions = [];
     private bool _isLoadingApps;
     private bool _showRequested;
+    private bool _persistSessionStateOnClose = true;
     private string _pendingQuery = string.Empty;
     private DateTime _openedAtUtc;
     private DateTime _sessionKeepAliveUntilUtc = DateTime.MinValue;
     private int _selectedIndex = -1;
     private double _retainedVerticalOffset;
+    private int _retainedSelectedIndex = -1;
     private int _retainedSearchSelectionStart;
     private int _retainedSearchSelectionLength;
     private Button[]? _cachedAppRows;
     private FinderAiWindow? _aiWindow;
+    private bool _shouldRestoreRetainedViewport;
 
     // Pooled scoring buffer to avoid allocations per keystroke
     private (FinderEntry entry, int score)[] _scoreBuffer = [];
@@ -205,6 +209,7 @@ public sealed partial class FinderWindow : Window
         ApplyWindowSize();
         if (!resumeSession)
         {
+            ClearRetainedSessionState();
             SearchTextBox.Text = string.Empty;
             UpdatePlaceholder();
 
@@ -217,10 +222,11 @@ public sealed partial class FinderWindow : Window
         }
         else
         {
+            RestoreCachedSessionState();
             UpdatePlaceholder();
             if (_allEntries.Length > 0)
             {
-                RebuildResults(preserveSelection: true);
+                ApplyFilter(SearchTextBox.Text);
                 UpdateStatusBar();
                 RestoreRetainedViewport();
             }
@@ -257,8 +263,10 @@ public sealed partial class FinderWindow : Window
     {
         _debounceTimer.Stop();
         _retainedVerticalOffset = ResultsScrollViewer.VerticalOffset;
+        _retainedSelectedIndex = _selectedIndex;
         _retainedSearchSelectionStart = SearchTextBox.SelectionStart;
         _retainedSearchSelectionLength = SearchTextBox.SelectionLength;
+        CacheSessionState();
         // Detach cached rows so they can be re-added on next show
         if (ReferenceEquals(_displayedEntries, _appEntries) && _cachedAppRows is not null)
         {
@@ -298,6 +306,7 @@ public sealed partial class FinderWindow : Window
 
     internal void Destroy()
     {
+        _persistSessionStateOnClose = false;
         CancelSessionKeepAlive();
         _sessionKeepAliveTimer.Stop();
         _debounceTimer.Stop();
@@ -313,8 +322,12 @@ public sealed partial class FinderWindow : Window
     {
         _debounceTimer.Stop();
         _sessionKeepAliveTimer.Stop();
+        if (_persistSessionStateOnClose)
+        {
+            CacheSessionState();
+        }
         _sessionKeepAliveUntilUtc = DateTime.MinValue;
-        _retainedVerticalOffset = 0;
+        ClearRetainedSessionState(clearCachedState: false);
     }
 
     private async Task EnsureAppsLoadedAsync()
@@ -379,6 +392,10 @@ public sealed partial class FinderWindow : Window
         }
 
         ApplyFilter(SearchTextBox.Text);
+        if (_shouldRestoreRetainedViewport)
+        {
+            RestoreRetainedViewport();
+        }
     }
 
     private void BuildAutocompleteIndex(FinderEntry[] entries)
@@ -778,8 +795,9 @@ public sealed partial class FinderWindow : Window
         _selectedIndex = -1;
         if (ResultsPanel.Children.Count > 0)
         {
-            int targetIndex = preserveSelection && previousSelectedIndex >= 0
-                ? Math.Min(previousSelectedIndex, ResultsPanel.Children.Count - 1)
+            int retainedIndex = previousSelectedIndex >= 0 ? previousSelectedIndex : _retainedSelectedIndex;
+            int targetIndex = preserveSelection && retainedIndex >= 0
+                ? Math.Min(retainedIndex, ResultsPanel.Children.Count - 1)
                 : 0;
             SetSelectedIndex(targetIndex);
         }
@@ -1421,7 +1439,12 @@ public sealed partial class FinderWindow : Window
 
     private bool ShouldResumeSession()
     {
-        return _sessionKeepAliveUntilUtc > DateTime.UtcNow;
+        if (_sessionKeepAliveUntilUtc > DateTime.UtcNow)
+        {
+            return true;
+        }
+
+        return TryGetCachedSessionSnapshot(out _);
     }
 
     private void OnSessionKeepAliveElapsed(object? sender, object e)
@@ -1434,6 +1457,7 @@ public sealed partial class FinderWindow : Window
 
     private void RestoreRetainedViewport()
     {
+        _shouldRestoreRetainedViewport = false;
         DispatcherQueue.TryEnqueue(() =>
         {
             ResultsScrollViewer.ChangeView(null, _retainedVerticalOffset, null, true);
@@ -1443,4 +1467,66 @@ public sealed partial class FinderWindow : Window
             SearchTextBox.SelectionLength = selectionLength;
         });
     }
+
+    private void CacheSessionState()
+    {
+        s_lastSessionSnapshot = new FinderSessionSnapshot(
+            SearchTextBox.Text,
+            _retainedVerticalOffset,
+            _selectedIndex >= 0 ? _selectedIndex : _retainedSelectedIndex,
+            _retainedSearchSelectionStart,
+            _retainedSearchSelectionLength,
+            DateTime.UtcNow);
+    }
+
+    private void RestoreCachedSessionState()
+    {
+        if (!TryGetCachedSessionSnapshot(out FinderSessionSnapshot snapshot))
+        {
+            ClearRetainedSessionState();
+            return;
+        }
+
+        SearchTextBox.Text = snapshot.Query;
+        _retainedVerticalOffset = snapshot.VerticalOffset;
+        _retainedSelectedIndex = snapshot.SelectedIndex;
+        _retainedSearchSelectionStart = snapshot.SelectionStart;
+        _retainedSearchSelectionLength = snapshot.SelectionLength;
+        _shouldRestoreRetainedViewport = true;
+    }
+
+    private void ClearRetainedSessionState(bool clearCachedState = true)
+    {
+        _retainedVerticalOffset = 0;
+        _retainedSelectedIndex = -1;
+        _retainedSearchSelectionStart = 0;
+        _retainedSearchSelectionLength = 0;
+        _shouldRestoreRetainedViewport = false;
+        if (clearCachedState)
+        {
+            s_lastSessionSnapshot = null;
+        }
+    }
+
+    private static bool TryGetCachedSessionSnapshot(out FinderSessionSnapshot snapshot)
+    {
+        if (s_lastSessionSnapshot is FinderSessionSnapshot cachedSnapshot &&
+            DateTime.UtcNow - cachedSnapshot.CapturedAtUtc <= SessionKeepAliveDuration)
+        {
+            snapshot = cachedSnapshot;
+            return true;
+        }
+
+        s_lastSessionSnapshot = null;
+        snapshot = default;
+        return false;
+    }
+
+    private readonly record struct FinderSessionSnapshot(
+        string Query,
+        double VerticalOffset,
+        int SelectedIndex,
+        int SelectionStart,
+        int SelectionLength,
+        DateTime CapturedAtUtc);
 }

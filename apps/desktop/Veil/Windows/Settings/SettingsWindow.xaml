@@ -597,7 +597,7 @@
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Spacing="2">
                                                 <TextBlock Text="Quiet laptops outside games" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                                <TextBlock Text="If Veil detects a laptop, it keeps max power on AC and stays on a battery profile computed from CPU and RAM without unnecessarily disabling Windows transparency." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
+                                                <TextBlock Text="If Veil detects a laptop, it switches to a distinctly quieter Windows power profile outside games, including on AC power, to reduce fan noise without unnecessarily disabling Windows transparency." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
                                             </StackPanel>
                                             <Button x:Name="QuietLaptopOutsideGamesEnabledButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnQuietLaptopOutsideGamesEnabledButtonClick" Content="Enabled" />
                                         </Grid>

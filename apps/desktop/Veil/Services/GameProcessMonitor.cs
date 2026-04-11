@@ -23,18 +23,19 @@ internal static class GameProcessMonitor
 
         try
         {
-            foreach (Process process in Process.GetProcesses())
+            foreach (string configuredName in configuredNames)
             {
-                try
+                Process[] matchingProcesses = Process.GetProcessesByName(configuredName);
+                foreach (Process process in matchingProcesses)
                 {
-                    if (configuredNames.Contains(NormalizeProcessName(process.ProcessName)))
+                    try
                     {
                         return true;
                     }
-                }
-                finally
-                {
-                    process.Dispose();
+                    finally
+                    {
+                        process.Dispose();
+                    }
                 }
             }
         }

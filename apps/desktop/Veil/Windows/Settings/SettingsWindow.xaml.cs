@@ -19,6 +19,7 @@ internal sealed record MonitorSelectionOption(string Id, string Label, bool IsPr
 public sealed partial class SettingsWindow : Window
 {
     private static readonly TimeSpan SessionKeepAliveDuration = TimeSpan.FromMinutes(10);
+    private static SettingsSessionSnapshot? s_lastSessionSnapshot;
     private readonly ScreenBounds _screen;
     private readonly string _preferredMonitorId;
     private readonly AppSettings _settings;
@@ -32,8 +33,10 @@ public sealed partial class SettingsWindow : Window
     private SystemBackdropConfiguration? _backdropConfig;
     private bool _isInitializing;
     private bool _showRequested;
+    private bool _persistSessionStateOnClose = true;
     private DateTime _openedAtUtc;
     private string _selectedSection = "TopBar";
+    private double _retainedVerticalOffset;
     private bool _useDarkForeground;
     private IReadOnlyList<ShortcutOption> _shortcutOptions =
     [
@@ -224,12 +227,24 @@ public sealed partial class SettingsWindow : Window
         }
 
         _showRequested = false;
+        bool resumeSession = ShouldResumeSession();
         CancelSessionKeepAlive();
         _openedAtUtc = DateTime.UtcNow;
         ApplyWindowSize();
+        if (resumeSession)
+        {
+            RestoreCachedSessionState();
+        }
+        else
+        {
+            ClearRetainedSessionState();
+            UpdateSectionUi();
+            ContentScrollViewer.ChangeView(null, 0, null, true);
+        }
         Activate();
         SetForegroundWindow(WindowHelper.GetHwnd(this));
         ApplyReadableContrast();
+        RestoreRetainedViewport();
         AppLogger.Info("SettingsWindow.ShowCenteredCore completed.");
     }
 
@@ -817,8 +832,10 @@ public sealed partial class SettingsWindow : Window
     {
         if (sender is Button { Tag: string section })
         {
+            _retainedVerticalOffset = 0;
             _selectedSection = section;
             UpdateSectionUi();
+            ContentScrollViewer.ChangeView(null, 0, null, true);
         }
     }
 
@@ -834,6 +851,10 @@ public sealed partial class SettingsWindow : Window
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
+        if (_persistSessionStateOnClose)
+        {
+            CacheSessionState();
+        }
         CancelSessionKeepAlive();
         _sessionKeepAliveTimer.Stop();
         _aiModelCatalogCancellationSource?.Cancel();
@@ -860,6 +881,8 @@ public sealed partial class SettingsWindow : Window
 
     internal void HideWindow(bool keepSessionWarm = true)
     {
+        _retainedVerticalOffset = ContentScrollViewer.VerticalOffset;
+        CacheSessionState();
         if (keepSessionWarm)
         {
             ScheduleSessionKeepAlive();
@@ -877,6 +900,7 @@ public sealed partial class SettingsWindow : Window
 
     internal void Destroy()
     {
+        _persistSessionStateOnClose = false;
         CancelSessionKeepAlive();
         _sessionKeepAliveTimer.Stop();
         Close();
@@ -1941,10 +1965,70 @@ public sealed partial class SettingsWindow : Window
         _sessionKeepAliveTimer.Stop();
     }
 
+    private bool ShouldResumeSession()
+    {
+        return TryGetCachedSessionSnapshot(out _);
+    }
+
     private void OnSessionKeepAliveElapsed(object? sender, object e)
     {
         _sessionKeepAliveTimer.Stop();
         SessionExpired?.Invoke(this, EventArgs.Empty);
         Destroy();
     }
+
+    private void CacheSessionState()
+    {
+        s_lastSessionSnapshot = new SettingsSessionSnapshot(
+            _selectedSection,
+            _retainedVerticalOffset,
+            DateTime.UtcNow);
+    }
+
+    private void RestoreCachedSessionState()
+    {
+        if (!TryGetCachedSessionSnapshot(out SettingsSessionSnapshot snapshot))
+        {
+            ClearRetainedSessionState();
+            return;
+        }
+
+        _selectedSection = snapshot.SelectedSection;
+        _retainedVerticalOffset = snapshot.VerticalOffset;
+        UpdateSectionUi();
+    }
+
+    private void RestoreRetainedViewport()
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            ContentScrollViewer.ChangeView(null, _retainedVerticalOffset, null, true);
+        });
+    }
+
+    private void ClearRetainedSessionState()
+    {
+        _selectedSection = "TopBar";
+        _retainedVerticalOffset = 0;
+        s_lastSessionSnapshot = null;
+    }
+
+    private static bool TryGetCachedSessionSnapshot(out SettingsSessionSnapshot snapshot)
+    {
+        if (s_lastSessionSnapshot is SettingsSessionSnapshot cachedSnapshot &&
+            DateTime.UtcNow - cachedSnapshot.CapturedAtUtc <= SessionKeepAliveDuration)
+        {
+            snapshot = cachedSnapshot;
+            return true;
+        }
+
+        s_lastSessionSnapshot = null;
+        snapshot = default;
+        return false;
+    }
+
+    private readonly record struct SettingsSessionSnapshot(
+        string SelectedSection,
+        double VerticalOffset,
+        DateTime CapturedAtUtc);
 }

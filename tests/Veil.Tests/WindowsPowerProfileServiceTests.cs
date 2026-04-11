@@ -6,17 +6,28 @@ namespace Veil.Tests;
 public sealed class WindowsPowerProfileServiceTests
 {
     [TestMethod]
-    public void ResolveQuietSchemeGuid_returns_balanced_scheme_on_ac_power()
+    public void ResolveQuietSchemeGuid_returns_power_saver_scheme_on_ac_power()
     {
         Guid schemeGuid = WindowsPowerProfileService.ResolveQuietSchemeGuid(onAcPower: true);
 
-        Assert.AreEqual(new Guid("381b4222-f694-41f0-9685-ff5bb260df2e"), schemeGuid);
+        Assert.AreEqual(new Guid("a1841308-3541-4fab-bc81-f71556f20b4a"), schemeGuid);
     }
 
     [TestMethod]
     public void ResolveQuietSchemeGuid_returns_power_saver_scheme_on_battery()
     {
         Guid schemeGuid = WindowsPowerProfileService.ResolveQuietSchemeGuid(onAcPower: false);
+
+        Assert.AreEqual(new Guid("a1841308-3541-4fab-bc81-f71556f20b4a"), schemeGuid);
+    }
+
+    [TestMethod]
+    public void ResolveQuietSchemeGuid_returns_power_saver_scheme_for_high_end_laptop_on_ac_power()
+    {
+        Guid schemeGuid = WindowsPowerProfileService.ResolveQuietSchemeGuid(
+            onAcPower: true,
+            logicalProcessorCount: 16,
+            totalMemoryGb: 32);
 
         Assert.AreEqual(new Guid("a1841308-3541-4fab-bc81-f71556f20b4a"), schemeGuid);
     }
