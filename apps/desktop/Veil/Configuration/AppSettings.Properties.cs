@@ -732,6 +732,21 @@ internal sealed partial class AppSettings
         }
     }
 
+    public bool QuietLaptopOutsideGamesEnabled
+    {
+        get => _quietLaptopOutsideGamesEnabled;
+        set
+        {
+            if (_quietLaptopOutsideGamesEnabled == value)
+            {
+                return;
+            }
+
+            _quietLaptopOutsideGamesEnabled = value;
+            PersistAndNotify();
+        }
+    }
+
     public void SetTopBarMonitorIds(IEnumerable<string> monitorIds)
     {
         string[] normalizedIds = monitorIds
