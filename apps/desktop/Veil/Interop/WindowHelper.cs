@@ -2,8 +2,10 @@ using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.IO;
 using Microsoft.UI;
+using Microsoft.UI.Composition;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using WinRT;
 using WinRT.Interop;
 using static Veil.Interop.NativeMethods;
 
@@ -74,6 +76,37 @@ internal static class WindowHelper
     {
         DisableLayeredTransparency(window);
     }
+
+    internal static void UseTransparentBackdrop(Window window)
+    {
+        PrepareForSystemBackdrop(window);
+
+        IntPtr hwnd = GetHwnd(window);
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var region = CreateRectRgn(-2, -2, -1, -1);
+        var blurBehind = new DwmBlurBehind
+        {
+            dwFlags = DWM_BB_ENABLE | DWM_BB_BLURREGION,
+            fEnable = true,
+            hRgnBlur = region
+        };
+        DwmEnableBlurBehindWindow(hwnd, ref blurBehind);
+        if (region != IntPtr.Zero)
+        {
+            DeleteObject(region);
+        }
+
+        var compositor = new global::Windows.UI.Composition.Compositor();
+        var transparentBrush = compositor.CreateColorBrush(
+            global::Windows.UI.Color.FromArgb(0, 255, 255, 255));
+        var target = window.As<ICompositionSupportsSystemBackdrop>();
+        target.SystemBackdrop = transparentBrush;
+    }
+
 
     internal static void DisableLayeredTransparency(Window window)
     {
