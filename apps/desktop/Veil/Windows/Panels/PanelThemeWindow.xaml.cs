@@ -310,14 +310,14 @@ public sealed partial class PanelThemeWindow : Window
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(230, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(234, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(248, 255, 255, 255));
     }
 
     private SolidColorBrush CreateSecondaryTextBrush()
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(180, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(180, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(214, 255, 255, 255));
     }
 
 }
