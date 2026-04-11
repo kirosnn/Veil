@@ -5,6 +5,7 @@
 
     <Grid Background="Transparent">
         <Border
+            x:Name="PanelBorder"
             Margin="10"
             Background="#080C14"
             CornerRadius="22"
