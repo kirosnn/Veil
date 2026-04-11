@@ -166,10 +166,10 @@ public sealed partial class FinderWindow : Window
 
         _acrylicController = new DesktopAcrylicController
         {
-            TintColor = global::Windows.UI.Color.FromArgb(242, 24, 24, 28),
-            TintOpacity = 0.34f,
-            LuminosityOpacity = 0.12f,
-            FallbackColor = global::Windows.UI.Color.FromArgb(212, 20, 20, 24)
+            TintColor = global::Windows.UI.Color.FromArgb(255, 34, 40, 50),
+            TintOpacity = 0.18f,
+            LuminosityOpacity = 0.58f,
+            FallbackColor = global::Windows.UI.Color.FromArgb(216, 22, 27, 34)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
@@ -180,6 +180,8 @@ public sealed partial class FinderWindow : Window
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
+        PanelBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, 255, 255, 255));
+        PanelBorder.BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, 255, 255, 255));
     }
 
     internal void ShowCentered()
