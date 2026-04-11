@@ -6,6 +6,7 @@ namespace Veil.Services;
 
 internal sealed class LocalSpeechTranscriptionService
 {
+    private const string HelperExecutableName = "veil-speech-cli.exe";
     private static readonly HashSet<string> SupportedModelIds = new(StringComparer.OrdinalIgnoreCase)
     {
         "parakeet-tdt-0.6b-v2",
@@ -104,10 +105,17 @@ internal sealed class LocalSpeechTranscriptionService
         await _helperBinaryGate.WaitAsync(cancellationToken);
         try
         {
+            string? deployedHelperPath = GetDeployedHelperPath();
+            if (deployedHelperPath is not null)
+            {
+                _cachedHelperPath = deployedHelperPath;
+                return deployedHelperPath;
+            }
+
             string? repoRoot = _cachedRepoRoot ??= FindRepoRoot();
             if (repoRoot is null)
             {
-                throw new InvalidOperationException("Veil speech helper source was not found.");
+                throw new InvalidOperationException("Veil speech helper executable was not found in the installed app.");
             }
 
             string manifestPath = Path.Combine(repoRoot, "apps", "desktop", "VeilSpeechCli", "Cargo.toml");
@@ -118,7 +126,7 @@ internal sealed class LocalSpeechTranscriptionService
                 "VeilSpeechCli",
                 "target",
                 "release",
-                "veil-speech-cli.exe");
+                HelperExecutableName);
 
             if (File.Exists(helperPath))
             {
@@ -184,6 +192,23 @@ internal sealed class LocalSpeechTranscriptionService
             }
 
             directory = directory.Parent;
+        }
+
+        return null;
+    }
+
+    private static string? GetDeployedHelperPath()
+    {
+        string baseDirectoryHelperPath = Path.Combine(AppContext.BaseDirectory, HelperExecutableName);
+        if (File.Exists(baseDirectoryHelperPath))
+        {
+            return baseDirectoryHelperPath;
+        }
+
+        string toolsDirectoryHelperPath = Path.Combine(AppContext.BaseDirectory, "Tools", HelperExecutableName);
+        if (File.Exists(toolsDirectoryHelperPath))
+        {
+            return toolsDirectoryHelperPath;
         }
 
         return null;

@@ -75,4 +75,14 @@
     <Exec Command='cargo build --manifest-path "..\VeilSpeechCli\Cargo.toml" --release' />
   </Target>
 
+  <Target Name="CopyVeilSpeechCli"
+          AfterTargets="Build"
+          DependsOnTargets="BuildVeilSpeechCli"
+          Inputs="..\VeilSpeechCli\target\release\veil-speech-cli.exe"
+          Outputs="$(OutDir)veil-speech-cli.exe">
+    <Copy SourceFiles="..\VeilSpeechCli\target\release\veil-speech-cli.exe"
+          DestinationFiles="$(OutDir)veil-speech-cli.exe"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
