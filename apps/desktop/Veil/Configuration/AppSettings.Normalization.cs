@@ -227,7 +227,7 @@ internal sealed partial class AppSettings
 
     private static string InferGlobalPanelTheme(AppSettingsDto dto)
     {
-        if (dto.MusicPanelTheme is "Light" || dto.RunCatPanelTheme is "Light" || dto.WeatherPanelTheme is "Light")
+        if (dto.MusicPanelTheme is "Light" || dto.RunCatPanelTheme is "Light")
         {
             return "Light";
         }
