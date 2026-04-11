@@ -7,7 +7,7 @@
         <Border
             x:Name="PanelBorder"
             Padding="0"
-            Background="#18000000"
+            Background="#10FFFFFF"
             CornerRadius="0">
 
             <Grid Margin="0">
@@ -19,7 +19,7 @@
                 <!-- ══ Sidebar ══ -->
                 <Border
                     Grid.Column="0"
-                    Background="#0A000000"
+                    Background="#08FFFFFF"
                     Padding="16,28,12,28">
                     <StackPanel Spacing="2">
                         <TextBlock
@@ -569,7 +569,7 @@
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Spacing="2">
                                                 <TextBlock Text="Background system care" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                                <TextBlock Text="Keep optimization active outside games to trim memory and calm low-value helpers." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
+                                                <TextBlock Text="Keep optimization active outside games to trim memory, calm low-value helpers, and shut down Xbox background apps when no game is active." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
                                             </StackPanel>
                                             <Button x:Name="BackgroundOptimizationEnabledButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnBackgroundOptimizationEnabledButtonClick" Content="Enabled" />
                                         </Grid>
@@ -586,6 +586,20 @@
                                                 <TextBlock Text="Temporarily switch to a more aggressive performance power plan while gaming on AC power." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
                                             </StackPanel>
                                             <Button x:Name="SystemPowerBoostEnabledButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnSystemPowerBoostEnabledButtonClick" Content="Enabled" />
+                                        </Grid>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="Quiet laptops outside games" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock Text="If Veil detects a laptop, it keeps max power on AC and stays on a battery profile computed from CPU and RAM without unnecessarily disabling Windows transparency." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
+                                            </StackPanel>
+                                            <Button x:Name="QuietLaptopOutsideGamesEnabledButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnQuietLaptopOutsideGamesEnabledButtonClick" Content="Enabled" />
                                         </Grid>
 
                                         <Border Height="1" Background="#08FFFFFF" />
