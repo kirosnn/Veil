@@ -684,14 +684,14 @@ public sealed partial class DiscordNotificationWindow : Window
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(240, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(240, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(248, 255, 255, 255));
     }
 
     private SolidColorBrush CreateSecondaryBrush()
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(160, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(160, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(214, 255, 255, 255));
     }
 
     private void OnOpenDiscordClick(object sender, RoutedEventArgs e)
