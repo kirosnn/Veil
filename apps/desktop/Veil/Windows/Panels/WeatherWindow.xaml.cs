@@ -674,12 +674,12 @@ public sealed partial class WeatherWindow : Window
         WindowHelper.ApplyRoundedRegion(_hwnd, metrics.Bounds.Width, metrics.Bounds.Height, PanelCornerRadius);
     }
 
-    private SolidColorBrush CreatePanelBackgroundBrush()
+    private Brush CreatePanelBackgroundBrush()
     {
         return PanelGlassPalette.CreateFrameBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 10);
     }
 
-    private SolidColorBrush CreateCardBackgroundBrush()
+    private Brush CreateCardBackgroundBrush()
     {
         return PanelGlassPalette.CreateCardBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 18);
     }
@@ -688,21 +688,21 @@ public sealed partial class WeatherWindow : Window
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(230, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(234, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(248, 255, 255, 255));
     }
 
     private SolidColorBrush CreateSecondaryTextBrush()
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(180, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(170, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(214, 255, 255, 255));
     }
 
     private SolidColorBrush CreateTertiaryTextBrush()
     {
         return UseLightTheme
             ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(132, 0, 0, 0))
-            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(128, 255, 255, 255));
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(184, 255, 255, 255));
     }
 
     private SolidColorBrush CreateAccentTextBrush()
