@@ -17,14 +17,18 @@ internal sealed class GamePerformanceService : IDisposable
     private static readonly TimeSpan PressureReliefMinimumInterval = TimeSpan.FromSeconds(45);
     private static readonly TimeSpan PressureTempCleanupMinimumInterval = TimeSpan.FromMinutes(20);
     private static readonly TimeSpan PressureTempFileMinimumAge = TimeSpan.FromHours(3);
-    private static readonly TimeSpan WorkingSetTrimMinimumInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan WorkingSetTrimMinimumInterval = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan PressureCandidateMinimumAge = TimeSpan.FromMinutes(3);
     private static readonly TimeSpan SystemPowerBoostMinimumHoldDuration = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan XboxCleanupMinimumInterval = TimeSpan.FromSeconds(75);
     private const double CpuPressureThresholdPercent = 78;
     private const double BackgroundCpuPressureThresholdPercent = 90;
-    private const int MemoryPressureThresholdPercent = 84;
-    private const int BackgroundMemoryPressureThresholdPercent = 88;
+    private const int MemoryPressureThresholdPercent = 82;
+    private const int BackgroundMemoryPressureThresholdPercent = 86;
     private const int SevereMemoryPressureThresholdPercent = 92;
+    private const int AvailableMemoryPressureThresholdMb = 4096;
+    private const int BackgroundAvailableMemoryPressureThresholdMb = 3072;
+    private const int SevereAvailableMemoryThresholdMb = 2048;
     private static readonly string[] VoiceAndStreamingProcesses =
     [
         "discord",
@@ -111,6 +115,12 @@ internal sealed class GamePerformanceService : IDisposable
         "update",
         "updater"
     ];
+    private static readonly string[] GameSuspendableProcessNames =
+    [
+        "widgetservice",
+        "widgetboard",
+        "widgets"
+    ];
 
     private bool _veilGameOptimizationsApplied;
     private ProcessPriorityClass _veilOriginalPriorityClass = ProcessPriorityClass.Normal;
@@ -118,6 +128,7 @@ internal sealed class GamePerformanceService : IDisposable
     private int? _boostedGameProcessId;
     private ProcessPriorityClass _boostedGameOriginalPriorityClass = ProcessPriorityClass.Normal;
     private readonly Dictionary<int, ProcessPriorityClass> _boostedCompanionProcesses = [];
+    private readonly Dictionary<string, ManagedProcessRestoreInfo> _suspendedGameProcesses = new(StringComparer.OrdinalIgnoreCase);
     private DateTime _lastCompanionRefreshUtc = DateTime.MinValue;
     private Task? _tempCleanupTask;
     private DateTime _lastTempCleanupUtc = DateTime.MinValue;
@@ -126,6 +137,7 @@ internal sealed class GamePerformanceService : IDisposable
     private DateTime _lastWorkingSetTrimUtc = DateTime.MinValue;
     private DateTime _lastBackgroundMaintenanceUtc = DateTime.MinValue;
     private DateTime _lastSystemPowerBoostUtc = DateTime.MinValue;
+    private DateTime _lastXboxCleanupUtc = DateTime.MinValue;
     private readonly int _currentSessionId = GetCurrentSessionId();
     private readonly PerformanceCounter? _cpuCounter = CreateCpuCounter();
     private readonly WindowsPowerProfileService _powerProfileService = new();
@@ -135,9 +147,10 @@ internal sealed class GamePerformanceService : IDisposable
     {
         lock (_syncRoot)
         {
-            ApplyVeilOptimizations();
+            ApplyVeilOptimizations(forGameMode: true);
             RefreshSystemPowerBoost(forGameMode: true);
             RefreshCompanionProcessPriorities();
+            SuspendGameBackgroundProcesses(activeGameProcessId);
             RelieveSystemPressure(activeGameProcessId);
 
             if (_boostedGameProcessId == activeGameProcessId)
@@ -177,10 +190,12 @@ internal sealed class GamePerformanceService : IDisposable
         {
             RestoreBoostedGamePriority();
             RestoreCompanionProcessPriorities();
+            RestoreSuspendedGameProcesses();
             _lastCompanionRefreshUtc = DateTime.MinValue;
 
-            ApplyVeilOptimizations();
-            ReleaseSystemPowerBoostIfIdle();
+            ApplyVeilOptimizations(forGameMode: false);
+            RefreshBackgroundPowerProfile();
+            CloseXboxProcessesOutsideGames();
             PerformBackgroundMaintenance();
         }
     }
@@ -191,12 +206,15 @@ internal sealed class GamePerformanceService : IDisposable
         {
             RestoreBoostedGamePriority();
             RestoreCompanionProcessPriorities();
+            RestoreSuspendedGameProcesses();
             _lastCompanionRefreshUtc = DateTime.MinValue;
             _lastPressureReliefUtc = DateTime.MinValue;
             _lastWorkingSetTrimUtc = DateTime.MinValue;
             _lastBackgroundMaintenanceUtc = DateTime.MinValue;
             _lastSystemPowerBoostUtc = DateTime.MinValue;
+            _lastXboxCleanupUtc = DateTime.MinValue;
             _powerProfileService.RestoreOriginalProfile();
+            CloseXboxProcessesOutsideGames();
 
             if (!_veilGameOptimizationsApplied)
             {
@@ -224,7 +242,7 @@ internal sealed class GamePerformanceService : IDisposable
         _cpuCounter?.Dispose();
     }
 
-    private void ApplyVeilOptimizations()
+    private void ApplyVeilOptimizations(bool forGameMode)
     {
         if (_veilGameOptimizationsApplied)
         {
@@ -236,8 +254,13 @@ internal sealed class GamePerformanceService : IDisposable
             using Process currentProcess = Process.GetCurrentProcess();
             _veilOriginalPriorityClass = currentProcess.PriorityClass;
             _veilOriginalPriorityBoostEnabled = currentProcess.PriorityBoostEnabled;
-            currentProcess.PriorityBoostEnabled = false;
-            currentProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
+
+            if (forGameMode)
+            {
+                currentProcess.PriorityBoostEnabled = false;
+                currentProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
+            }
+
             SetProcessWorkingSetSize(currentProcess.Handle, new IntPtr(-1), new IntPtr(-1));
         }
         catch
@@ -278,39 +301,51 @@ internal sealed class GamePerformanceService : IDisposable
 
         _lastBackgroundMaintenanceUtc = nowUtc;
         ScheduleTempCleanup();
+        CloseXboxProcessesOutsideGames();
 
         if (!TryGetPressureSnapshot(out SystemPressureSnapshot snapshot))
         {
-            ReleaseSystemPowerBoostIfIdle();
+            RefreshBackgroundPowerProfile();
             return;
         }
 
         if (snapshot.CpuPercent < BackgroundCpuPressureThresholdPercent &&
-            snapshot.MemoryUsedPercent < BackgroundMemoryPressureThresholdPercent)
+            snapshot.MemoryUsedPercent < BackgroundMemoryPressureThresholdPercent &&
+            snapshot.AvailableMemoryMb > BackgroundAvailableMemoryPressureThresholdMb)
         {
-            ReleaseSystemPowerBoostIfIdle();
+            RefreshBackgroundPowerProfile();
             return;
         }
 
-        RefreshSystemPowerBoost(forGameMode: false);
+        if (ShouldPreferQuietBackgroundPower())
+        {
+            RefreshBackgroundPowerProfile();
+        }
+        else
+        {
+            RefreshSystemPowerBoost(forGameMode: false);
+        }
 
         int trimmedProcesses = 0;
         if (nowUtc - _lastWorkingSetTrimUtc >= WorkingSetTrimMinimumInterval)
         {
-            trimmedProcesses = TrimBackgroundWorkingSets(null, snapshot.MemoryUsedPercent >= SevereMemoryPressureThresholdPercent ? 8 : 4);
+            trimmedProcesses = TrimBackgroundWorkingSets(
+                null,
+                GetBackgroundTrimTarget(snapshot),
+                GetTrimWorkingSetThresholdBytes(snapshot));
             _lastWorkingSetTrimUtc = nowUtc;
         }
 
         bool scheduledTempCleanup = SchedulePressureTempCleanup();
         int closedProcesses = 0;
 
-        if (snapshot.MemoryUsedPercent >= SevereMemoryPressureThresholdPercent)
+        if (snapshot.IsSevereMemoryPressure)
         {
             TryCompactMemory();
 
             if (nowUtc - _lastPressureReliefUtc >= BackgroundPressureReliefMinimumInterval)
             {
-                closedProcesses = ClosePressureCandidateProcesses(null, 2);
+                closedProcesses = ClosePressureCandidateProcesses(null, snapshot.AvailableMemoryMb <= SevereAvailableMemoryThresholdMb ? 4 : 3);
                 _lastPressureReliefUtc = nowUtc;
             }
         }
@@ -340,13 +375,16 @@ internal sealed class GamePerformanceService : IDisposable
 
         if (nowUtc - _lastWorkingSetTrimUtc >= WorkingSetTrimMinimumInterval)
         {
-            trimmedProcesses = TrimBackgroundWorkingSets(activeGameProcessId, snapshot.MemoryUsedPercent >= SevereMemoryPressureThresholdPercent ? 12 : 6);
+            trimmedProcesses = TrimBackgroundWorkingSets(
+                activeGameProcessId,
+                GetGameTrimTarget(snapshot),
+                GetTrimWorkingSetThresholdBytes(snapshot));
             _lastWorkingSetTrimUtc = nowUtc;
         }
 
         bool scheduledTempCleanup = SchedulePressureTempCleanup();
 
-        if (snapshot.MemoryUsedPercent >= SevereMemoryPressureThresholdPercent)
+        if (snapshot.IsSevereMemoryPressure)
         {
             TryCompactMemory();
         }
@@ -361,7 +399,9 @@ internal sealed class GamePerformanceService : IDisposable
             return;
         }
 
-        int closedProcesses = ClosePressureCandidateProcesses(activeGameProcessId);
+        int closedProcesses = ClosePressureCandidateProcesses(
+            activeGameProcessId,
+            snapshot.AvailableMemoryMb <= SevereAvailableMemoryThresholdMb ? 5 : 3);
         if (trimmedProcesses > 0 || closedProcesses > 0 || scheduledTempCleanup)
         {
             AppLogger.Info($"Pressure relief engaged. CPU {snapshot.CpuPercent:F0}% RAM {snapshot.MemoryUsedPercent}% Trimmed {trimmedProcesses} background working sets and closed {closedProcesses} helper processes.");
@@ -475,6 +515,135 @@ internal sealed class GamePerformanceService : IDisposable
         }
     }
 
+    private void SuspendGameBackgroundProcesses(int? activeGameProcessId)
+    {
+        try
+        {
+            foreach (Process process in Process.GetProcesses())
+            {
+                try
+                {
+                    if (!ShouldSuspendGameBackgroundProcess(process, activeGameProcessId))
+                    {
+                        continue;
+                    }
+
+                    string processName = GameProcessMonitor.NormalizeProcessName(process.ProcessName);
+                    if (_suspendedGameProcesses.ContainsKey(processName))
+                    {
+                        continue;
+                    }
+
+                    if (!TryCreateRestoreInfo(process, processName, out ManagedProcessRestoreInfo restoreInfo))
+                    {
+                        continue;
+                    }
+
+                    if (!TryClosePressureCandidate(process))
+                    {
+                        continue;
+                    }
+
+                    _suspendedGameProcesses[processName] = restoreInfo;
+                    AppLogger.Info($"Suspended {process.ProcessName} during gameplay.");
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private bool ShouldSuspendGameBackgroundProcess(Process process, int? activeGameProcessId)
+    {
+        if (process.Id == Environment.ProcessId ||
+            process.Id == activeGameProcessId ||
+            process.SessionId != _currentSessionId)
+        {
+            return false;
+        }
+
+        string processName = GameProcessMonitor.NormalizeProcessName(process.ProcessName);
+        if (!IsGameSuspendableProcessName(processName) ||
+            _boostedCompanionProcesses.ContainsKey(process.Id))
+        {
+            return false;
+        }
+
+        try
+        {
+            if (process.StartTime > DateTime.Now.AddMinutes(-1))
+            {
+                return false;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static bool TryCreateRestoreInfo(Process process, string processName, out ManagedProcessRestoreInfo restoreInfo)
+    {
+        try
+        {
+            string? executablePath = process.MainModule?.FileName;
+            if (string.IsNullOrWhiteSpace(executablePath) || !File.Exists(executablePath))
+            {
+                restoreInfo = default;
+                return false;
+            }
+
+            restoreInfo = new ManagedProcessRestoreInfo(processName, executablePath);
+            return true;
+        }
+        catch
+        {
+            restoreInfo = default;
+            return false;
+        }
+    }
+
+    private void RestoreSuspendedGameProcesses()
+    {
+        foreach ((string processName, ManagedProcessRestoreInfo restoreInfo) in _suspendedGameProcesses.ToArray())
+        {
+            try
+            {
+                if (IsProcessRunning(processName))
+                {
+                    _suspendedGameProcesses.Remove(processName);
+                    continue;
+                }
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = restoreInfo.ExecutablePath,
+                    WorkingDirectory = Path.GetDirectoryName(restoreInfo.ExecutablePath) ?? string.Empty,
+                    UseShellExecute = true
+                });
+
+                AppLogger.Info($"Restarted {restoreInfo.ProcessName} after gameplay.");
+            }
+            catch
+            {
+            }
+            finally
+            {
+                _suspendedGameProcesses.Remove(processName);
+            }
+        }
+    }
+
     private void ScheduleTempCleanup()
     {
         if (_tempCleanupTask is { IsCompleted: false })
@@ -508,29 +677,43 @@ internal sealed class GamePerformanceService : IDisposable
         return true;
     }
 
-    private int TrimBackgroundWorkingSets(int? activeGameProcessId, int maxProcesses)
+    private int TrimBackgroundWorkingSets(int? activeGameProcessId, int maxProcesses, long minimumWorkingSetBytes)
     {
         int trimmedProcesses = 0;
 
         try
         {
+            List<Process> trimCandidates = [];
+
             foreach (Process process in Process.GetProcesses())
             {
                 try
                 {
-                    if (!ShouldTrimBackgroundProcess(process, activeGameProcessId))
+                    if (!ShouldTrimBackgroundProcess(process, activeGameProcessId, minimumWorkingSetBytes))
                     {
+                        process.Dispose();
                         continue;
                     }
 
+                    trimCandidates.Add(process);
+                }
+                catch
+                {
+                    process.Dispose();
+                }
+            }
+
+            Process[] orderedCandidates = trimCandidates
+                .OrderByDescending(static candidate => candidate.WorkingSet64)
+                .ToArray();
+
+            foreach (Process process in orderedCandidates.Take(maxProcesses))
+            {
+                try
+                {
                     if (SetProcessWorkingSetSize(process.Handle, new IntPtr(-1), new IntPtr(-1)))
                     {
                         trimmedProcesses++;
-                    }
-
-                    if (trimmedProcesses >= maxProcesses)
-                    {
-                        break;
                     }
                 }
                 catch
@@ -541,6 +724,11 @@ internal sealed class GamePerformanceService : IDisposable
                     process.Dispose();
                 }
             }
+
+            foreach (Process process in orderedCandidates.Skip(maxProcesses))
+            {
+                process.Dispose();
+            }
         }
         catch
         {
@@ -549,7 +737,7 @@ internal sealed class GamePerformanceService : IDisposable
         return trimmedProcesses;
     }
 
-    private bool ShouldTrimBackgroundProcess(Process process, int? activeGameProcessId)
+    private bool ShouldTrimBackgroundProcess(Process process, int? activeGameProcessId, long minimumWorkingSetBytes)
     {
         if (process.Id == Environment.ProcessId ||
             process.Id == activeGameProcessId ||
@@ -562,13 +750,12 @@ internal sealed class GamePerformanceService : IDisposable
         string processName = GameProcessMonitor.NormalizeProcessName(process.ProcessName);
         if (string.IsNullOrWhiteSpace(processName) ||
             VoiceAndStreamingProcesses.Contains(processName, StringComparer.OrdinalIgnoreCase) ||
-            BrowserProcesses.Contains(processName, StringComparer.OrdinalIgnoreCase) ||
             ProtectedBackgroundProcesses.Contains(processName, StringComparer.OrdinalIgnoreCase))
         {
             return false;
         }
 
-        if (!string.IsNullOrWhiteSpace(process.MainWindowTitle) || process.WorkingSet64 < 80L * 1024 * 1024)
+        if (!string.IsNullOrWhiteSpace(process.MainWindowTitle) || process.WorkingSet64 < minimumWorkingSetBytes)
         {
             return false;
         }
@@ -735,8 +922,58 @@ internal sealed class GamePerformanceService : IDisposable
         }
 
         double usedRatio = (memoryStatus.ullTotalPhys - memoryStatus.ullAvailPhys) / (double)memoryStatus.ullTotalPhys;
-        snapshot = new SystemPressureSnapshot(cpuPercent, (int)Math.Round(Math.Clamp(usedRatio * 100.0, 0, 100)));
+        int availableMemoryMb = (int)Math.Clamp(
+            memoryStatus.ullAvailPhys / (1024.0 * 1024.0),
+            0,
+            int.MaxValue);
+        snapshot = new SystemPressureSnapshot(
+            cpuPercent,
+            (int)Math.Round(Math.Clamp(usedRatio * 100.0, 0, 100)),
+            availableMemoryMb);
         return true;
+    }
+
+    private static int GetBackgroundTrimTarget(SystemPressureSnapshot snapshot)
+    {
+        if (snapshot.AvailableMemoryMb <= SevereAvailableMemoryThresholdMb)
+        {
+            return 14;
+        }
+
+        if (snapshot.MemoryUsedPercent >= SevereMemoryPressureThresholdPercent ||
+            snapshot.AvailableMemoryMb <= BackgroundAvailableMemoryPressureThresholdMb)
+        {
+            return 10;
+        }
+
+        return 6;
+    }
+
+    private static int GetGameTrimTarget(SystemPressureSnapshot snapshot)
+    {
+        if (snapshot.AvailableMemoryMb <= SevereAvailableMemoryThresholdMb)
+        {
+            return 18;
+        }
+
+        if (snapshot.MemoryUsedPercent >= SevereMemoryPressureThresholdPercent ||
+            snapshot.AvailableMemoryMb <= AvailableMemoryPressureThresholdMb)
+        {
+            return 14;
+        }
+
+        return 8;
+    }
+
+    private static long GetTrimWorkingSetThresholdBytes(SystemPressureSnapshot snapshot)
+    {
+        long minimumMegabytes = snapshot.AvailableMemoryMb <= SevereAvailableMemoryThresholdMb
+            ? 32
+            : snapshot.AvailableMemoryMb <= AvailableMemoryPressureThresholdMb
+                ? 48
+                : 64;
+
+        return minimumMegabytes * 1024L * 1024L;
     }
 
     private void TryCompactMemory()
@@ -810,6 +1047,163 @@ internal sealed class GamePerformanceService : IDisposable
         {
             _powerProfileService.RestoreOriginalProfile();
         }
+    }
+
+    private void RefreshBackgroundPowerProfile()
+    {
+        if (ShouldUseLaptopBatteryQuietProfile())
+        {
+            if (_powerProfileService.TryApplyQuietProfile())
+            {
+                AppLogger.Info("Quiet laptop power profile engaged outside gameplay.");
+            }
+
+            return;
+        }
+
+        if (_powerProfileService.IsLaptopDevice && _powerProfileService.IsOnAcPowerNow)
+        {
+            RefreshSystemPowerBoost(forGameMode: false);
+            return;
+        }
+
+        ReleaseSystemPowerBoostIfIdle();
+    }
+
+    private bool ShouldPreferQuietBackgroundPower()
+    {
+        return ShouldUseLaptopBatteryQuietProfile();
+    }
+
+    private bool ShouldUseLaptopBatteryQuietProfile()
+    {
+        return AppSettings.Current.QuietLaptopOutsideGamesEnabled &&
+            _powerProfileService.IsLaptopDevice &&
+            !_powerProfileService.IsOnAcPowerNow;
+    }
+
+    private void CloseXboxProcessesOutsideGames()
+    {
+        DateTime nowUtc = DateTime.UtcNow;
+        if (nowUtc - _lastXboxCleanupUtc < XboxCleanupMinimumInterval)
+        {
+            return;
+        }
+
+        _lastXboxCleanupUtc = nowUtc;
+        int closedProcesses = 0;
+
+        try
+        {
+            foreach (Process process in Process.GetProcesses())
+            {
+                try
+                {
+                    if (!ShouldCloseXboxProcess(process))
+                    {
+                        continue;
+                    }
+
+                    if (!TryClosePressureCandidate(process))
+                    {
+                        continue;
+                    }
+
+                    closedProcesses++;
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        if (closedProcesses > 0)
+        {
+            AppLogger.Info($"Closed {closedProcesses} Xbox-related background processes outside gameplay.");
+        }
+    }
+
+    private bool ShouldCloseXboxProcess(Process process)
+    {
+        if (process.Id == Environment.ProcessId ||
+            process.SessionId != _currentSessionId ||
+            _boostedCompanionProcesses.ContainsKey(process.Id))
+        {
+            return false;
+        }
+
+        string processName = GameProcessMonitor.NormalizeProcessName(process.ProcessName);
+        if (!IsXboxBackgroundProcessName(processName) ||
+            ProtectedBackgroundProcesses.Contains(processName, StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        try
+        {
+            return process.StartTime <= DateTime.Now.AddSeconds(-20);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal static bool IsGameSuspendableProcessName(string processName)
+    {
+        return GameSuspendableProcessNames.Contains(
+            GameProcessMonitor.NormalizeProcessName(processName),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    internal static bool IsXboxBackgroundProcessName(string processName)
+    {
+        string normalizedProcessName = GameProcessMonitor.NormalizeProcessName(processName);
+        if (string.IsNullOrWhiteSpace(normalizedProcessName))
+        {
+            return false;
+        }
+
+        return normalizedProcessName.Contains("xbox", StringComparison.OrdinalIgnoreCase) ||
+            normalizedProcessName.Contains("gamebar", StringComparison.OrdinalIgnoreCase) ||
+            normalizedProcessName.Contains("gamingoverlay", StringComparison.OrdinalIgnoreCase) ||
+            normalizedProcessName.Contains("gamingservicesui", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsProcessRunning(string processName)
+    {
+        try
+        {
+            foreach (Process process in Process.GetProcesses())
+            {
+                try
+                {
+                    if (string.Equals(
+                        GameProcessMonitor.NormalizeProcessName(process.ProcessName),
+                        processName,
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
     }
 
     private static void CleanupTempFiles(TimeSpan minimumFileAge, int maxDeletedItems, bool includeChildDirectoryFiles)
@@ -931,10 +1325,17 @@ internal sealed class GamePerformanceService : IDisposable
         }
     }
 
-    private readonly record struct SystemPressureSnapshot(double CpuPercent, int MemoryUsedPercent)
+    private readonly record struct SystemPressureSnapshot(double CpuPercent, int MemoryUsedPercent, int AvailableMemoryMb)
     {
         public bool IsUnderPressure =>
             CpuPercent >= CpuPressureThresholdPercent ||
-            MemoryUsedPercent >= MemoryPressureThresholdPercent;
+            MemoryUsedPercent >= MemoryPressureThresholdPercent ||
+            AvailableMemoryMb <= AvailableMemoryPressureThresholdMb;
+
+        public bool IsSevereMemoryPressure =>
+            MemoryUsedPercent >= SevereMemoryPressureThresholdPercent ||
+            AvailableMemoryMb <= SevereAvailableMemoryThresholdMb;
     }
+
+    private readonly record struct ManagedProcessRestoreInfo(string ProcessName, string ExecutablePath);
 }
