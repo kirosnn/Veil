@@ -57,6 +57,7 @@ internal sealed partial class AppSettings
             GameProcessNames = _gameProcessNames,
             BackgroundOptimizationEnabled = _backgroundOptimizationEnabled,
             SystemPowerBoostEnabled = _systemPowerBoostEnabled,
+            QuietLaptopOutsideGamesEnabled = _quietLaptopOutsideGamesEnabled,
             ShortcutButtons = _shortcutButtons
                 .Select(setting => setting is null
                     ? null
@@ -147,6 +148,7 @@ internal sealed partial class AppSettings
                 settings._gameProcessNames = NormalizeGameProcessNames(dto.GameProcessNames);
                 settings._backgroundOptimizationEnabled = dto.BackgroundOptimizationEnabled;
                 settings._systemPowerBoostEnabled = dto.SystemPowerBoostEnabled;
+                settings._quietLaptopOutsideGamesEnabled = dto.QuietLaptopOutsideGamesEnabled;
                 settings._shortcutButtons = NormalizeShortcutButtons(dto.ShortcutButtons);
 
                 if (requiresSave)
@@ -211,6 +213,7 @@ internal sealed partial class AppSettings
         public string[]? GameProcessNames { get; set; }
         public bool BackgroundOptimizationEnabled { get; set; } = true;
         public bool SystemPowerBoostEnabled { get; set; } = true;
+        public bool QuietLaptopOutsideGamesEnabled { get; set; } = true;
         public AppShortcutDto?[]? ShortcutButtons { get; set; }
     }
 
