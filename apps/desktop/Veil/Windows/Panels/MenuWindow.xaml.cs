@@ -162,7 +162,7 @@ public sealed partial class MenuWindow : Window
     public void ShowAt(int x, int y)
     {
         int height = CalculateMenuHeight();
-        _useDarkForeground = ReadableSurfaceHelper.ShouldUseDarkForeground(x + 6, y + 6, MenuWidth, height);
+        _useDarkForeground = false;
         ApplySettings();
         BuildMenuItems();
 
