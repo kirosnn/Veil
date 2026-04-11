@@ -109,10 +109,10 @@ public sealed partial class SettingsWindow : Window
 
         _acrylicController = new DesktopAcrylicController
         {
-            TintColor = global::Windows.UI.Color.FromArgb(238, 26, 26, 30),
-            TintOpacity = 0.2f,
-            LuminosityOpacity = 0.09f,
-            FallbackColor = global::Windows.UI.Color.FromArgb(194, 20, 20, 24)
+            TintColor = global::Windows.UI.Color.FromArgb(255, 34, 40, 50),
+            TintOpacity = 0.16f,
+            LuminosityOpacity = 0.58f,
+            FallbackColor = global::Windows.UI.Color.FromArgb(216, 22, 27, 34)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
@@ -123,6 +123,9 @@ public sealed partial class SettingsWindow : Window
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
+        PanelBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, 255, 255, 255));
+        PanelBorder.BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, 255, 255, 255));
+        PanelBorder.BorderThickness = new Thickness(1);
     }
 
     private void ConfigureWindowChrome()
@@ -508,6 +511,17 @@ public sealed partial class SettingsWindow : Window
         }
 
         _settings.SystemPowerBoostEnabled = !_settings.SystemPowerBoostEnabled;
+        UpdateSectionUi();
+    }
+
+    private void OnQuietLaptopOutsideGamesEnabledButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _settings.QuietLaptopOutsideGamesEnabled = !_settings.QuietLaptopOutsideGamesEnabled;
         UpdateSectionUi();
     }
 
@@ -1842,21 +1856,16 @@ public sealed partial class SettingsWindow : Window
         SystemPowerBoostEnabledButton.Content = isSystemPowerBoostEnabled ? "Enabled" : "Disabled";
         SystemPowerBoostEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isSystemPowerBoostEnabled ? (byte)48 : (byte)0, 255, 255, 255));
         SystemPowerBoostEnabledButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isSystemPowerBoostEnabled ? (byte)255 : (byte)214);
+
+        bool isQuietLaptopOutsideGamesEnabled = _settings.QuietLaptopOutsideGamesEnabled;
+        QuietLaptopOutsideGamesEnabledButton.Content = isQuietLaptopOutsideGamesEnabled ? "Enabled" : "Disabled";
+        QuietLaptopOutsideGamesEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isQuietLaptopOutsideGamesEnabled ? (byte)48 : (byte)0, 255, 255, 255));
+        QuietLaptopOutsideGamesEnabledButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isQuietLaptopOutsideGamesEnabled ? (byte)255 : (byte)214);
     }
 
     private void ApplyReadableContrast()
     {
-        if (!GetWindowRect(_hwnd, out var rect))
-        {
-            return;
-        }
-
-        _useDarkForeground = ReadableSurfaceHelper.ShouldUseDarkForeground(
-            rect.Left,
-            rect.Top,
-            Math.Max(1, rect.Right - rect.Left),
-            Math.Max(1, rect.Bottom - rect.Top));
-
+        _useDarkForeground = false;
         ReadableSurfaceHelper.ApplyTextContrast(PanelBorder, _useDarkForeground);
         UpdateSectionUi();
     }
