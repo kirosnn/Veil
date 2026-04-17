@@ -603,6 +603,21 @@ internal sealed partial class AppSettings
         PersistAndNotify();
     }
 
+    public bool HideForFullscreen
+    {
+        get => _hideForFullscreen;
+        set
+        {
+            if (_hideForFullscreen == value)
+            {
+                return;
+            }
+
+            _hideForFullscreen = value;
+            PersistAndNotify();
+        }
+    }
+
     public bool BackgroundOptimizationEnabled
     {
         get => _backgroundOptimizationEnabled;
