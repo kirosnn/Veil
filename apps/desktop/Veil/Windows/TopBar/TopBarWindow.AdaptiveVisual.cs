@@ -73,9 +73,13 @@ public sealed partial class TopBarWindow
 
     private void ResetAdaptiveModeState()
     {
+        _isAdaptiveClearModeActive = false;
         _hasAdaptiveModeState = false;
         _pendingAdaptiveClearMode = null;
         _pendingAdaptiveClearModeUtc = DateTime.MinValue;
+        _adaptiveForegroundOverride = null;
+        _lastAdaptiveColor = null;
+        _lastAdaptiveProbeColor = null;
     }
 
     private void EnsureTopBarAcrylic()
@@ -94,6 +98,16 @@ public sealed partial class TopBarWindow
         _acrylicController?.Dispose();
         _acrylicController = null;
         _backdropConfig = null;
+
+        if (_hwnd != IntPtr.Zero)
+        {
+            try
+            {
+                var target = this.As<ICompositionSupportsSystemBackdrop>();
+                target.SystemBackdrop = null;
+            }
+            catch { }
+        }
 
         float tintOpacity = (float)(intensity * 0.18);
         float luminosity = (float)Math.Min(intensity * 0.85, 0.90);
