@@ -25,6 +25,7 @@ public sealed partial class TopBarWindow : Window
     private const double MinimumRenderedTopBarOpacity = 0.04;
     private const double DefaultRenderedBlurIntensity = 0.55;
     private const double MinimumRenderedBlurIntensity = 0.20;
+    private static readonly TimeSpan ShowAfterHideDelay = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan AdaptiveVisualWarmRefreshInterval = TimeSpan.FromMilliseconds(700);
     private static readonly TimeSpan AdaptiveVisualRefreshInterval = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan AdaptiveVisualDeepSampleInterval = TimeSpan.FromMilliseconds(900);
@@ -94,6 +95,7 @@ public sealed partial class TopBarWindow : Window
     private DateTime _lastDiscordBoostUtc = DateTime.MinValue;
     private DateTime _lastBackgroundMaintenanceBoostUtc = DateTime.MinValue;
     private double _lastAppliedBlurIntensity = -1;
+    private DateTime _pendingShowUtc = DateTime.MinValue;
 
     internal TopBarWindow(string monitorId, ScreenBounds screen, GamePerformanceService gamePerformanceService, bool ownsGlobalHotkeys, bool startHiddenUntilReady = false)
     {
@@ -274,6 +276,7 @@ public sealed partial class TopBarWindow : Window
         bool visibilityChanged = false;
         if (gameRunning)
         {
+            _pendingShowUtc = DateTime.MinValue;
             EnterMinimalMode(activeGameProcessId);
             return;
         }
@@ -287,6 +290,7 @@ public sealed partial class TopBarWindow : Window
 
         if (shouldHideWindow && !_isHidden)
         {
+            _pendingShowUtc = DateTime.MinValue;
             _isHidden = true;
             visibilityChanged = true;
             AppLogger.Info($"TopBarWindow hiding for {_monitorId}. Foreground game fullscreen={shouldHideForForegroundWindow}.");
@@ -297,13 +301,29 @@ public sealed partial class TopBarWindow : Window
             }
             WindowHelper.HideWindow(this);
         }
+        else if (shouldHideWindow && _isHidden)
+        {
+            _pendingShowUtc = DateTime.MinValue;
+        }
         else if (!shouldHideWindow && _isHidden)
         {
-            _isHidden = false;
-            visibilityChanged = true;
-            AppLogger.Info($"TopBarWindow showing for {_monitorId}.");
-            WindowHelper.ShowWindow(this);
-            ApplyTopBarPlacement(true);
+            if (_pendingShowUtc == DateTime.MinValue)
+            {
+                _pendingShowUtc = DateTime.UtcNow;
+            }
+            else if (DateTime.UtcNow - _pendingShowUtc >= ShowAfterHideDelay)
+            {
+                _pendingShowUtc = DateTime.MinValue;
+                _isHidden = false;
+                visibilityChanged = true;
+                AppLogger.Info($"TopBarWindow showing for {_monitorId}.");
+                WindowHelper.ShowWindow(this);
+                ApplyTopBarPlacement(true);
+            }
+        }
+        else
+        {
+            _pendingShowUtc = DateTime.MinValue;
         }
 
         if (visibilityChanged)
