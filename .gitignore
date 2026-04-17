@@ -32,3 +32,4 @@ artifacts/
 apps/desktop/VeilSpeechCli/target/
 target/
 
+.claude/
