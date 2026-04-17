@@ -602,6 +602,20 @@
                                         <Border Height="1" Background="#08FFFFFF" />
 
                                         <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="Hide for fullscreen apps" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock Text="Automatically hide the top bar when any window (video player, browser, etc.) goes fullscreen." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
+                                            </StackPanel>
+                                            <Button x:Name="HideForFullscreenButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnHideForFullscreenButtonClick" Content="Enabled" />
+                                        </Grid>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <Grid>
                                             <TextBlock Text="Detection mode" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" VerticalAlignment="Center" />
                                             <TextBlock x:Name="GameDetectionModeValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" VerticalAlignment="Center" />
                                         </Grid>
