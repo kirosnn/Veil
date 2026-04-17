@@ -1,7 +1,8 @@
 {
   "bash": {
     "autoRun": [
-      "git rev-list *"
+      "git rev-list *",
+      "git status *"
     ]
   }
 }
