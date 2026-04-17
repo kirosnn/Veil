@@ -36,20 +36,8 @@ internal sealed partial class AppSettings
     private bool _musicButtonEnabled = true;
     private bool _musicShowVolume = true;
     private bool _musicShowSourceToggle = true;
-    private bool _weatherButtonEnabled = true;
-    private string _weatherPrimaryCity = "Paris";
-    private string[] _weatherSecondaryCities =
-    [
-        "Cupertino",
-        "New York",
-        "London",
-        "Beijing"
-    ];
-    private double _weatherBlurIntensity = 0.68;
-    private string _topBarPanelTheme = "Dark";
     private string _musicPanelTheme = "Dark";
     private string _runCatPanelTheme = "Dark";
-    private string _weatherPanelTheme = "Light";
     private string _topBarStyle = "Solid";
     private string _solidColor = "#000000";
     private string _topBarForegroundColor = "#FFFFFF";

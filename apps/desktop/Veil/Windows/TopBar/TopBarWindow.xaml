@@ -48,31 +48,6 @@
                     </Setter>
                 </Style>
             </StackPanel.Resources>
-            <Button x:Name="WeatherButton"
-                    Style="{StaticResource TopBarRightButtonStyle}"
-                    VerticalAlignment="Center"
-                    Padding="8,2"
-                    MinWidth="0"
-                    MinHeight="0"
-                    CornerRadius="11"
-                    BorderThickness="0"
-                    Background="Transparent"
-                    Foreground="#FFFFFFFF"
-                    IsTabStop="False"
-                    Click="OnWeatherButtonClick">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <Grid x:Name="WeatherIconHost"
-                          Width="14"
-                          Height="14"
-                          VerticalAlignment="Center" />
-                    <TextBlock x:Name="WeatherButtonText"
-                               Text="--°"
-                               FontSize="12"
-                               FontFamily="{StaticResource SfTextSemibold}"
-                               Foreground="#FFFFFFFF"
-                               VerticalAlignment="Center" />
-                </StackPanel>
-            </Button>
             <Button x:Name="DiscordButton"
                     Style="{StaticResource TopBarRightButtonStyle}"
                     VerticalAlignment="Center"
@@ -154,24 +129,6 @@
                 <Image x:Name="RunCatImage"
                        Width="20"
                        Height="20"
-                       IsHitTestVisible="False" />
-            </Button>
-            <Button x:Name="PanelThemeButton"
-                    Style="{StaticResource TopBarRightButtonStyle}"
-                    VerticalAlignment="Center"
-                    Padding="4,2"
-                    MinWidth="0"
-                    MinHeight="0"
-                    CornerRadius="4"
-                    BorderThickness="0"
-                    Background="Transparent"
-                    IsTabStop="False"
-                    Click="OnPanelThemeButtonClick">
-                <Image x:Name="PanelThemeIcon"
-                       Width="16"
-                       Height="16"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
                        IsHitTestVisible="False" />
             </Button>
         </StackPanel>

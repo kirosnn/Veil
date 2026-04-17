@@ -151,31 +151,6 @@ public sealed partial class TopBarWindow
         return _systemStatsWindow;
     }
 
-    private PanelThemeWindow EnsurePanelThemeWindowCreated()
-    {
-        if (_panelThemeWindow is not null)
-        {
-            return _panelThemeWindow;
-        }
-
-        _panelThemeWindow = new PanelThemeWindow();
-        _panelThemeWindow.Initialize();
-        return _panelThemeWindow;
-    }
-
-    private WeatherWindow EnsureWeatherWindowCreated()
-    {
-        if (_weatherWindow is not null)
-        {
-            return _weatherWindow;
-        }
-
-        _weatherWindow = new WeatherWindow();
-        _weatherWindow.SetWeatherService(_weatherService);
-        _weatherWindow.Initialize();
-        return _weatherWindow;
-    }
-
     private MusicControlWindow EnsureMusicControlWindowCreated()
     {
         if (_musicControlWindow is not null)
@@ -205,16 +180,10 @@ public sealed partial class TopBarWindow
     private void PrewarmTransientWindows()
     {
         EnsureFinderWindowCreated();
-        EnsurePanelThemeWindowCreated();
 
         if (_settings.RunCatEnabled)
         {
             EnsureSystemStatsWindowCreated();
-        }
-
-        if (_settings.WeatherButtonEnabled)
-        {
-            EnsureWeatherWindowCreated();
         }
 
         if (_settings.MusicButtonEnabled)
@@ -255,54 +224,6 @@ public sealed partial class TopBarWindow
         }
 
         SystemStatsWindow window = EnsureSystemStatsWindowCreated();
-
-        if ((DateTime.UtcNow - window.LastHiddenAtUtc).TotalMilliseconds < 200)
-        {
-            return;
-        }
-
-        int barWidth = _screen.Right - _screen.Left;
-        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
-    }
-
-    private void OnPanelThemeButtonClick(object sender, RoutedEventArgs e)
-    {
-        if (_isGameMinimalMode)
-        {
-            return;
-        }
-
-        if (_panelThemeWindow is { IsPanelVisible: true })
-        {
-            _panelThemeWindow.Hide();
-            return;
-        }
-
-        PanelThemeWindow window = EnsurePanelThemeWindowCreated();
-
-        if ((DateTime.UtcNow - window.LastHiddenAtUtc).TotalMilliseconds < 200)
-        {
-            return;
-        }
-
-        int barWidth = _screen.Right - _screen.Left;
-        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
-    }
-
-    private void OnWeatherButtonClick(object sender, RoutedEventArgs e)
-    {
-        if (_isGameMinimalMode)
-        {
-            return;
-        }
-
-        if (_weatherWindow is { IsWeatherVisible: true })
-        {
-            _weatherWindow.Hide();
-            return;
-        }
-
-        WeatherWindow window = EnsureWeatherWindowCreated();
 
         if ((DateTime.UtcNow - window.LastHiddenAtUtc).TotalMilliseconds < 200)
         {

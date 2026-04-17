@@ -154,22 +154,6 @@ internal sealed partial class AppSettings
         }
     }
 
-    public string TopBarPanelTheme
-    {
-        get => _topBarPanelTheme;
-        set
-        {
-            value = NormalizePanelTheme(value);
-            if (_topBarPanelTheme == value)
-            {
-                return;
-            }
-
-            _topBarPanelTheme = value;
-            PersistAndNotify();
-        }
-    }
-
     public string RunCatPanelTheme
     {
         get => _runCatPanelTheme;
@@ -182,89 +166,6 @@ internal sealed partial class AppSettings
             }
 
             _runCatPanelTheme = value;
-            PersistAndNotify();
-        }
-    }
-
-    public string WeatherPanelTheme
-    {
-        get => _weatherPanelTheme;
-        set
-        {
-            value = NormalizePanelTheme(value);
-            if (_weatherPanelTheme == value)
-            {
-                return;
-            }
-
-            _weatherPanelTheme = value;
-            PersistAndNotify();
-        }
-    }
-
-    public bool WeatherButtonEnabled
-    {
-        get => _weatherButtonEnabled;
-        set
-        {
-            if (_weatherButtonEnabled == value)
-            {
-                return;
-            }
-
-            _weatherButtonEnabled = value;
-            PersistAndNotify();
-        }
-    }
-
-    public string WeatherPrimaryCity
-    {
-        get => _weatherPrimaryCity;
-        set
-        {
-            value = string.IsNullOrWhiteSpace(value) ? "Paris" : value.Trim();
-            if (string.Equals(_weatherPrimaryCity, value, StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            _weatherPrimaryCity = value;
-            PersistAndNotify();
-        }
-    }
-
-    public IReadOnlyList<string> WeatherSecondaryCities => _weatherSecondaryCities;
-
-    public void SetWeatherSecondaryCities(IEnumerable<string> cityNames)
-    {
-        string[] normalizedCities = cityNames
-            .Select(static name => name.Trim())
-            .Where(static name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .ToArray();
-
-        if (_weatherSecondaryCities.SequenceEqual(normalizedCities, StringComparer.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        _weatherSecondaryCities = normalizedCities;
-        PersistAndNotify();
-    }
-
-    public double WeatherBlurIntensity
-    {
-        get => _weatherBlurIntensity;
-        set
-        {
-            value = Math.Clamp(value, 0.2, 1.0);
-            if (Math.Abs(_weatherBlurIntensity - value) < 0.001)
-            {
-                return;
-            }
-
-            _weatherBlurIntensity = value;
             PersistAndNotify();
         }
     }

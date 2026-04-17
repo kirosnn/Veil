@@ -56,7 +56,7 @@ public sealed partial class SystemStatsWindow : Window
         Task.Run(InitHardwareInfo);
     }
 
-    private bool UseLightTheme => _settings.TopBarPanelTheme == "Light";
+    private bool UseLightTheme => _settings.RunCatPanelTheme == "Light";
 
     private void InitHardwareInfo()
     {

@@ -134,32 +134,6 @@ internal sealed partial class AppSettings
             .ToArray();
     }
 
-    private static string[] NormalizeWeatherCities(string[]? cityNames)
-    {
-        if (cityNames == null)
-        {
-            return
-            [
-                "Cupertino",
-                "New York",
-                "London",
-                "Beijing"
-            ];
-        }
-
-        if (cityNames.Length == 0)
-        {
-            return [];
-        }
-
-        return cityNames
-            .Select(static name => name.Trim())
-            .Where(static name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .ToArray();
-    }
-
     private static string NormalizeTopBarDisplayMode(string? value)
     {
         return value is "Primary" or "All" or "Custom" ? value : "Primary";
@@ -225,13 +199,4 @@ internal sealed partial class AppSettings
         return value is "Light" or "Dark" ? value : fallback;
     }
 
-    private static string InferGlobalPanelTheme(AppSettingsDto dto)
-    {
-        if (dto.MusicPanelTheme is "Light" || dto.RunCatPanelTheme is "Light")
-        {
-            return "Light";
-        }
-
-        return "Dark";
-    }
 }

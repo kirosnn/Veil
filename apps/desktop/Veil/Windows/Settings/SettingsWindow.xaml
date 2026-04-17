@@ -44,9 +44,6 @@
                         <Button x:Name="MusicSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="Music" Click="OnSectionButtonClick">
                             <TextBlock Text="Music" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
                         </Button>
-                        <Button x:Name="WeatherSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="Weather" Click="OnSectionButtonClick">
-                            <TextBlock Text="Weather" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
-                        </Button>
                         <Button x:Name="GamesSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="Games" Click="OnSectionButtonClick">
                             <TextBlock Text="Games" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
                         </Button>
@@ -703,48 +700,6 @@
                                             </StackPanel>
                                             <Button x:Name="MusicShowSourceToggleButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnMusicShowSourceToggleButtonClick" Content="Enabled" />
                                         </Grid>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Grid>
-
-                        <!-- ── Weather ── -->
-                        <Grid x:Name="WeatherSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
-                            <StackPanel Spacing="16">
-                                <StackPanel Spacing="4" Margin="0,0,0,4">
-                                    <TextBlock Text="Weather" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
-                                    <TextBlock Text="Choose cities and frosted glass strength for the weather panel." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
-                                </StackPanel>
-
-                                <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Spacing="2">
-                                            <TextBlock Text="Enable Weather Button" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                            <TextBlock Text="Show the weather button in the topbar." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" />
-                                        </StackPanel>
-                                        <Button x:Name="WeatherButtonEnabledButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnWeatherButtonEnabledButtonClick" Content="Enabled" />
-                                    </Grid>
-                                </Border>
-
-                                <TextBlock Text="Forecast" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
-                                <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
-                                    <StackPanel Spacing="14">
-                                        <StackPanel Spacing="6">
-                                            <TextBlock Text="Primary City" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                            <TextBox x:Name="WeatherPrimaryCityTextBox" PlaceholderText="Paris" TextChanged="OnWeatherPrimaryCityChanged" />
-                                        </StackPanel>
-
-                                        <Border Height="1" Background="#08FFFFFF" />
-
-                                        <StackPanel Spacing="6">
-                                            <TextBlock Text="Secondary Cities" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                            <TextBlock Text="One city per line. Up to four cities are shown." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" />
-                                            <TextBox x:Name="WeatherSecondaryCitiesTextBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" PlaceholderText="Cupertino&#10;New York&#10;London&#10;Beijing" TextChanged="OnWeatherSecondaryCitiesChanged" />
-                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

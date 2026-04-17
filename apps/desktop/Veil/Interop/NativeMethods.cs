@@ -399,6 +399,7 @@ internal static partial class NativeMethods
     internal const uint VK_SHIFT = 0x10;
     internal const uint VK_LSHIFT = 0xA0;
     internal const uint VK_RSHIFT = 0xA1;
+    internal const uint VK_RCONTROL = 0xA3;
     internal const uint VK_MENU = 0x12;
     internal const uint VK_LMENU = 0xA4;
     internal const uint VK_RMENU = 0xA5;

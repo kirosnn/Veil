@@ -190,35 +190,26 @@ public sealed partial class TopBarWindow
         var pressedBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(8, foregroundColor.R, foregroundColor.G, foregroundColor.B));
 
         ClockText.Foreground = foregroundBrush;
-        WeatherButton.Foreground = foregroundBrush;
-        WeatherButtonText.Foreground = foregroundBrush;
         MusicIcon.Foreground = mutedForegroundBrush;
         FinderButton.Foreground = foregroundBrush;
         FinderButtonText.Foreground = foregroundBrush;
         DiscordIcon.Source = UseDarkTopBarForeground(foregroundColor)
             ? DiscordDarkIconSource
             : DiscordLightIconSource;
-        PanelThemeIcon.Source = UseDarkTopBarForeground(foregroundColor)
-            ? PanelThemeDarkIconSource
-            : PanelThemeLightIconSource;
 
         MenuButton.Opacity = buttonOpacity;
         FinderButton.Opacity = buttonOpacity;
-        WeatherButton.Opacity = buttonOpacity;
         DiscordButton.Opacity = buttonOpacity;
         MusicButton.Opacity = buttonOpacity;
         RunCatButton.Opacity = buttonOpacity;
-        PanelThemeButton.Opacity = buttonOpacity;
 
         MenuButton.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(170, foregroundColor.R, foregroundColor.G, foregroundColor.B));
         MenuButton.Resources["ButtonBackgroundPointerOver"] = foregroundBrush;
         MenuButton.Resources["ButtonBackgroundPressed"] = new SolidColorBrush(global::Windows.UI.Color.FromArgb(119, foregroundColor.R, foregroundColor.G, foregroundColor.B));
 
-        ApplyIconButtonResources(WeatherButton, hoverBrush, pressedBrush);
         ApplyIconButtonResources(DiscordButton, hoverBrush, pressedBrush);
         ApplyIconButtonResources(MusicButton, hoverBrush, pressedBrush);
         ApplyIconButtonResources(RunCatButton, hoverBrush, pressedBrush);
-        ApplyIconButtonResources(PanelThemeButton, hoverBrush, pressedBrush);
 
         byte bubbleAlpha = _settings.ShowFinderBubble
             ? (byte)Math.Round(_settings.FinderBubbleOpacity * 255)
@@ -246,7 +237,6 @@ public sealed partial class TopBarWindow
         }
 
         UpdateGlassPanels(true);
-        UpdateWeatherButton();
         _ = ApplyRunCatSettingsAsync();
     }
 

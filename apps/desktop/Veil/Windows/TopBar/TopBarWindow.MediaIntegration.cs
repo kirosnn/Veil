@@ -12,57 +12,6 @@ namespace Veil.Windows;
 
 public sealed partial class TopBarWindow
 {
-    private async Task InitWeatherAsync()
-    {
-        try
-        {
-            _weatherService.StateChanged -= OnWeatherStateChanged;
-            _weatherService.StateChanged += OnWeatherStateChanged;
-            await _weatherService.InitializeAsync();
-            DispatcherQueue.TryEnqueue(UpdateWeatherButton);
-            _weatherRefreshTimer.Start();
-        }
-        catch
-        {
-        }
-    }
-
-    private void OnWeatherRefreshTick(object? sender, object e)
-    {
-        _ = _weatherService.RefreshAsync(true);
-    }
-
-    private void OnWeatherStateChanged()
-    {
-        DispatcherQueue.TryEnqueue(UpdateWeatherButton);
-    }
-
-    private void UpdateWeatherButton()
-    {
-        WeatherButton.Visibility = _settings.WeatherButtonEnabled
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-
-        if (!_settings.WeatherButtonEnabled && _weatherWindow is { IsWeatherVisible: true })
-        {
-            _weatherWindow.Hide();
-        }
-
-        var snapshot = _weatherService.Snapshot;
-        string text = snapshot is null
-            ? "--°"
-            : $"{Math.Round(snapshot.PrimaryCity.TemperatureC):0}°";
-
-        WeatherButtonText.Text = text;
-
-        WeatherIconHost.Children.Clear();
-        WeatherIconHost.Children.Add(WeatherVisualFactory.CreateIcon(
-            snapshot?.PrimaryCity.WeatherCode ?? 0,
-            snapshot?.PrimaryCity.IsDay ?? true,
-            14,
-            UseDarkTopBarForeground(GetTopBarForegroundColor())));
-    }
-
     private async Task InitMediaControlAsync()
     {
         try

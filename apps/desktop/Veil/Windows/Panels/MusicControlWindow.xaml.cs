@@ -85,7 +85,7 @@ public sealed partial class MusicControlWindow : Window
         _settings.Changed += OnSettingsChanged;
     }
 
-    private bool UseLightTheme => _settings.TopBarPanelTheme == "Light";
+    private bool UseLightTheme => _settings.MusicPanelTheme == "Light";
 
     internal void SetMediaService(MediaControlService service)
     {

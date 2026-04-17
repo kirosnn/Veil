@@ -107,11 +107,9 @@ public sealed partial class TopBarWindow
 
         AddContentRegion(regions, MenuButton, useElementBounds: true, paddingX: 1, paddingY: 1);
         AddContentRegion(regions, FinderButton, useElementBounds: true, paddingX: 8, paddingY: 5);
-        AddContentRegion(regions, WeatherButton, useElementBounds: false, paddingX: 1, paddingY: 1);
         AddContentRegion(regions, DiscordButton, useElementBounds: false, paddingX: 1, paddingY: 1);
         AddContentRegion(regions, MusicButton, useElementBounds: false, paddingX: 1, paddingY: 1);
         AddContentRegion(regions, RunCatButton, useElementBounds: false, paddingX: 1, paddingY: 1);
-        AddContentRegion(regions, PanelThemeButton, useElementBounds: false, paddingX: 1, paddingY: 1);
         AddElementRegion(regions, ClockText, paddingX: 1, paddingY: 1);
         AddElementRegion(regions, ShortcutGlass, paddingX: 0, paddingY: 0);
 

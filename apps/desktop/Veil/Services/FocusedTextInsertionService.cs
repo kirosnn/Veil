@@ -294,6 +294,10 @@ internal sealed class FocusedTextInsertionService
             {
                 SetForegroundWindow(insertionTarget.WindowHandle);
                 await Task.Delay(ForegroundActivationDelayMs, cancellationToken);
+                if (GetForegroundWindow() != insertionTarget.WindowHandle)
+                {
+                    return false;
+                }
             }
 
             SendCtrlV();

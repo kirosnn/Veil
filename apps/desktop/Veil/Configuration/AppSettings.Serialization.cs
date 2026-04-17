@@ -22,14 +22,8 @@ internal sealed partial class AppSettings
             MusicButtonEnabled = _musicButtonEnabled,
             MusicShowVolume = _musicShowVolume,
             MusicShowSourceToggle = _musicShowSourceToggle,
-            WeatherButtonEnabled = _weatherButtonEnabled,
-            WeatherPrimaryCity = _weatherPrimaryCity,
-            WeatherSecondaryCities = _weatherSecondaryCities,
-            WeatherBlurIntensity = _weatherBlurIntensity,
-            TopBarPanelTheme = _topBarPanelTheme,
             MusicPanelTheme = _musicPanelTheme,
             RunCatPanelTheme = _runCatPanelTheme,
-            WeatherPanelTheme = _weatherPanelTheme,
             TopBarStyle = _topBarStyle,
             SolidColor = _solidColor,
             TopBarForegroundColor = _topBarForegroundColor,
@@ -113,14 +107,8 @@ internal sealed partial class AppSettings
                 settings._musicButtonEnabled = dto.MusicButtonEnabled;
                 settings._musicShowVolume = dto.MusicShowVolume;
                 settings._musicShowSourceToggle = dto.MusicShowSourceToggle;
-                settings._weatherButtonEnabled = dto.WeatherButtonEnabled;
-                settings._weatherPrimaryCity = string.IsNullOrWhiteSpace(dto.WeatherPrimaryCity) ? "Paris" : dto.WeatherPrimaryCity.Trim();
-                settings._weatherSecondaryCities = NormalizeWeatherCities(dto.WeatherSecondaryCities);
-                settings._weatherBlurIntensity = Math.Clamp(dto.WeatherBlurIntensity <= 0 ? 0.68 : dto.WeatherBlurIntensity, 0.2, 1.0);
-                settings._topBarPanelTheme = NormalizePanelTheme(dto.TopBarPanelTheme, InferGlobalPanelTheme(dto));
                 settings._musicPanelTheme = NormalizePanelTheme(dto.MusicPanelTheme, "Dark");
                 settings._runCatPanelTheme = NormalizePanelTheme(dto.RunCatPanelTheme, "Dark");
-                settings._weatherPanelTheme = NormalizePanelTheme(dto.WeatherPanelTheme, "Light");
                 settings._topBarStyle = normalizedTopBarStyle;
                 settings._solidColor = NormalizeHexColor(dto.SolidColor);
                 settings._topBarForegroundColor = NormalizeHexColor(dto.TopBarForegroundColor);
@@ -178,14 +166,8 @@ internal sealed partial class AppSettings
         public bool MusicButtonEnabled { get; set; } = true;
         public bool MusicShowVolume { get; set; } = true;
         public bool MusicShowSourceToggle { get; set; } = true;
-        public bool WeatherButtonEnabled { get; set; } = true;
-        public string WeatherPrimaryCity { get; set; } = "Paris";
-        public string[]? WeatherSecondaryCities { get; set; }
-        public double WeatherBlurIntensity { get; set; } = 0.68;
-        public string TopBarPanelTheme { get; set; } = "Dark";
         public string MusicPanelTheme { get; set; } = "Dark";
         public string RunCatPanelTheme { get; set; } = "Dark";
-        public string WeatherPanelTheme { get; set; } = "Light";
         public string TopBarStyle { get; set; } = "Solid";
         public string SolidColor { get; set; } = "#000000";
         public string TopBarForegroundColor { get; set; } = "#FFFFFF";

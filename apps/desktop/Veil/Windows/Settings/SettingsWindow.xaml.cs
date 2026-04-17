@@ -186,8 +186,6 @@ public sealed partial class SettingsWindow : Window
         GameProcessesTextBox.Text = string.Join(Environment.NewLine, _settings.GameProcessNames);
         SolidColorTextBox.Text = _settings.SolidColor;
         TopBarForegroundColorTextBox.Text = _settings.TopBarForegroundColor;
-        WeatherPrimaryCityTextBox.Text = _settings.WeatherPrimaryCity;
-        WeatherSecondaryCitiesTextBox.Text = string.Join(Environment.NewLine, _settings.WeatherSecondaryCities);
         InitializeAiSpeechModelPicker();
 
         SyncLabels();
@@ -485,17 +483,6 @@ public sealed partial class SettingsWindow : Window
         UpdateSectionUi();
     }
 
-    private void OnWeatherButtonEnabledButtonClick(object sender, RoutedEventArgs e)
-    {
-        if (_isInitializing)
-        {
-            return;
-        }
-
-        _settings.WeatherButtonEnabled = !_settings.WeatherButtonEnabled;
-        UpdateSectionUi();
-    }
-
     private void OnBackgroundOptimizationEnabledButtonClick(object sender, RoutedEventArgs e)
     {
         if (_isInitializing)
@@ -538,29 +525,6 @@ public sealed partial class SettingsWindow : Window
 
         _settings.QuietLaptopOutsideGamesEnabled = !_settings.QuietLaptopOutsideGamesEnabled;
         UpdateSectionUi();
-    }
-
-    private void OnWeatherPrimaryCityChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_isInitializing)
-        {
-            return;
-        }
-
-        _settings.WeatherPrimaryCity = WeatherPrimaryCityTextBox.Text;
-    }
-
-    private void OnWeatherSecondaryCitiesChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_isInitializing)
-        {
-            return;
-        }
-
-        IEnumerable<string> cityNames = WeatherSecondaryCitiesTextBox.Text
-            .Split(["\r\n", "\n"], StringSplitOptions.None)
-            .Select(static value => value.Trim());
-        _settings.SetWeatherSecondaryCities(cityNames);
     }
 
     private void OnShortcutSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -947,7 +911,6 @@ public sealed partial class SettingsWindow : Window
         AiSectionPanel.Visibility = _selectedSection == "AI" ? Visibility.Visible : Visibility.Collapsed;
         DiscordSectionPanel.Visibility = _selectedSection == "Discord" ? Visibility.Visible : Visibility.Collapsed;
         MusicSectionPanel.Visibility = _selectedSection == "Music" ? Visibility.Visible : Visibility.Collapsed;
-        WeatherSectionPanel.Visibility = _selectedSection == "Weather" ? Visibility.Visible : Visibility.Collapsed;
         GamesSectionPanel.Visibility = _selectedSection == "Games" ? Visibility.Visible : Visibility.Collapsed;
         MenuSectionPanel.Visibility = _selectedSection == "Menu" ? Visibility.Visible : Visibility.Collapsed;
         RunCatSectionPanel.Visibility = _selectedSection == "RunCat" ? Visibility.Visible : Visibility.Collapsed;
@@ -956,7 +919,6 @@ public sealed partial class SettingsWindow : Window
         UpdateSectionButton(AiSectionButton, _selectedSection == "AI");
         UpdateSectionButton(DiscordSectionButton, _selectedSection == "Discord");
         UpdateSectionButton(MusicSectionButton, _selectedSection == "Music");
-        UpdateSectionButton(WeatherSectionButton, _selectedSection == "Weather");
         UpdateSectionButton(GamesSectionButton, _selectedSection == "Games");
         UpdateSectionButton(MenuSectionButton, _selectedSection == "Menu");
         UpdateSectionButton(RunCatSectionButton, _selectedSection == "RunCat");
@@ -982,7 +944,6 @@ public sealed partial class SettingsWindow : Window
         UpdateAppButtonOutlineButton();
         UpdateDiscordButtons();
         UpdateMusicButtons();
-        UpdateWeatherButtons();
         UpdateGameButtons();
         UpdateRunCatButtons();
     }
@@ -1861,13 +1822,6 @@ public sealed partial class SettingsWindow : Window
         MusicShowSourceToggleButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, showSourceToggle ? (byte)255 : (byte)214);
     }
 
-    private void UpdateWeatherButtons()
-    {
-        bool isWeatherEnabled = _settings.WeatherButtonEnabled;
-        WeatherButtonEnabledButton.Content = isWeatherEnabled ? "Enabled" : "Disabled";
-        WeatherButtonEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isWeatherEnabled ? (byte)48 : (byte)0, 255, 255, 255));
-        WeatherButtonEnabledButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isWeatherEnabled ? (byte)255 : (byte)214);
-    }
 
     private void UpdateGameButtons()
     {

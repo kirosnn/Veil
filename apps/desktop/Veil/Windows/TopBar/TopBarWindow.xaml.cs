@@ -42,8 +42,6 @@ public sealed partial class TopBarWindow : Window
     private static readonly ImageSource YouTubeDarkIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/youtube-dark.svg"));
     private static readonly ImageSource DiscordLightIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/discord.svg"));
     private static readonly ImageSource DiscordDarkIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/discord-dark.svg"));
-    private static readonly ImageSource PanelThemeLightIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/theme-adjustments.svg"));
-    private static readonly ImageSource PanelThemeDarkIconSource = new SvgImageSource(new Uri("ms-appx:///Assets/Icons/theme-adjustments-dark.svg"));
     private static readonly DiscordNotificationService SharedDiscordNotificationService = new();
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _visualTimer;
@@ -69,13 +67,10 @@ public sealed partial class TopBarWindow : Window
     private FinderHotkeyService? _finderHotkeyService;
     private SettingsWindow? _settingsWindow;
     private SystemStatsWindow? _systemStatsWindow;
-    private WeatherWindow? _weatherWindow;
-    private PanelThemeWindow? _panelThemeWindow;
     private MusicControlWindow? _musicControlWindow;
     private DiscordNotificationWindow? _discordNotificationWindow;
     private readonly DiscordNotificationService _discordNotificationService;
     private readonly MediaControlService _mediaControlService = new();
-    private readonly WeatherService _weatherService = new();
     private RunCatService? _runCatService;
     private readonly GamePerformanceService _gamePerformanceService;
     private Button[] _shortcutButtons = [];
@@ -83,7 +78,6 @@ public sealed partial class TopBarWindow : Window
     private int _runCatLoadVersion;
     private int _musicAlbumArtLoadVersion;
     private string? _lastRunCatTintHex;
-    private readonly DispatcherTimer _weatherRefreshTimer;
     private readonly DispatcherTimer _backgroundMaintenanceTimer;
     private int _backgroundMaintenanceInFlight;
     private string _lastWindowRegionSignature = string.Empty;
@@ -114,7 +108,6 @@ public sealed partial class TopBarWindow : Window
 
         InitializeComponent();
         Title = "Veil TopBar";
-        UpdateWeatherButton();
         if (_startHiddenUntilReady)
         {
             RootPanel.Opacity = 0;
@@ -133,12 +126,6 @@ public sealed partial class TopBarWindow : Window
             Interval = AdaptiveVisualRefreshInterval
         };
         _visualTimer.Tick += OnVisualTick;
-
-        _weatherRefreshTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMinutes(20)
-        };
-        _weatherRefreshTimer.Tick += OnWeatherRefreshTick;
 
         _backgroundMaintenanceTimer = new DispatcherTimer
         {
@@ -189,7 +176,6 @@ public sealed partial class TopBarWindow : Window
 
         RebuildShortcutButtons();
         _ = InstalledAppService.PreloadAsync();
-        _ = InitWeatherAsync();
         _ = ApplyRunCatSettingsAsync();
         _ = InitMediaControlAsync();
         _ = InitDiscordNotificationsAsync();
@@ -211,10 +197,8 @@ public sealed partial class TopBarWindow : Window
         AppLogger.Info($"TopBarWindow closed for {_monitorId}. Hidden={_isHidden} MinimalMode={_isGameMinimalMode}.");
         _clockTimer.Stop();
         _visualTimer.Stop();
-        _weatherRefreshTimer.Stop();
         _backgroundMaintenanceTimer.Stop();
         _settings.Changed -= OnSettingsChanged;
-        _weatherService.StateChanged -= OnWeatherStateChanged;
         _mediaControlService.StateChanged -= OnMediaStateChanged;
         _discordNotificationService.NotificationsChanged -= OnDiscordNotificationsChanged;
         _discordNotificationService.ReleaseDemand(_discordDemandOwnerId);
@@ -375,13 +359,10 @@ public sealed partial class TopBarWindow : Window
             _finderHotkeyService?.SetEnabled(_settings.FinderHotkeyEnabled);
             _musicControlWindow?.RefreshLayout();
             _discordNotificationWindow?.RefreshLayout();
-            _weatherWindow?.RefreshAppearance();
             _systemStatsWindow?.RefreshAppearance();
             UpdateMusicButtonVisibility();
             UpdateDiscordButtonVisibility();
             UpdateDiscordDemand(boost: true);
-            UpdateWeatherButton();
-            _ = _weatherService.RefreshAsync(true);
             _ = ApplyRunCatSettingsAsync();
         });
     }
@@ -456,10 +437,6 @@ public sealed partial class TopBarWindow : Window
             _settings.MusicButtonEnabled,
             _settings.MusicShowVolume,
             _settings.MusicShowSourceToggle,
-            _settings.WeatherButtonEnabled,
-            _settings.WeatherPrimaryCity,
-            string.Join(",", _settings.WeatherSecondaryCities),
-            _settings.TopBarPanelTheme,
             _settings.ShowAppButtonOutline,
             _settings.RunCatEnabled,
             _settings.RunCatRunner,

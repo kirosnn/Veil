@@ -10,9 +10,8 @@ internal sealed class DictationHotkeyService : IDisposable
     private readonly DispatcherQueue _dispatcherQueue;
     private LowLevelKeyboardProc? _hookProc;
     private IntPtr _hookHandle;
-    private bool _capsPressed;
-    private bool _comboActive;
-    private bool _capsUsedAsModifier;
+    private bool _isHeld;
+    private bool _captureActive;
     private bool _disposed;
 
     internal DictationHotkeyService(DispatcherQueue dispatcherQueue)
@@ -49,89 +48,43 @@ internal sealed class DictationHotkeyService : IDisposable
             return CallNextHookEx(_hookHandle, nCode, wParam, lParam);
         }
 
+        if (data.vkCode != VK_RCONTROL)
+        {
+            return CallNextHookEx(_hookHandle, nCode, wParam, lParam);
+        }
+
         uint message = unchecked((uint)wParam.ToInt64());
         bool isKeyDown = message is WM_KEYDOWN or WM_SYSKEYDOWN;
         bool isKeyUp = message is WM_KEYUP or WM_SYSKEYUP;
 
-        switch (data.vkCode)
+        if (isKeyDown && !_isHeld)
         {
-            case VK_CAPITAL:
-                if (isKeyDown)
-                {
-                    _capsPressed = true;
-                    _capsUsedAsModifier = false;
-                    return (IntPtr)1;
-                }
+            _isHeld = true;
+            if (!_captureActive && CanStartCapture?.Invoke() == true)
+            {
+                _captureActive = true;
+                Enqueue(() => CaptureStarted?.Invoke());
+            }
+            return (IntPtr)1;
+        }
 
-                if (isKeyUp)
-                {
-                    _capsPressed = false;
+        if (isKeyUp && _isHeld)
+        {
+            _isHeld = false;
+            if (_captureActive)
+            {
+                _captureActive = false;
+                Enqueue(() => CaptureStopped?.Invoke());
+            }
+            return (IntPtr)1;
+        }
 
-                    if (_comboActive)
-                    {
-                        _comboActive = false;
-                        Enqueue(() => CaptureStopped?.Invoke());
-                        return (IntPtr)1;
-                    }
-
-                    if (!_capsUsedAsModifier)
-                    {
-                        SimulateCapsLockToggle();
-                    }
-
-                    return (IntPtr)1;
-                }
-
-                break;
-
-            case VK_SPACE:
-                if (_capsPressed || _comboActive)
-                {
-                    _capsUsedAsModifier = true;
-
-                    if (isKeyDown)
-                    {
-                        if (!_comboActive)
-                        {
-                            _comboActive = true;
-                            if (CanStartCapture?.Invoke() == true)
-                            {
-                                Enqueue(() => CaptureStarted?.Invoke());
-                            }
-                        }
-
-                        return (IntPtr)1;
-                    }
-
-                    if (isKeyUp)
-                    {
-                        if (_comboActive)
-                        {
-                            _comboActive = false;
-                            Enqueue(() => CaptureStopped?.Invoke());
-                        }
-
-                        return (IntPtr)1;
-                    }
-                }
-
-                break;
-
-            default:
-                if (_capsPressed)
-                {
-                    _capsUsedAsModifier = true;
-                }
-                break;
+        if (_isHeld)
+        {
+            return (IntPtr)1;
         }
 
         return CallNextHookEx(_hookHandle, nCode, wParam, lParam);
-    }
-
-    private void SimulateCapsLockToggle()
-    {
-        KeybdEvent((byte)VK_CAPITAL, 0, 0, 0);
-        KeybdEvent((byte)VK_CAPITAL, 0, KEYEVENTF_KEYUP, 0);
     }
 
     private void Enqueue(Action action)

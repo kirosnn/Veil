@@ -54,7 +54,7 @@ public sealed partial class DiscordNotificationWindow : Window
         _settings.Changed += OnSettingsChanged;
     }
 
-    private bool UseLightTheme => _settings.TopBarPanelTheme == "Light";
+    private bool UseLightTheme => false;
 
     internal void SetDiscordService(DiscordNotificationService service)
     {
