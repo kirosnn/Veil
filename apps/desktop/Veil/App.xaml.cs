@@ -285,8 +285,7 @@ public partial class App : Application
             bool configuredGameRunning = _gameDetectionService.IsConfiguredGameRunning(_normalizedConfiguredGameProcessNames);
             GameDetectionService.ForegroundProcessInfo foregroundProcessInfo = default;
 
-            bool hasForegroundProcess = detectionMode == GameDetectionService.HybridMode &&
-                _gameDetectionService.TryGetForegroundProcessInfo(_topBarWindowHandles, out foregroundProcessInfo, out _);
+            bool hasForegroundProcess = _gameDetectionService.TryGetForegroundProcessInfo(_topBarWindowHandles, out foregroundProcessInfo, out _);
 
             foreach (TopBarWindow topBarWindow in _topBarWindows.Values)
             {
@@ -298,15 +297,25 @@ public partial class App : Application
 
                     if (hasForegroundProcess)
                     {
-                        activeGameProcessId = _gameDetectionService.TryGetForegroundGameProcessIdForScreen(
-                            foregroundProcessInfo,
-                            topBarWindow.ScreenBounds,
-                            _normalizedConfiguredGameProcessNames);
-                        shouldHideForForegroundWindow = activeGameProcessId.HasValue;
-
-                        if (!gameRunning)
+                        if (detectionMode == GameDetectionService.HybridMode)
                         {
-                            gameRunning = activeGameProcessId.HasValue;
+                            activeGameProcessId = _gameDetectionService.TryGetForegroundGameProcessIdForScreen(
+                                foregroundProcessInfo,
+                                topBarWindow.ScreenBounds,
+                                _normalizedConfiguredGameProcessNames);
+                            shouldHideForForegroundWindow = activeGameProcessId.HasValue;
+
+                            if (!gameRunning)
+                            {
+                                gameRunning = activeGameProcessId.HasValue;
+                            }
+                        }
+
+                        if (!shouldHideForForegroundWindow && _settings.HideForFullscreen)
+                        {
+                            shouldHideForForegroundWindow = _gameDetectionService.IsForegroundWindowFullscreenForScreen(
+                                foregroundProcessInfo,
+                                topBarWindow.ScreenBounds);
                         }
                     }
 
