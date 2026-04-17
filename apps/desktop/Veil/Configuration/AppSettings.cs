@@ -49,6 +49,7 @@ internal sealed partial class AppSettings
     private bool _backgroundOptimizationEnabled = true;
     private bool _systemPowerBoostEnabled = true;
     private bool _quietLaptopOutsideGamesEnabled = true;
+    private bool _hideForFullscreen = true;
     private string _topBarDisplayMode = "Primary";
     private string[] _topBarMonitorIds = [];
     private bool _showAppButtonOutline = true;
