@@ -483,6 +483,17 @@ public sealed partial class SettingsWindow : Window
         UpdateSectionUi();
     }
 
+    private void OnHideForFullscreenButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _settings.HideForFullscreen = !_settings.HideForFullscreen;
+        UpdateSectionUi();
+    }
+
     private void OnBackgroundOptimizationEnabledButtonClick(object sender, RoutedEventArgs e)
     {
         if (_isInitializing)
@@ -1825,6 +1836,11 @@ public sealed partial class SettingsWindow : Window
 
     private void UpdateGameButtons()
     {
+        bool isHideForFullscreen = _settings.HideForFullscreen;
+        HideForFullscreenButton.Content = isHideForFullscreen ? "Enabled" : "Disabled";
+        HideForFullscreenButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isHideForFullscreen ? (byte)48 : (byte)0, 255, 255, 255));
+        HideForFullscreenButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isHideForFullscreen ? (byte)255 : (byte)214);
+
         bool isBackgroundOptimizationEnabled = _settings.BackgroundOptimizationEnabled;
         BackgroundOptimizationEnabledButton.Content = isBackgroundOptimizationEnabled ? "Enabled" : "Disabled";
         BackgroundOptimizationEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isBackgroundOptimizationEnabled ? (byte)48 : (byte)0, 255, 255, 255));
