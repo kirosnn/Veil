@@ -16,9 +16,6 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <DisableXbfGeneration>false</DisableXbfGeneration>
     <ApplicationIcon>Assets\Logo\veil.ico</ApplicationIcon>
-    <FinderAiWebRoot>Assets\Web\FinderAi</FinderAiWebRoot>
-    <FinderAiTsConfig>$(FinderAiWebRoot)\tsconfig.json</FinderAiTsConfig>
-    <FinderAiTsOutput>$(FinderAiWebRoot)\dist\app.js</FinderAiTsOutput>
   </PropertyGroup>
 
   <ItemGroup>
@@ -53,20 +50,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-
-  <ItemGroup>
-    <FinderAiWebSources Include="$(FinderAiWebRoot)\src\**\*.ts" />
-    <FinderAiWebSources Include="$(FinderAiWebRoot)\index.html" />
-    <FinderAiWebSources Include="$(FinderAiWebRoot)\styles.css" />
-    <FinderAiWebSources Include="$(FinderAiTsConfig)" />
-  </ItemGroup>
-
-  <Target Name="BuildFinderAiWeb"
-          BeforeTargets="BeforeBuild"
-          Inputs="@(FinderAiWebSources)"
-          Outputs="$(FinderAiTsOutput)">
-    <Exec Command='tsc -p "$(FinderAiTsConfig)"' />
-  </Target>
 
   <Target Name="BuildVeilSpeechCli"
           BeforeTargets="BeforeBuild"
