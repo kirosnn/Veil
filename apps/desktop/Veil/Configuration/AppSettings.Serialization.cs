@@ -52,6 +52,7 @@ internal sealed partial class AppSettings
             BackgroundOptimizationEnabled = _backgroundOptimizationEnabled,
             SystemPowerBoostEnabled = _systemPowerBoostEnabled,
             QuietLaptopOutsideGamesEnabled = _quietLaptopOutsideGamesEnabled,
+            HideForFullscreen = _hideForFullscreen,
             ShortcutButtons = _shortcutButtons
                 .Select(setting => setting is null
                     ? null
@@ -137,6 +138,7 @@ internal sealed partial class AppSettings
                 settings._backgroundOptimizationEnabled = dto.BackgroundOptimizationEnabled;
                 settings._systemPowerBoostEnabled = dto.SystemPowerBoostEnabled;
                 settings._quietLaptopOutsideGamesEnabled = dto.QuietLaptopOutsideGamesEnabled;
+                settings._hideForFullscreen = dto.HideForFullscreen;
                 settings._shortcutButtons = NormalizeShortcutButtons(dto.ShortcutButtons);
 
                 if (requiresSave)
@@ -196,6 +198,7 @@ internal sealed partial class AppSettings
         public bool BackgroundOptimizationEnabled { get; set; } = true;
         public bool SystemPowerBoostEnabled { get; set; } = true;
         public bool QuietLaptopOutsideGamesEnabled { get; set; } = true;
+        public bool HideForFullscreen { get; set; } = true;
         public AppShortcutDto?[]? ShortcutButtons { get; set; }
     }
 
