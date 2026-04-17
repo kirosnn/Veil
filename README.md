@@ -77,6 +77,43 @@ Live development helper:
 
 `dev.cmd` also watches Finder AI web sources under `apps/desktop/Veil/Assets/Web/FinderAi` and rebuilds the app when `.ts`, `.html`, `.css`, or the local `tsconfig.json` changes.
 
+## Performance Benchmark
+
+The repository includes a local benchmark runner that compares four scenarios:
+
+- desktop workload without Veil
+- desktop workload with Veil
+- fullscreen game-like workload without Veil
+- fullscreen game-like workload with Veil
+
+Run it with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\benchmark-perf.ps1
+```
+
+The benchmark now includes default non-regression assertions for the game scenario and exits with a non-zero code when Veil exceeds the configured thresholds.
+
+Example with stricter thresholds and a shorter local run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\benchmark-perf.ps1 `
+  -SkipBuild `
+  -DurationSeconds 15 `
+  -WarmupSeconds 4 `
+  -MaxGameFpsDropPercent 3 `
+  -MaxGameP95FrameIncreaseMs 2
+```
+
+Artifacts are written under `artifacts/perf/<timestamp>/`:
+
+- `summary.md`: compact comparison table
+- `summary.json`: aggregated scenario data
+- `assertions.json`: pass/fail results for non-regression thresholds
+- per-scenario `samples.json`: raw sampled process metrics
+- per-scenario `workload-report.json`: workload FPS and frame pacing
+- per-scenario `veil.log`: Veil log snapshot when applicable
+
 ## Packaging
 
 The repository includes a local setup builder:

@@ -110,8 +110,12 @@ internal sealed class FinderHotkeyService : IDisposable
 
         if (_hwnd != IntPtr.Zero)
         {
+            WndProc? wndProcDelegate = _wndProcDelegate;
             DestroyWindow(_hwnd);
+            GC.KeepAlive(wndProcDelegate);
             _hwnd = IntPtr.Zero;
         }
+
+        _wndProcDelegate = null;
     }
 }

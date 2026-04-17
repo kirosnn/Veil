@@ -63,4 +63,56 @@ public sealed class GamePerformanceServiceTests
 
         Assert.IsFalse(shouldUseQuietProfile);
     }
+
+    [TestMethod]
+    public void ShouldCompactVeilHeapOnModeTransition_returns_true_only_when_entering_game_mode()
+    {
+        Assert.IsTrue(GamePerformanceService.ShouldCompactVeilHeapOnModeTransition(
+            GamePerformanceService.VeilOptimizationMode.None,
+            GamePerformanceService.VeilOptimizationMode.Game));
+        Assert.IsTrue(GamePerformanceService.ShouldCompactVeilHeapOnModeTransition(
+            GamePerformanceService.VeilOptimizationMode.Background,
+            GamePerformanceService.VeilOptimizationMode.Game));
+        Assert.IsFalse(GamePerformanceService.ShouldCompactVeilHeapOnModeTransition(
+            GamePerformanceService.VeilOptimizationMode.Game,
+            GamePerformanceService.VeilOptimizationMode.Game));
+        Assert.IsFalse(GamePerformanceService.ShouldCompactVeilHeapOnModeTransition(
+            GamePerformanceService.VeilOptimizationMode.Game,
+            GamePerformanceService.VeilOptimizationMode.Background));
+    }
+
+    [TestMethod]
+    public void ShouldTrimVeilWorkingSetOnModeTransition_returns_false_without_real_transition()
+    {
+        DateTime nowUtc = new(2026, 4, 12, 10, 0, 0, DateTimeKind.Utc);
+        DateTime lastTrimUtc = nowUtc - TimeSpan.FromMinutes(30);
+
+        Assert.IsFalse(GamePerformanceService.ShouldTrimVeilWorkingSetOnModeTransition(
+            GamePerformanceService.VeilOptimizationMode.None,
+            GamePerformanceService.VeilOptimizationMode.None,
+            nowUtc,
+            lastTrimUtc));
+        Assert.IsFalse(GamePerformanceService.ShouldTrimVeilWorkingSetOnModeTransition(
+            GamePerformanceService.VeilOptimizationMode.Background,
+            GamePerformanceService.VeilOptimizationMode.Background,
+            nowUtc,
+            lastTrimUtc));
+    }
+
+    [TestMethod]
+    public void ShouldTrimVeilWorkingSetOnModeTransition_respects_trim_cooldown()
+    {
+        DateTime nowUtc = new(2026, 4, 12, 10, 0, 0, DateTimeKind.Utc);
+
+        Assert.IsTrue(GamePerformanceService.ShouldTrimVeilWorkingSetOnModeTransition(
+            GamePerformanceService.VeilOptimizationMode.None,
+            GamePerformanceService.VeilOptimizationMode.Background,
+            nowUtc,
+            nowUtc - TimeSpan.FromMinutes(5)));
+        Assert.IsFalse(GamePerformanceService.ShouldTrimVeilWorkingSetOnModeTransition(
+            GamePerformanceService.VeilOptimizationMode.Background,
+            GamePerformanceService.VeilOptimizationMode.Game,
+            nowUtc,
+            nowUtc - TimeSpan.FromSeconds(30)));
+    }
 }

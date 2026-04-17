@@ -25,6 +25,15 @@ internal sealed class GameDetectionService
         "\\battle.net\\",
         "\\games\\"
     ];
+    private static readonly HashSet<string> RemoteGamingProcessNames =
+    [
+        "parsec",
+        "parsecd",
+        "moonlight",
+        "sunshine",
+        "steamlink",
+        "steamstreamingclient"
+    ];
     private static readonly HashSet<string> ForegroundFallbackDenyList =
     [
         "applicationframehost",
@@ -196,6 +205,7 @@ internal sealed class GameDetectionService
         }
 
         return MatchesConfiguredList(processInfo.ProcessName, configuredProcessNames) ||
+            IsRemoteGamingProcess(processInfo.ProcessName) ||
             IsCatalogMatch(processInfo) ||
             IsLikelyGameForeground(processInfo);
     }
@@ -219,6 +229,13 @@ internal sealed class GameDetectionService
         }
 
         return configuredProcessNames.Contains(processName);
+    }
+
+    internal static bool IsRemoteGamingProcess(string? processName)
+    {
+        string normalizedProcessName = GameProcessMonitor.NormalizeProcessName(processName);
+        return !string.IsNullOrWhiteSpace(normalizedProcessName) &&
+            RemoteGamingProcessNames.Contains(normalizedProcessName);
     }
 
     private void EnsureCatalogRefreshScheduled(bool force)
@@ -319,7 +336,17 @@ internal sealed class GameDetectionService
             return false;
         }
 
-        string normalizedPath = processInfo.ExecutablePath.Replace('/', '\\');
+        return IsLikelyGameInstallationPath(processInfo.ExecutablePath);
+    }
+
+    internal static bool IsLikelyGameInstallationPath(string? executablePath)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath))
+        {
+            return false;
+        }
+
+        string normalizedPath = executablePath.Replace('/', '\\');
         return GameDirectoryMarkers.Any(marker => normalizedPath.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 

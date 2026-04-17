@@ -74,7 +74,10 @@
       "Bash(mv FinderWindow.xaml FinderWindow.xaml.cs Finder/)",
       "Bash(mv AltTabWindow.xaml AltTabWindow.xaml.cs AltTab/)",
       "Bash(mv SettingsWindow.xaml SettingsWindow.xaml.cs Settings/)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(Start-Process *)",
+      "Bash(cmd.exe *)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \"C:\\\\Users\\\\Nassim\\\\Projects\\\\Veil\\\\scripts\\\\build-setup.ps1\")"
     ]
   }
 }

@@ -183,8 +183,12 @@ internal sealed class DesktopContextMenuService : IDisposable
 
         if (_messageHwnd != IntPtr.Zero)
         {
+            WndProc? wndProcDelegate = _wndProcDelegate;
             DestroyWindow(_messageHwnd);
+            GC.KeepAlive(wndProcDelegate);
             _messageHwnd = IntPtr.Zero;
         }
+
+        _wndProcDelegate = null;
     }
 }

@@ -17,6 +17,8 @@ internal sealed record TextInsertionTarget(IntPtr WindowHandle, IntPtr FocusHand
 internal sealed class FocusedTextInsertionService
 {
     private const int ForegroundActivationDelayMs = 24;
+    private const int ForegroundActivationPollIntervalMs = 10;
+    private const int ForegroundActivationMaxWaitMs = 300;
     private const int ClipboardPropagationDelayMs = 20;
     private const int ClipboardRestoreDelayMs = 120;
 
@@ -54,7 +56,7 @@ internal sealed class FocusedTextInsertionService
         if (needsForegroundActivation)
         {
             SetForegroundWindow(insertionTarget.WindowHandle);
-            await Task.Delay(ForegroundActivationDelayMs, cancellationToken);
+            await WaitForForegroundWindowAsync(insertionTarget.WindowHandle, cancellationToken);
         }
 
         if (TryRestoreFocus(insertionTarget))
@@ -62,10 +64,12 @@ internal sealed class FocusedTextInsertionService
             await Task.Delay(ForegroundActivationDelayMs, cancellationToken);
         }
 
-        AppLogger.Info(
-            $"Dictation target window=0x{insertionTarget.WindowHandle.ToInt64():X} focus=0x{insertionTarget.FocusHandle.ToInt64():X} caret=0x{insertionTarget.CaretHandle.ToInt64():X} class={GetTargetClassName(insertionTarget) ?? "unknown"} automation={(insertionTarget.EditableElement is not null)}.");
+        TextInsertionTarget effectiveInsertionTarget = RefreshInsertionTarget(insertionTarget);
 
-        if (TryInsertWithControlMessage(text, insertionTarget, out string? controlMessageMethod))
+        AppLogger.Info(
+            $"Dictation target window=0x{effectiveInsertionTarget.WindowHandle.ToInt64():X} focus=0x{effectiveInsertionTarget.FocusHandle.ToInt64():X} caret=0x{effectiveInsertionTarget.CaretHandle.ToInt64():X} class={GetTargetClassName(effectiveInsertionTarget) ?? "unknown"} automation={(effectiveInsertionTarget.EditableElement is not null)}.");
+
+        if (TryInsertWithControlMessage(text, effectiveInsertionTarget, out string? controlMessageMethod))
         {
             AppLogger.Info($"Dictation inserted using {controlMessageMethod}.");
             return new TextInsertionResult(
@@ -73,7 +77,7 @@ internal sealed class FocusedTextInsertionService
                 text.Length > 80 ? text[..80] + "..." : text);
         }
 
-        if (await TryInsertWithPasteAsync(text, insertionTarget, cancellationToken))
+        if (await TryInsertWithPasteAsync(text, effectiveInsertionTarget, cancellationToken))
         {
             AppLogger.Info("Dictation inserted using clipboard paste.");
             return new TextInsertionResult(
@@ -93,6 +97,22 @@ internal sealed class FocusedTextInsertionService
         return await FallbackToClipboardAsync(
             text,
             "Text was copied to the clipboard because direct insertion failed.");
+    }
+
+    private static TextInsertionTarget RefreshInsertionTarget(TextInsertionTarget insertionTarget)
+    {
+        if (insertionTarget.WindowHandle == IntPtr.Zero)
+        {
+            return insertionTarget;
+        }
+
+        TextInsertionTarget refreshedTarget = ResolveInsertionTarget(insertionTarget.WindowHandle);
+        return refreshedTarget.WindowHandle == IntPtr.Zero
+            ? insertionTarget
+            : refreshedTarget with
+            {
+                EditableElement = refreshedTarget.EditableElement ?? insertionTarget.EditableElement
+            };
     }
 
     internal async Task<TextInsertionResult> FallbackToClipboardAsync(string text, string message)
@@ -268,10 +288,15 @@ internal sealed class FocusedTextInsertionService
                 return true;
             }
 
-            KeybdEvent((byte)VK_CONTROL, 0, 0, 0);
-            KeybdEvent((byte)VK_V, 0, 0, 0);
-            KeybdEvent((byte)VK_V, 0, KEYEVENTF_KEYUP, 0);
-            KeybdEvent((byte)VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+            IntPtr targetWindowForPaste = ResolveBestTargetHandle(insertionTarget);
+            IntPtr foregroundForPaste = GetForegroundWindow();
+            if (foregroundForPaste != insertionTarget.WindowHandle && foregroundForPaste != targetWindowForPaste)
+            {
+                SetForegroundWindow(insertionTarget.WindowHandle);
+                await Task.Delay(ForegroundActivationDelayMs, cancellationToken);
+            }
+
+            SendCtrlV();
             return true;
         }
         catch (Exception ex)
@@ -388,6 +413,50 @@ internal sealed class FocusedTextInsertionService
                 {
                     wVk = 0,
                     wScan = character,
+                    dwFlags = flags,
+                    time = 0,
+                    dwExtraInfo = IntPtr.Zero
+                }
+            }
+        };
+    }
+
+    private static async Task WaitForForegroundWindowAsync(IntPtr windowHandle, CancellationToken cancellationToken)
+    {
+        int elapsed = 0;
+        while (elapsed < ForegroundActivationMaxWaitMs && !cancellationToken.IsCancellationRequested)
+        {
+            if (GetForegroundWindow() == windowHandle)
+            {
+                return;
+            }
+
+            await Task.Delay(ForegroundActivationPollIntervalMs, cancellationToken);
+            elapsed += ForegroundActivationPollIntervalMs;
+        }
+    }
+
+    private static void SendCtrlV()
+    {
+        var inputs = new Input[4];
+        inputs[0] = CreateVirtualKeyInput((ushort)VK_CONTROL, 0);
+        inputs[1] = CreateVirtualKeyInput((ushort)VK_V, 0);
+        inputs[2] = CreateVirtualKeyInput((ushort)VK_V, KEYEVENTF_KEYUP);
+        inputs[3] = CreateVirtualKeyInput((ushort)VK_CONTROL, KEYEVENTF_KEYUP);
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
+    }
+
+    private static Input CreateVirtualKeyInput(ushort vk, uint flags)
+    {
+        return new Input
+        {
+            type = INPUT_KEYBOARD,
+            Anonymous = new InputUnion
+            {
+                ki = new KeybdInput
+                {
+                    wVk = vk,
+                    wScan = 0,
                     dwFlags = flags,
                     time = 0,
                     dwExtraInfo = IntPtr.Zero

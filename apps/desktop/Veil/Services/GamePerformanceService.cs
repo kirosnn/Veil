@@ -9,6 +9,13 @@ namespace Veil.Services;
 
 internal sealed class GamePerformanceService : IDisposable
 {
+    internal enum VeilOptimizationMode
+    {
+        None = 0,
+        Background = 1,
+        Game = 2
+    }
+
     private static readonly TimeSpan CompanionRefreshMinimumInterval = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan BackgroundMaintenanceMinimumInterval = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan BackgroundPressureReliefMinimumInterval = TimeSpan.FromMinutes(6);
@@ -18,6 +25,9 @@ internal sealed class GamePerformanceService : IDisposable
     private static readonly TimeSpan PressureTempCleanupMinimumInterval = TimeSpan.FromMinutes(20);
     private static readonly TimeSpan PressureTempFileMinimumAge = TimeSpan.FromHours(3);
     private static readonly TimeSpan WorkingSetTrimMinimumInterval = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan LightBackgroundWorkingSetTrimMinimumInterval = TimeSpan.FromMinutes(4);
+    private static readonly TimeSpan VeilWorkingSetTrimMinimumInterval = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan VeilHeapCompactionMinimumInterval = TimeSpan.FromMinutes(8);
     private static readonly TimeSpan PressureCandidateMinimumAge = TimeSpan.FromMinutes(3);
     private static readonly TimeSpan SystemPowerBoostMinimumHoldDuration = TimeSpan.FromMinutes(3);
     private static readonly TimeSpan XboxCleanupMinimumInterval = TimeSpan.FromSeconds(75);
@@ -29,6 +39,9 @@ internal sealed class GamePerformanceService : IDisposable
     private const int AvailableMemoryPressureThresholdMb = 4096;
     private const int BackgroundAvailableMemoryPressureThresholdMb = 3072;
     private const int SevereAvailableMemoryThresholdMb = 2048;
+    private const int LightBackgroundWorkingSetTrimThresholdMb = 96;
+    private const int VeilWorkingSetTrimThresholdMb = 160;
+    private const int VeilPrivateMemoryCompactionThresholdMb = 220;
     private static readonly string[] VoiceAndStreamingProcesses =
     [
         "discord",
@@ -122,7 +135,7 @@ internal sealed class GamePerformanceService : IDisposable
         "widgets"
     ];
 
-    private bool _veilGameOptimizationsApplied;
+    private VeilOptimizationMode _veilOptimizationMode;
     private ProcessPriorityClass _veilOriginalPriorityClass = ProcessPriorityClass.Normal;
     private bool _veilOriginalPriorityBoostEnabled = true;
     private int? _boostedGameProcessId;
@@ -135,6 +148,9 @@ internal sealed class GamePerformanceService : IDisposable
     private DateTime _lastPressureTempCleanupUtc = DateTime.MinValue;
     private DateTime _lastPressureReliefUtc = DateTime.MinValue;
     private DateTime _lastWorkingSetTrimUtc = DateTime.MinValue;
+    private DateTime _lastLightBackgroundTrimUtc = DateTime.MinValue;
+    private DateTime _lastVeilWorkingSetTrimUtc = DateTime.MinValue;
+    private DateTime _lastVeilHeapCompactionUtc = DateTime.MinValue;
     private DateTime _lastBackgroundMaintenanceUtc = DateTime.MinValue;
     private DateTime _lastSystemPowerBoostUtc = DateTime.MinValue;
     private DateTime _lastXboxCleanupUtc = DateTime.MinValue;
@@ -147,7 +163,7 @@ internal sealed class GamePerformanceService : IDisposable
     {
         lock (_syncRoot)
         {
-            ApplyVeilOptimizations(forGameMode: true);
+            ApplyVeilOptimizations(VeilOptimizationMode.Game);
             RefreshSystemPowerBoost(forGameMode: true);
             RefreshCompanionProcessPriorities();
             SuspendGameBackgroundProcesses(activeGameProcessId);
@@ -193,7 +209,7 @@ internal sealed class GamePerformanceService : IDisposable
             RestoreSuspendedGameProcesses();
             _lastCompanionRefreshUtc = DateTime.MinValue;
 
-            ApplyVeilOptimizations(forGameMode: false);
+            ApplyVeilOptimizations(VeilOptimizationMode.Background);
             RefreshBackgroundPowerProfile();
             CloseXboxProcessesOutsideGames();
             PerformBackgroundMaintenance();
@@ -210,13 +226,15 @@ internal sealed class GamePerformanceService : IDisposable
             _lastCompanionRefreshUtc = DateTime.MinValue;
             _lastPressureReliefUtc = DateTime.MinValue;
             _lastWorkingSetTrimUtc = DateTime.MinValue;
+            _lastLightBackgroundTrimUtc = DateTime.MinValue;
+            _lastVeilWorkingSetTrimUtc = DateTime.MinValue;
+            _lastVeilHeapCompactionUtc = DateTime.MinValue;
             _lastBackgroundMaintenanceUtc = DateTime.MinValue;
             _lastSystemPowerBoostUtc = DateTime.MinValue;
             _lastXboxCleanupUtc = DateTime.MinValue;
             _powerProfileService.RestoreOriginalProfile();
-            CloseXboxProcessesOutsideGames();
 
-            if (!_veilGameOptimizationsApplied)
+            if (_veilOptimizationMode == VeilOptimizationMode.None)
             {
                 return;
             }
@@ -231,7 +249,7 @@ internal sealed class GamePerformanceService : IDisposable
             {
             }
 
-            _veilGameOptimizationsApplied = false;
+            _veilOptimizationMode = VeilOptimizationMode.None;
             ScheduleTempCleanup();
         }
     }
@@ -242,41 +260,54 @@ internal sealed class GamePerformanceService : IDisposable
         _cpuCounter?.Dispose();
     }
 
-    private void ApplyVeilOptimizations(bool forGameMode)
+    private void ApplyVeilOptimizations(VeilOptimizationMode targetMode)
     {
-        if (_veilGameOptimizationsApplied)
+        if (targetMode == VeilOptimizationMode.None || _veilOptimizationMode == targetMode)
         {
             return;
         }
 
+        bool captureOriginalPriority = _veilOptimizationMode == VeilOptimizationMode.None;
+        bool enteringGameMode = targetMode == VeilOptimizationMode.Game && _veilOptimizationMode != VeilOptimizationMode.Game;
+        bool leavingGameMode = _veilOptimizationMode == VeilOptimizationMode.Game && targetMode != VeilOptimizationMode.Game;
+
         try
         {
             using Process currentProcess = Process.GetCurrentProcess();
-            _veilOriginalPriorityClass = currentProcess.PriorityClass;
-            _veilOriginalPriorityBoostEnabled = currentProcess.PriorityBoostEnabled;
+            if (captureOriginalPriority)
+            {
+                _veilOriginalPriorityClass = currentProcess.PriorityClass;
+                _veilOriginalPriorityBoostEnabled = currentProcess.PriorityBoostEnabled;
+            }
 
-            if (forGameMode)
+            if (enteringGameMode)
             {
                 currentProcess.PriorityBoostEnabled = false;
                 currentProcess.PriorityClass = ProcessPriorityClass.BelowNormal;
             }
+            else if (leavingGameMode)
+            {
+                currentProcess.PriorityBoostEnabled = _veilOriginalPriorityBoostEnabled;
+                currentProcess.PriorityClass = _veilOriginalPriorityClass;
+            }
 
-            SetProcessWorkingSetSize(currentProcess.Handle, new IntPtr(-1), new IntPtr(-1));
+            if (ShouldTrimVeilWorkingSetOnModeTransition(_veilOptimizationMode, targetMode, DateTime.UtcNow, _lastVeilWorkingSetTrimUtc))
+            {
+                SetProcessWorkingSetSize(currentProcess.Handle, new IntPtr(-1), new IntPtr(-1));
+                _lastVeilWorkingSetTrimUtc = DateTime.UtcNow;
+            }
         }
         catch
         {
         }
 
-        try
+        if (ShouldCompactVeilHeapOnModeTransition(_veilOptimizationMode, targetMode))
         {
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive, blocking: false, compacting: true);
-        }
-        catch
-        {
+            TryCompactMemory();
+            _lastVeilHeapCompactionUtc = DateTime.UtcNow;
         }
 
-        _veilGameOptimizationsApplied = true;
+        _veilOptimizationMode = targetMode;
     }
 
     private void RefreshCompanionProcessPriorities()
@@ -305,6 +336,7 @@ internal sealed class GamePerformanceService : IDisposable
 
         if (!TryGetPressureSnapshot(out SystemPressureSnapshot snapshot))
         {
+            MaintainVeilMemory(compactHeap: false, "background-idle-no-snapshot");
             RefreshBackgroundPowerProfile();
             return;
         }
@@ -313,6 +345,22 @@ internal sealed class GamePerformanceService : IDisposable
             snapshot.MemoryUsedPercent < BackgroundMemoryPressureThresholdPercent &&
             snapshot.AvailableMemoryMb > BackgroundAvailableMemoryPressureThresholdMb)
         {
+            int lightlyTrimmedProcesses = 0;
+            if (nowUtc - _lastLightBackgroundTrimUtc >= LightBackgroundWorkingSetTrimMinimumInterval)
+            {
+                lightlyTrimmedProcesses = TrimBackgroundWorkingSets(
+                    null,
+                    maxProcesses: 2,
+                    minimumWorkingSetBytes: LightBackgroundWorkingSetTrimThresholdMb * 1024L * 1024L);
+                _lastLightBackgroundTrimUtc = nowUtc;
+            }
+
+            if (lightlyTrimmedProcesses > 0)
+            {
+                AppLogger.Info($"Background idle care trimmed {lightlyTrimmedProcesses} non-game background working sets.");
+            }
+
+            MaintainVeilMemory(compactHeap: false, "background-idle");
             RefreshBackgroundPowerProfile();
             return;
         }
@@ -354,6 +402,8 @@ internal sealed class GamePerformanceService : IDisposable
         {
             AppLogger.Info($"Background care engaged. CPU {snapshot.CpuPercent:F0}% RAM {snapshot.MemoryUsedPercent}% Trimmed {trimmedProcesses} background working sets and closed {closedProcesses} helper processes.");
         }
+
+        MaintainVeilMemory(snapshot.IsSevereMemoryPressure, "background-pressure");
     }
 
     private void RelieveSystemPressure(int? activeGameProcessId)
@@ -749,6 +799,7 @@ internal sealed class GamePerformanceService : IDisposable
 
         string processName = GameProcessMonitor.NormalizeProcessName(process.ProcessName);
         if (string.IsNullOrWhiteSpace(processName) ||
+            IsProtectedGameOrRemoteProcess(process, processName) ||
             VoiceAndStreamingProcesses.Contains(processName, StringComparer.OrdinalIgnoreCase) ||
             ProtectedBackgroundProcesses.Contains(processName, StringComparer.OrdinalIgnoreCase))
         {
@@ -824,6 +875,7 @@ internal sealed class GamePerformanceService : IDisposable
 
         string processName = GameProcessMonitor.NormalizeProcessName(process.ProcessName);
         if (string.IsNullOrWhiteSpace(processName) ||
+            IsProtectedGameOrRemoteProcess(process, processName) ||
             VoiceAndStreamingProcesses.Contains(processName, StringComparer.OrdinalIgnoreCase) ||
             BrowserProcesses.Contains(processName, StringComparer.OrdinalIgnoreCase) ||
             ProtectedBackgroundProcesses.Contains(processName, StringComparer.OrdinalIgnoreCase))
@@ -985,6 +1037,79 @@ internal sealed class GamePerformanceService : IDisposable
         }
         catch
         {
+        }
+    }
+
+    private void MaintainVeilMemory(bool compactHeap, string reason)
+    {
+        DateTime nowUtc = DateTime.UtcNow;
+
+        try
+        {
+            using Process currentProcess = Process.GetCurrentProcess();
+            double workingSetMb = currentProcess.WorkingSet64 / (1024d * 1024d);
+            double privateMemoryMb = currentProcess.PrivateMemorySize64 / (1024d * 1024d);
+
+            bool shouldTrimWorkingSet =
+                nowUtc - _lastVeilWorkingSetTrimUtc >= VeilWorkingSetTrimMinimumInterval &&
+                workingSetMb >= VeilWorkingSetTrimThresholdMb;
+
+            bool shouldCompactHeap =
+                nowUtc - _lastVeilHeapCompactionUtc >= VeilHeapCompactionMinimumInterval &&
+                (compactHeap || privateMemoryMb >= VeilPrivateMemoryCompactionThresholdMb);
+
+            if (!shouldTrimWorkingSet && !shouldCompactHeap)
+            {
+                return;
+            }
+
+            if (shouldCompactHeap)
+            {
+                TryCompactMemory();
+                _lastVeilHeapCompactionUtc = nowUtc;
+            }
+
+            if (shouldTrimWorkingSet)
+            {
+                try
+                {
+                    SetProcessWorkingSetSize(currentProcess.Handle, new IntPtr(-1), new IntPtr(-1));
+                }
+                catch
+                {
+                }
+
+                _lastVeilWorkingSetTrimUtc = nowUtc;
+            }
+
+            AppLogger.Info(
+                $"Veil memory maintenance ran. Reason={reason} compactHeap={shouldCompactHeap} trimWorkingSet={shouldTrimWorkingSet} ws={workingSetMb:F1}MB private={privateMemoryMb:F1}MB.");
+        }
+        catch
+        {
+        }
+    }
+
+    private static bool IsProtectedGameOrRemoteProcess(Process process, string processName)
+    {
+        if (GameDetectionService.IsRemoteGamingProcess(processName))
+        {
+            return true;
+        }
+
+        if (AppSettings.Current.GameProcessNames.Contains(processName, StringComparer.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        try
+        {
+            string? executablePath = process.MainModule?.FileName;
+            return GameDetectionService.IsLikelyGameInstallationPath(executablePath);
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -1203,6 +1328,25 @@ internal sealed class GamePerformanceService : IDisposable
         }
 
         return false;
+    }
+
+    internal static bool ShouldCompactVeilHeapOnModeTransition(VeilOptimizationMode currentMode, VeilOptimizationMode targetMode)
+    {
+        return currentMode != VeilOptimizationMode.Game && targetMode == VeilOptimizationMode.Game;
+    }
+
+    internal static bool ShouldTrimVeilWorkingSetOnModeTransition(
+        VeilOptimizationMode currentMode,
+        VeilOptimizationMode targetMode,
+        DateTime nowUtc,
+        DateTime lastTrimUtc)
+    {
+        if (targetMode == VeilOptimizationMode.None || currentMode == targetMode)
+        {
+            return false;
+        }
+
+        return nowUtc - lastTrimUtc >= VeilWorkingSetTrimMinimumInterval;
     }
 
     private static void CleanupTempFiles(TimeSpan minimumFileAge, int maxDeletedItems, bool includeChildDirectoryFiles)

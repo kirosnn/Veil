@@ -72,6 +72,38 @@ public sealed class GameDetectionServiceTests
     }
 
     [TestMethod]
+    public void TryGetForegroundGameProcessIdForScreen_returns_process_id_for_fullscreen_parsec()
+    {
+        var service = new GameDetectionService();
+        var processInfo = new GameDetectionService.ForegroundProcessInfo(
+            77,
+            "parsecd",
+            @"C:\Program Files\Parsec\parsecd.exe",
+            new Rect
+            {
+                Left = 0,
+                Top = 0,
+                Right = 2560,
+                Bottom = 1440
+            });
+
+        int? processId = service.TryGetForegroundGameProcessIdForScreen(
+            processInfo,
+            new ScreenBounds(0, 0, 2560, 1440),
+            []);
+
+        Assert.AreEqual(77, processId);
+    }
+
+    [TestMethod]
+    public void IsRemoteGamingProcess_returns_true_for_parsec()
+    {
+        bool isRemoteGamingProcess = GameDetectionService.IsRemoteGamingProcess("Parsec.exe");
+
+        Assert.IsTrue(isRemoteGamingProcess);
+    }
+
+    [TestMethod]
     public void IsForegroundWindowFullscreenForScreen_returns_true_for_non_game_fullscreen_process()
     {
         var service = new GameDetectionService();
