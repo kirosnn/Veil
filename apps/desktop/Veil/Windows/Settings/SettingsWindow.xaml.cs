@@ -23,11 +23,8 @@ public sealed partial class SettingsWindow : Window
     private readonly ScreenBounds _screen;
     private readonly string _preferredMonitorId;
     private readonly AppSettings _settings;
-    private readonly AiSecretStore _aiSecretStore;
-    private readonly AiModelCatalogService _aiModelCatalogService;
     private readonly LocalSpeechModelStore _localSpeechModelStore;
     private readonly DispatcherTimer _sessionKeepAliveTimer;
-    private FinderAiWindow? _finderAiWindow;
     private IntPtr _hwnd;
     private DesktopAcrylicController? _acrylicController;
     private SystemBackdropConfiguration? _backdropConfig;
@@ -44,12 +41,10 @@ public sealed partial class SettingsWindow : Window
     ];
     private IReadOnlyList<MonitorSelectionOption> _monitorOptions = [];
     private CancellationTokenSource? _speechModelDownloadCancellationSource;
-    private CancellationTokenSource? _aiModelCatalogCancellationSource;
     private string? _activeSpeechModelDownloadId;
     private string? _speechModelMessageModelId;
     private string _speechModelMessage = string.Empty;
     private double _speechModelProgressPercent;
-    private IReadOnlyList<AiModelCatalogEntry> _aiModelOptions = [];
 
     internal event EventHandler? SessionExpired;
 
@@ -58,8 +53,6 @@ public sealed partial class SettingsWindow : Window
         _screen = screen;
         _preferredMonitorId = preferredMonitorId;
         _settings = AppSettings.Current;
-        _aiSecretStore = new AiSecretStore();
-        _aiModelCatalogService = new AiModelCatalogService();
         _localSpeechModelStore = new LocalSpeechModelStore();
 
         InitializeComponent();
@@ -590,7 +583,6 @@ public sealed partial class SettingsWindow : Window
 
     private void SyncLabels()
     {
-        AiProviderValueText.Text = AiProviderKind.ToDisplayName(_settings.AiProvider);
         TopBarDisplayModeValueText.Text = _settings.TopBarDisplayMode;
         TopBarStyleValueText.Text = _settings.TopBarStyle == "Transparent" ? "Clear" : _settings.TopBarStyle;
         TopBarOpacityValueText.Text = $"{Math.Round(_settings.TopBarOpacity * 100):0}%";
@@ -832,9 +824,6 @@ public sealed partial class SettingsWindow : Window
         }
         CancelSessionKeepAlive();
         _sessionKeepAliveTimer.Stop();
-        _aiModelCatalogCancellationSource?.Cancel();
-        _aiModelCatalogCancellationSource?.Dispose();
-        _aiModelCatalogCancellationSource = null;
         SizeChanged -= OnSettingsWindowSizeChanged;
         _speechModelDownloadCancellationSource?.Cancel();
         _speechModelDownloadCancellationSource?.Dispose();
@@ -842,11 +831,6 @@ public sealed partial class SettingsWindow : Window
         _acrylicController?.Dispose();
         _acrylicController = null;
         _backdropConfig = null;
-        if (_finderAiWindow is not null)
-        {
-            _finderAiWindow.Close();
-            _finderAiWindow = null;
-        }
     }
 
     private void OnSettingsWindowSizeChanged(object sender, WindowSizeChangedEventArgs e)
@@ -946,8 +930,7 @@ public sealed partial class SettingsWindow : Window
         BlurIntensityPanel.Visibility = _settings.TopBarStyle == "Blur" ? Visibility.Visible : Visibility.Collapsed;
         TopBarOpacityPanel.Visibility = _settings.TopBarStyle is "Solid" or "Blur"
             ? Visibility.Visible : Visibility.Collapsed;
-        UpdateAiProviderButtons();
-        ApplyAiProviderInputs();
+        InitializeAiSpeechModelPicker();
         SyncSolidColorPreview();
         SyncTopBarForegroundColorPreview();
         UpdateFinderBubbleButton();
@@ -1006,66 +989,6 @@ public sealed partial class SettingsWindow : Window
             };
             TopBarMonitorSelectionPanel.Children.Add(button);
         }
-    }
-
-    private void OnAiProviderButtonClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: string provider })
-        {
-            return;
-        }
-
-        _settings.AiProvider = provider;
-        SyncLabels();
-        UpdateSectionUi();
-    }
-
-    private void UpdateAiProviderButtons()
-    {
-        UpdateTopBarStyleButton(AiProviderChatGptButton, _settings.AiProvider == AiProviderKind.ChatGptPremium);
-        UpdateTopBarStyleButton(AiProviderOpenAiButton, _settings.AiProvider == AiProviderKind.OpenAi);
-        UpdateTopBarStyleButton(AiProviderAnthropicButton, _settings.AiProvider == AiProviderKind.Anthropic);
-        UpdateTopBarStyleButton(AiProviderMistralButton, _settings.AiProvider == AiProviderKind.Mistral);
-        UpdateTopBarStyleButton(AiProviderOllamaButton, _settings.AiProvider == AiProviderKind.Ollama);
-        UpdateTopBarStyleButton(AiProviderOllamaCloudButton, _settings.AiProvider == AiProviderKind.OllamaCloud);
-    }
-
-    private void ApplyAiProviderInputs()
-    {
-        _isInitializing = true;
-
-        string provider = _settings.AiProvider;
-        bool isChatGpt = provider == AiProviderKind.ChatGptPremium;
-        bool showsBaseUrl = provider != AiProviderKind.ChatGptPremium;
-        bool showsCredential = provider is AiProviderKind.OpenAi or AiProviderKind.Anthropic or AiProviderKind.Mistral or AiProviderKind.OllamaCloud;
-
-        AiChatGptPanel.Visibility = isChatGpt ? Visibility.Visible : Visibility.Collapsed;
-        AiBaseUrlPanel.Visibility = showsBaseUrl ? Visibility.Visible : Visibility.Collapsed;
-        AiCredentialPanel.Visibility = showsCredential ? Visibility.Visible : Visibility.Collapsed;
-        AiModelPanel.Visibility = Visibility.Visible;
-
-        ChatGptAuthFilePathTextBox.Text = string.IsNullOrWhiteSpace(_settings.ChatGptAuthFilePath)
-            ? AiSecretStore.DetectDefaultChatGptAuthPath() ?? string.Empty
-            : _settings.ChatGptAuthFilePath;
-        AiBaseUrlTextBox.Text = GetCurrentAiBaseUrl();
-        AiBaseUrlTextBox.PlaceholderText = GetCurrentAiBaseUrlPlaceholder();
-        AiBaseUrlLabelText.Text = provider switch
-        {
-            AiProviderKind.Ollama => "Ollama Endpoint",
-            AiProviderKind.OllamaCloud => "Ollama Cloud Base URL",
-            _ => "Base URL"
-        };
-        AiModelLabelText.Text = isChatGpt ? "Preferred Model" : "Default Model";
-        AiCredentialLabelText.Text = provider == AiProviderKind.OllamaCloud ? "Cloud API Key" : "API Key";
-        AiCredentialPasswordBox.Password = string.Empty;
-        AiProviderStatusText.Text = GetAiProviderStatusText(provider);
-        UpdateAiHeroCard();
-        UpdateAiValidationUi();
-        ApplyAiSpeechModelInputs();
-
-        _isInitializing = false;
-        ApplyAiModelCatalogPlaceholder();
-        _ = LoadAiModelCatalogAsync();
     }
 
     private void InitializeAiSpeechModelPicker()
@@ -1278,489 +1201,6 @@ public sealed partial class SettingsWindow : Window
     {
         double value = bytes / (1024d * 1024d);
         return $"{Math.Max(0, value):0} MB";
-    }
-
-    private void OnValidateAiProviderClick(object sender, RoutedEventArgs e)
-    {
-        UpdateAiValidationUi();
-    }
-
-    private void OnOpenAiWindowClick(object sender, RoutedEventArgs e)
-    {
-        if (_finderAiWindow is null)
-        {
-            _finderAiWindow = new FinderAiWindow(_screen);
-            _finderAiWindow.Closed += OnFinderAiWindowClosed;
-        }
-
-        _finderAiWindow.ShowCentered();
-    }
-
-    private void OnFinderAiWindowClosed(object sender, WindowEventArgs args)
-    {
-        if (sender is FinderAiWindow aiWindow)
-        {
-            aiWindow.Closed -= OnFinderAiWindowClosed;
-            if (ReferenceEquals(_finderAiWindow, aiWindow))
-            {
-                _finderAiWindow = null;
-            }
-        }
-    }
-
-    private void OnChatGptAuthFilePathChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_isInitializing)
-        {
-            return;
-        }
-
-        _settings.ChatGptAuthFilePath = ChatGptAuthFilePathTextBox.Text;
-    }
-
-    private void OnUseDetectedChatGptAuthPathClick(object sender, RoutedEventArgs e)
-    {
-        string? detectedPath = AiSecretStore.DetectDefaultChatGptAuthPath();
-        if (string.IsNullOrWhiteSpace(detectedPath))
-        {
-            AiProviderStatusText.Text = "No local Codex or ChatGPT auth file was detected on this machine.";
-            return;
-        }
-
-        _settings.ChatGptAuthFilePath = detectedPath;
-        _isInitializing = true;
-        ChatGptAuthFilePathTextBox.Text = detectedPath;
-        _isInitializing = false;
-        UpdateSectionUi();
-    }
-
-    private void OnImportChatGptAuthClick(object sender, RoutedEventArgs e)
-    {
-        string authFilePath = ChatGptAuthFilePathTextBox.Text.Trim();
-        if (!_aiSecretStore.TryImportChatGptAuth(authFilePath, out string errorMessage))
-        {
-            AiProviderStatusText.Text = errorMessage;
-            return;
-        }
-
-        _settings.ChatGptAuthFilePath = authFilePath;
-        UpdateSectionUi();
-    }
-
-    private void OnClearChatGptAuthClick(object sender, RoutedEventArgs e)
-    {
-        _aiSecretStore.DeleteSecret(AiSecretNames.ChatGptOAuthPayload);
-        UpdateSectionUi();
-    }
-
-    private void OnAiBaseUrlChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_isInitializing)
-        {
-            return;
-        }
-
-        SetCurrentAiBaseUrl(AiBaseUrlTextBox.Text);
-    }
-
-    private void OnAiModelSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isInitializing || AiModelComboBox.SelectedItem is not AiModelCatalogEntry entry)
-        {
-            return;
-        }
-
-        SetCurrentAiModel(entry.ModelId);
-        UpdateAiHeroCard();
-        UpdateAiValidationUi();
-    }
-
-    private async void OnRefreshAiModelCatalogClick(object sender, RoutedEventArgs e)
-    {
-        await LoadAiModelCatalogAsync(forceRefresh: true);
-    }
-
-    private void OnSaveAiCredentialClick(object sender, RoutedEventArgs e)
-    {
-        string? secretName = GetCurrentAiSecretName();
-        if (string.IsNullOrWhiteSpace(secretName))
-        {
-            AiProviderStatusText.Text = "This provider does not need a separate API secret in Veil.";
-            return;
-        }
-
-        string secretValue = AiCredentialPasswordBox.Password.Trim();
-        if (string.IsNullOrWhiteSpace(secretValue))
-        {
-            AiProviderStatusText.Text = "Paste a credential before saving it.";
-            return;
-        }
-
-        _aiSecretStore.SaveSecret(secretName, secretValue);
-        AiCredentialPasswordBox.Password = string.Empty;
-        UpdateSectionUi();
-    }
-
-    private void OnClearAiCredentialClick(object sender, RoutedEventArgs e)
-    {
-        string? secretName = GetCurrentAiSecretName();
-        if (!string.IsNullOrWhiteSpace(secretName))
-        {
-            _aiSecretStore.DeleteSecret(secretName);
-        }
-
-        AiCredentialPasswordBox.Password = string.Empty;
-        UpdateSectionUi();
-    }
-
-    private string GetCurrentAiBaseUrl()
-    {
-        return _settings.AiProvider switch
-        {
-            AiProviderKind.OpenAi => _settings.OpenAiBaseUrl,
-            AiProviderKind.Anthropic => _settings.AnthropicBaseUrl,
-            AiProviderKind.Mistral => _settings.MistralBaseUrl,
-            AiProviderKind.Ollama => _settings.OllamaBaseUrl,
-            AiProviderKind.OllamaCloud => _settings.OllamaCloudBaseUrl,
-            _ => string.Empty
-        };
-    }
-
-    private string GetCurrentAiBaseUrlPlaceholder()
-    {
-        return _settings.AiProvider switch
-        {
-            AiProviderKind.OpenAi => "https://api.openai.com/v1",
-            AiProviderKind.Anthropic => "https://api.anthropic.com",
-            AiProviderKind.Mistral => "https://api.mistral.ai/v1",
-            AiProviderKind.Ollama => "http://127.0.0.1:11434/api",
-            AiProviderKind.OllamaCloud => "https://ollama.com/api",
-            _ => string.Empty
-        };
-    }
-
-    private string GetCurrentAiModel()
-    {
-        return _settings.AiProvider switch
-        {
-            AiProviderKind.ChatGptPremium => _settings.ChatGptModel,
-            AiProviderKind.OpenAi => _settings.OpenAiModel,
-            AiProviderKind.Anthropic => _settings.AnthropicModel,
-            AiProviderKind.Mistral => _settings.MistralModel,
-            AiProviderKind.Ollama => _settings.OllamaModel,
-            AiProviderKind.OllamaCloud => _settings.OllamaCloudModel,
-            _ => string.Empty
-        };
-    }
-
-    private void ApplyAiModelCatalogPlaceholder()
-    {
-        string currentModel = GetCurrentAiModel();
-        _aiModelOptions = CreateAiModelOptions([], currentModel);
-
-        _isInitializing = true;
-        AiModelComboBox.ItemsSource = _aiModelOptions;
-        AiModelComboBox.SelectedItem = _aiModelOptions.FirstOrDefault(item =>
-            string.Equals(item.ModelId, currentModel, StringComparison.Ordinal));
-        AiModelCatalogStatusText.Text = $"Loading models.dev catalog for {AiProviderKind.ToDisplayName(_settings.AiProvider)}.";
-        _isInitializing = false;
-    }
-
-    private async Task LoadAiModelCatalogAsync(bool forceRefresh = false)
-    {
-        _aiModelCatalogCancellationSource?.Cancel();
-        _aiModelCatalogCancellationSource?.Dispose();
-        _aiModelCatalogCancellationSource = new CancellationTokenSource();
-        CancellationToken cancellationToken = _aiModelCatalogCancellationSource.Token;
-        string currentModel = GetCurrentAiModel();
-
-        _isInitializing = true;
-        AiModelRefreshButton.IsEnabled = false;
-        AiModelCatalogStatusText.Text = forceRefresh
-            ? "Refreshing models.dev catalog..."
-            : $"Loading models.dev catalog for {AiProviderKind.ToDisplayName(_settings.AiProvider)}.";
-        _isInitializing = false;
-
-        try
-        {
-            AiModelCatalogSnapshot snapshot = await _aiModelCatalogService.GetModelsForProviderAsync(
-                _settings.AiProvider,
-                forceRefresh,
-                cancellationToken);
-
-            _aiModelOptions = CreateAiModelOptions(snapshot.Models, currentModel);
-            _isInitializing = true;
-            AiModelComboBox.ItemsSource = _aiModelOptions;
-            AiModelComboBox.SelectedItem = _aiModelOptions.FirstOrDefault(item =>
-                string.Equals(item.ModelId, currentModel, StringComparison.Ordinal));
-            AiModelCatalogStatusText.Text = snapshot.StatusText;
-            _isInitializing = false;
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("Failed to load AI model catalog.", ex);
-            _aiModelOptions = CreateAiModelOptions([], currentModel);
-            _isInitializing = true;
-            AiModelComboBox.ItemsSource = _aiModelOptions;
-            AiModelComboBox.SelectedItem = _aiModelOptions.FirstOrDefault(item =>
-                string.Equals(item.ModelId, currentModel, StringComparison.Ordinal));
-            AiModelCatalogStatusText.Text = $"Model catalog unavailable: {ex.Message}";
-            _isInitializing = false;
-        }
-        finally
-        {
-            AiModelRefreshButton.IsEnabled = true;
-        }
-    }
-
-    private static IReadOnlyList<AiModelCatalogEntry> CreateAiModelOptions(
-        IReadOnlyList<AiModelCatalogEntry> catalog,
-        string currentModel)
-    {
-        var options = new List<AiModelCatalogEntry>();
-
-        if (!string.IsNullOrWhiteSpace(currentModel))
-        {
-            options.Add(new AiModelCatalogEntry(
-                string.Empty,
-                string.Empty,
-                currentModel,
-                currentModel,
-                $"{currentModel}  •  current",
-                "current"));
-        }
-
-        options.AddRange(catalog);
-        return options
-            .GroupBy(static item => item.ModelId, StringComparer.OrdinalIgnoreCase)
-            .Select(static group => group.First())
-            .OrderBy(item => string.Equals(item.ModelId, currentModel, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-            .ThenBy(static item => item.DisplayLabel, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-    }
-
-    private string GetCurrentAiModelPlaceholder()
-    {
-        return _settings.AiProvider switch
-        {
-            AiProviderKind.ChatGptPremium => "gpt-5.4",
-            AiProviderKind.OpenAi => "gpt-5.4",
-            AiProviderKind.Anthropic => "claude-sonnet-4-20250514",
-            AiProviderKind.Mistral => "mistral-large-latest",
-            AiProviderKind.Ollama => "qwen3-coder",
-            AiProviderKind.OllamaCloud => "gpt-oss:120b",
-            _ => string.Empty
-        };
-    }
-
-    private void SetCurrentAiBaseUrl(string value)
-    {
-        switch (_settings.AiProvider)
-        {
-            case AiProviderKind.OpenAi:
-                _settings.OpenAiBaseUrl = value;
-                break;
-            case AiProviderKind.Anthropic:
-                _settings.AnthropicBaseUrl = value;
-                break;
-            case AiProviderKind.Mistral:
-                _settings.MistralBaseUrl = value;
-                break;
-            case AiProviderKind.Ollama:
-                _settings.OllamaBaseUrl = value;
-                break;
-            case AiProviderKind.OllamaCloud:
-                _settings.OllamaCloudBaseUrl = value;
-                break;
-        }
-    }
-
-    private void SetCurrentAiModel(string value)
-    {
-        switch (_settings.AiProvider)
-        {
-            case AiProviderKind.ChatGptPremium:
-                _settings.ChatGptModel = value;
-                break;
-            case AiProviderKind.OpenAi:
-                _settings.OpenAiModel = value;
-                break;
-            case AiProviderKind.Anthropic:
-                _settings.AnthropicModel = value;
-                break;
-            case AiProviderKind.Mistral:
-                _settings.MistralModel = value;
-                break;
-            case AiProviderKind.Ollama:
-                _settings.OllamaModel = value;
-                break;
-            case AiProviderKind.OllamaCloud:
-                _settings.OllamaCloudModel = value;
-                break;
-        }
-    }
-
-    private string? GetCurrentAiSecretName()
-    {
-        return _settings.AiProvider switch
-        {
-            AiProviderKind.OpenAi => AiSecretNames.OpenAiApiKey,
-            AiProviderKind.Anthropic => AiSecretNames.AnthropicApiKey,
-            AiProviderKind.Mistral => AiSecretNames.MistralApiKey,
-            AiProviderKind.OllamaCloud => AiSecretNames.OllamaCloudApiKey,
-            _ => null
-        };
-    }
-
-    private string GetAiProviderStatusText(string provider)
-    {
-        return provider switch
-        {
-            AiProviderKind.ChatGptPremium => _aiSecretStore.HasSecret(AiSecretNames.ChatGptOAuthPayload)
-                ? "Local OAuth payload imported and encrypted for the current Windows account."
-                : string.IsNullOrWhiteSpace(AiSecretStore.DetectDefaultChatGptAuthPath())
-                    ? "No local Codex or ChatGPT auth file detected yet."
-                    : "A local Codex or ChatGPT auth file is available and can be imported into Veil.",
-            AiProviderKind.OpenAi => _aiSecretStore.HasSecret(AiSecretNames.OpenAiApiKey)
-                ? "OpenAI API key is stored locally in encrypted form."
-                : "OpenAI API key has not been stored yet.",
-            AiProviderKind.Anthropic => _aiSecretStore.HasSecret(AiSecretNames.AnthropicApiKey)
-                ? "Anthropic API key is stored locally in encrypted form."
-                : "Anthropic API key has not been stored yet.",
-            AiProviderKind.Mistral => _aiSecretStore.HasSecret(AiSecretNames.MistralApiKey)
-                ? "Mistral API key is stored locally in encrypted form."
-                : "Mistral API key has not been stored yet.",
-            AiProviderKind.Ollama => "Ollama runs locally by default, so Veil only needs an endpoint and a model.",
-            AiProviderKind.OllamaCloud => _aiSecretStore.HasSecret(AiSecretNames.OllamaCloudApiKey)
-                ? "Ollama Cloud API key is stored locally in encrypted form."
-                : "Ollama Cloud API key has not been stored yet.",
-            _ => "Provider not configured."
-        };
-    }
-
-    private void UpdateAiValidationUi()
-    {
-        AiProviderValidationResult result = AiProviderValidationService.Validate(_settings, _aiSecretStore);
-
-        AiValidationSummaryText.Text = result.Summary;
-        UpdateAiHeroCard(result);
-        AiValidationMessagePanel.Children.Clear();
-
-        foreach (AiProviderValidationMessage message in result.Messages)
-        {
-            var rowBorder = new Border
-            {
-                CornerRadius = new CornerRadius(12),
-                Padding = new Thickness(12, 10, 12, 10),
-                Background = new SolidColorBrush(message.IsValid
-                    ? global::Windows.UI.Color.FromArgb(22, 118, 255, 168)
-                    : global::Windows.UI.Color.FromArgb(20, 255, 143, 143))
-            };
-
-            var rowStack = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 10
-            };
-
-            rowStack.Children.Add(new TextBlock
-            {
-                Text = message.IsValid ? "OK" : "Fix",
-                FontSize = 11,
-                FontFamily = (FontFamily)Application.Current.Resources["SfTextSemibold"],
-                Foreground = new SolidColorBrush(message.IsValid
-                    ? global::Windows.UI.Color.FromArgb(255, 162, 255, 211)
-                    : global::Windows.UI.Color.FromArgb(255, 255, 190, 190)),
-                VerticalAlignment = VerticalAlignment.Center
-            });
-
-            rowStack.Children.Add(new TextBlock
-            {
-                Text = message.Text,
-                TextWrapping = TextWrapping.WrapWholeWords,
-                FontSize = 11,
-                FontFamily = (FontFamily)Application.Current.Resources["SfTextRegular"],
-                Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, 220),
-                VerticalAlignment = VerticalAlignment.Center
-            });
-
-            rowBorder.Child = rowStack;
-            AiValidationMessagePanel.Children.Add(rowBorder);
-        }
-
-        switch (result.State)
-        {
-            case AiProviderValidationState.Valid:
-                AiValidationBadgeBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(32, 96, 220, 160));
-                AiValidationBadgeText.Text = "Ready";
-                AiValidationBadgeText.Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(255, 198, 255, 227));
-                break;
-            case AiProviderValidationState.Warning:
-                AiValidationBadgeBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(32, 255, 196, 92));
-                AiValidationBadgeText.Text = "Review";
-                AiValidationBadgeText.Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(255, 255, 231, 184));
-                break;
-            default:
-                AiValidationBadgeBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(32, 255, 120, 120));
-                AiValidationBadgeText.Text = "Not Ready";
-                AiValidationBadgeText.Foreground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(255, 255, 214, 214));
-                break;
-        }
-    }
-
-    private void UpdateAiHeroCard(AiProviderValidationResult? validation = null)
-    {
-        string providerDisplayName = AiProviderKind.ToDisplayName(_settings.AiProvider);
-        string model = GetCurrentAiModel();
-
-        AiHeroProviderText.Text = providerDisplayName;
-        AiHeroModelText.Text = string.IsNullOrWhiteSpace(model) ? "No model selected" : model.Trim();
-
-        string runtimeTitle;
-        string runtimeSubtitle;
-
-        if (_settings.AiProvider == AiProviderKind.ChatGptPremium)
-        {
-            bool hasImportedAuth = _aiSecretStore.HasSecret(AiSecretNames.ChatGptOAuthPayload);
-            bool hasDetectedAuth = !string.IsNullOrWhiteSpace(_settings.ChatGptAuthFilePath)
-                || !string.IsNullOrWhiteSpace(AiSecretStore.DetectDefaultChatGptAuthPath());
-
-            runtimeTitle = hasImportedAuth
-                ? "Encrypted local bridge"
-                : hasDetectedAuth
-                    ? "Detected local bridge"
-                    : "Bridge not ready";
-            runtimeSubtitle = hasImportedAuth
-                ? "Veil can launch OpenAI OAuth from its encrypted local copy."
-                : hasDetectedAuth
-                    ? "A local Codex or ChatGPT auth file is available for direct use."
-                    : "Import or detect a local auth file to enable the native bridge.";
-        }
-        else if (_settings.AiProvider == AiProviderKind.Ollama)
-        {
-            runtimeTitle = "Local endpoint";
-            runtimeSubtitle = "Requests stay on your configured Ollama host.";
-        }
-        else
-        {
-            bool hasSecret = !string.IsNullOrWhiteSpace(GetCurrentAiSecretName()) &&
-                _aiSecretStore.HasSecret(GetCurrentAiSecretName()!);
-            runtimeTitle = hasSecret ? "Encrypted API secret" : "Credential required";
-            runtimeSubtitle = hasSecret
-                ? "Veil stores the provider secret in the Windows user vault."
-                : "Save a provider secret to complete the route.";
-        }
-
-        if (validation is { State: AiProviderValidationState.Valid })
-        {
-            runtimeTitle = "Ready";
-        }
-
-        AiHeroRuntimeText.Text = runtimeTitle;
-        AiHeroRuntimeSubtext.Text = validation?.Summary ?? runtimeSubtitle;
     }
 
     private static void UpdateToggleButton(Button button, bool isSelected, bool useDarkForeground)
