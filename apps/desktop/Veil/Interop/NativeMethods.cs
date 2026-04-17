@@ -384,6 +384,36 @@ internal static partial class NativeMethods
     internal const int WM_SYSKEYUP = 0x0105;
     internal const int WM_PASTE = 0x0302;
     internal const int EM_REPLACESEL = 0x00C2;
+    internal const uint CF_UNICODETEXT = 13;
+    internal const uint GMEM_MOVEABLE = 0x0002;
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool OpenClipboard(IntPtr hWndNewOwner);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EmptyClipboard();
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool CloseClipboard();
+
+    [LibraryImport("kernel32.dll")]
+    internal static partial IntPtr GlobalAlloc(uint uFlags, nuint dwBytes);
+
+    [LibraryImport("kernel32.dll")]
+    internal static partial IntPtr GlobalLock(IntPtr hMem);
+
+    [LibraryImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GlobalUnlock(IntPtr hMem);
+
+    [LibraryImport("kernel32.dll")]
+    internal static partial IntPtr GlobalFree(IntPtr hMem);
 
     internal const uint MOD_ALT = 0x0001;
     internal const uint MOD_CONTROL = 0x0002;

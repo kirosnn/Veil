@@ -36,6 +36,7 @@ public sealed partial class TopBarWindow
         _dictationHotkeyService.Initialize();
         _microphoneRecordingService ??= new MicrophoneRecordingService();
         _microphoneRecordingService.SpectrumChanged += OnDictationSpectrumChanged;
+        EnsureDictationOverlayWindowCreated();
     }
 
     private void DisposeDictationHotkey()
@@ -95,7 +96,6 @@ public sealed partial class TopBarWindow
         _dictationInsertionTarget = _focusedTextInsertionService.CaptureInsertionTarget(_dictationTargetWindow);
         AppLogger.Info(
             $"Dictation capture started targetWindow=0x{_dictationTargetWindow.ToInt64():X} capturedWindow=0x{(_dictationInsertionTarget?.WindowHandle ?? IntPtr.Zero).ToInt64():X}.");
-        EnsureDictationOverlayWindowCreated();
         _dictationOverlayWindow?.ShowStatus(_screen, "Listening", "Release Space to transcribe with the selected local model.");
 
         try

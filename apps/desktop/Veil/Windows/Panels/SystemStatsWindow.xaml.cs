@@ -234,7 +234,7 @@ public sealed partial class SystemStatsWindow : Window
     {
         StatsPanel.Children.Clear();
 
-        AddTitle("System");
+        AddTitle("System", topMargin: 0);
 
         double cpuPercent = GetCpuUsage();
         int coreCount = Environment.ProcessorCount;
@@ -258,10 +258,14 @@ public sealed partial class SystemStatsWindow : Window
         foreach (var gpu in gpus)
         {
             string shortName = ShortenGpuName(gpu.Name);
+            string gpuLabel = gpu.IsIntegrated ? "iGPU" : "GPU";
 
             if (gpu.TotalBytes == 0)
             {
-                AddStatSection("GPU", "—", 0, shortName);
+                string detail = gpu.EngineUsagePercent > 0
+                    ? $"{shortName}  •  Load {gpu.EngineUsagePercent:F0}%"
+                    : shortName;
+                AddStatSection(gpuLabel, "—", 0, detail);
                 continue;
             }
 
@@ -272,13 +276,18 @@ public sealed partial class SystemStatsWindow : Window
             double totalDisplay = sizeUnit == "GB" ? totalMb / 1024 : totalMb;
 
             string memDetail = $"{shortName}  •  {usedDisplay:F1} / {totalDisplay:F1} {sizeUnit}";
-            string valueStr = $"{gpu.UsagePercent:F0}%";
-            AddStatSection("GPU", valueStr, gpu.UsagePercent, memDetail);
+            string valueStr = gpu.EngineUsagePercent > 0
+                ? $"{gpu.EngineUsagePercent:F0}%"
+                : $"{gpu.MemoryUsagePercent:F0}%";
+            double barPercent = gpu.EngineUsagePercent > 0
+                ? gpu.EngineUsagePercent
+                : gpu.MemoryUsagePercent;
+            AddStatSection(gpuLabel, valueStr, barPercent, memDetail);
         }
 
         if (TryGetVeilStats(memoryStatus, out VeilStats veilStats))
         {
-            AddTitle("Veil");
+            AddTitle("Veil", topMargin: 10);
             string cpuDetailText = $"{FormatPriorityClass(veilStats.PriorityClass)}  •  {veilStats.ThreadCount} threads  •  {veilStats.HandleCount} handles";
             AddStatSection("CPU", $"{veilStats.CpuPercent:F0}%", veilStats.CpuPercent, cpuDetailText);
 
@@ -287,15 +296,15 @@ public sealed partial class SystemStatsWindow : Window
         }
     }
 
-    private void AddTitle(string title)
+    private void AddTitle(string title, double topMargin)
     {
         var titleText = new TextBlock
         {
             Text = title,
-            FontSize = 12,
+            FontSize = 14,
             FontFamily = (FontFamily)Application.Current.Resources["SfDisplaySemibold"],
             Foreground = CreateLabelBrush(150, 130),
-            Margin = new Thickness(0, 0, 0, 4)
+            Margin = new Thickness(0, topMargin, 0, 2)
         };
         StatsPanel.Children.Add(titleText);
     }

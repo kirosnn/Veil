@@ -20,7 +20,6 @@ internal sealed class FocusedTextInsertionService
     private const int ForegroundActivationPollIntervalMs = 10;
     private const int ForegroundActivationMaxWaitMs = 300;
     private const int ClipboardPropagationDelayMs = 20;
-    private const int ClipboardRestoreDelayMs = 120;
 
     internal TextInsertionTarget CaptureInsertionTarget(IntPtr targetWindow)
     {
@@ -46,7 +45,11 @@ internal sealed class FocusedTextInsertionService
                 "No insertion target was available. Text was copied to the clipboard.");
         }
 
-        bool needsForegroundActivation = GetForegroundWindow() != insertionTarget.WindowHandle;
+        IntPtr currentForeground = GetForegroundWindow();
+        bool needsForegroundActivation = currentForeground != insertionTarget.WindowHandle;
+        AppLogger.Info(
+            $"Dictation insert: foreground=0x{currentForeground.ToInt64():X} target=0x{insertionTarget.WindowHandle.ToInt64():X} needsActivation={needsForegroundActivation}.");
+
         if (IsIconic(insertionTarget.WindowHandle))
         {
             ShowWindowNative(insertionTarget.WindowHandle, SW_RESTORE);
@@ -57,11 +60,11 @@ internal sealed class FocusedTextInsertionService
         {
             SetForegroundWindow(insertionTarget.WindowHandle);
             await WaitForForegroundWindowAsync(insertionTarget.WindowHandle, cancellationToken);
-        }
 
-        if (TryRestoreFocus(insertionTarget))
-        {
-            await Task.Delay(ForegroundActivationDelayMs, cancellationToken);
+            if (TryRestoreFocus(insertionTarget))
+            {
+                await Task.Delay(ForegroundActivationDelayMs, cancellationToken);
+            }
         }
 
         TextInsertionTarget effectiveInsertionTarget = RefreshInsertionTarget(insertionTarget);
@@ -85,7 +88,7 @@ internal sealed class FocusedTextInsertionService
                 text.Length > 80 ? text[..80] + "..." : text);
         }
 
-        if (TryInsertWithSendInput(text))
+        if (await TryInsertWithSendInputAsync(text))
         {
             AppLogger.Info("Dictation inserted using SendInput text entry.");
             return new TextInsertionResult(
@@ -115,15 +118,15 @@ internal sealed class FocusedTextInsertionService
             };
     }
 
-    internal async Task<TextInsertionResult> FallbackToClipboardAsync(string text, string message)
+    internal Task<TextInsertionResult> FallbackToClipboardAsync(string text, string message)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
-            return new TextInsertionResult(TextInsertionResultKind.CopiedToClipboard, "Nothing to copy.");
+            return Task.FromResult(new TextInsertionResult(TextInsertionResultKind.CopiedToClipboard, "Nothing to copy."));
         }
 
-        await SetClipboardTextAsync(text);
-        return new TextInsertionResult(TextInsertionResultKind.CopiedToClipboard, message);
+        SetClipboardText(text);
+        return Task.FromResult(new TextInsertionResult(TextInsertionResultKind.CopiedToClipboard, message));
     }
 
     private static TextInsertionTarget ResolveInsertionTarget(IntPtr targetWindow)
@@ -271,49 +274,60 @@ internal sealed class FocusedTextInsertionService
         }
     }
 
+    // No clipboard save/restore: avoids the race where RestoreClipboardTextAsync fires 120ms
+    // after FallbackToClipboard has already set the transcribed text, overwriting it.
     private static async Task<bool> TryInsertWithPasteAsync(string text, TextInsertionTarget insertionTarget, CancellationToken cancellationToken)
     {
-        string? originalClipboardText = await TryGetClipboardTextAsync();
-
         try
         {
-            await SetClipboardTextAsync(text);
-            await Task.Delay(ClipboardPropagationDelayMs, cancellationToken);
-
             IntPtr targetHandle = ResolveBestTargetHandle(insertionTarget);
             string? className = targetHandle != IntPtr.Zero ? GetWindowClassName(targetHandle) : null;
+
             if (targetHandle != IntPtr.Zero && IsStandardEditableClass(className))
             {
+                if (!SetClipboardText(text))
+                {
+                    AppLogger.Info("Dictation paste: clipboard set failed for WM_PASTE path.");
+                    return false;
+                }
+
+                await Task.Delay(ClipboardPropagationDelayMs, cancellationToken);
                 SendMessageW(targetHandle, WM_PASTE, IntPtr.Zero, IntPtr.Zero);
                 return true;
             }
 
-            IntPtr targetWindowForPaste = ResolveBestTargetHandle(insertionTarget);
+            // For modern apps (WinUI, WPF, Electron, browsers, terminals): Ctrl+V.
             IntPtr foregroundForPaste = GetForegroundWindow();
-            if (foregroundForPaste != insertionTarget.WindowHandle && foregroundForPaste != targetWindowForPaste)
+            AppLogger.Info(
+                $"Dictation paste: foreground=0x{foregroundForPaste.ToInt64():X} target=0x{insertionTarget.WindowHandle.ToInt64():X}.");
+
+            if (foregroundForPaste != insertionTarget.WindowHandle)
             {
                 SetForegroundWindow(insertionTarget.WindowHandle);
                 await Task.Delay(ForegroundActivationDelayMs, cancellationToken);
-                if (GetForegroundWindow() != insertionTarget.WindowHandle)
-                {
-                    return false;
-                }
+                IntPtr foregroundAfter = GetForegroundWindow();
+                AppLogger.Info(
+                    $"Dictation paste: after SetForegroundWindow, foreground=0x{foregroundAfter.ToInt64():X}.");
+                // Do not abort if SetForegroundWindow failed — still attempt Ctrl+V;
+                // worst case it lands in the wrong window, but returning false here
+                // causes silent fallback to clipboard-only.
             }
 
-            SendCtrlV();
-            return true;
+            if (!SetClipboardText(text))
+            {
+                AppLogger.Info("Dictation paste: clipboard set failed for Ctrl+V path.");
+                return false;
+            }
+
+            await Task.Delay(ClipboardPropagationDelayMs, cancellationToken);
+            bool ctrlVSent = await SendCtrlVAsync();
+            AppLogger.Info($"Dictation paste: SendCtrlV result={ctrlVSent}.");
+            return ctrlVSent;
         }
         catch (Exception ex)
         {
             AppLogger.Error("Dictation paste insertion failed.", ex);
             return false;
-        }
-        finally
-        {
-            if (originalClipboardText is not null)
-            {
-                _ = RestoreClipboardTextAsync(originalClipboardText);
-            }
         }
     }
 
@@ -381,11 +395,11 @@ internal sealed class FocusedTextInsertionService
         }
     }
 
-    private static bool TryInsertWithSendInput(string text)
+    private static Task<bool> TryInsertWithSendInputAsync(string text)
     {
         if (string.IsNullOrEmpty(text))
         {
-            return false;
+            return Task.FromResult(false);
         }
 
         string normalizedText = text
@@ -402,8 +416,12 @@ internal sealed class FocusedTextInsertionService
             inputs[inputIndex++] = CreateKeyboardInput(inputCharacter, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP);
         }
 
-        uint sentInputCount = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
-        return sentInputCount == inputs.Length;
+        return Task.Run(() =>
+        {
+            uint sentInputCount = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
+            AppLogger.Info($"Dictation SendInput unicode: sent={sentInputCount} expected={inputs.Length} foreground=0x{GetForegroundWindow().ToInt64():X}.");
+            return sentInputCount == (uint)inputs.Length;
+        });
     }
 
     private static Input CreateKeyboardInput(char character, uint flags)
@@ -440,14 +458,20 @@ internal sealed class FocusedTextInsertionService
         }
     }
 
-    private static void SendCtrlV()
+    // SendInput must run off the UI thread: the WH_KEYBOARD_LL hook is installed on the UI
+    // thread, so calling SendInput from the UI thread deadlocks — the hook message can never
+    // be delivered while the thread is blocked inside SendInput.
+    private static Task<bool> SendCtrlVAsync()
     {
-        var inputs = new Input[4];
-        inputs[0] = CreateVirtualKeyInput((ushort)VK_CONTROL, 0);
-        inputs[1] = CreateVirtualKeyInput((ushort)VK_V, 0);
-        inputs[2] = CreateVirtualKeyInput((ushort)VK_V, KEYEVENTF_KEYUP);
-        inputs[3] = CreateVirtualKeyInput((ushort)VK_CONTROL, KEYEVENTF_KEYUP);
-        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
+        return Task.Run(() =>
+        {
+            var inputs = new Input[4];
+            inputs[0] = CreateVirtualKeyInput((ushort)VK_CONTROL, 0);
+            inputs[1] = CreateVirtualKeyInput((ushort)VK_V, 0);
+            inputs[2] = CreateVirtualKeyInput((ushort)VK_V, KEYEVENTF_KEYUP);
+            inputs[3] = CreateVirtualKeyInput((ushort)VK_CONTROL, KEYEVENTF_KEYUP);
+            return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>()) == (uint)inputs.Length;
+        });
     }
 
     private static Input CreateVirtualKeyInput(ushort vk, uint flags)
@@ -469,42 +493,56 @@ internal sealed class FocusedTextInsertionService
         };
     }
 
-    private static Task SetClipboardTextAsync(string text)
+    private static bool SetClipboardText(string text)
     {
-        var package = new global::Windows.ApplicationModel.DataTransfer.DataPackage();
-        package.SetText(text);
-        global::Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
-        global::Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
-        return Task.CompletedTask;
-    }
+        bool opened = false;
+        for (int attempt = 0; attempt < 5 && !opened; attempt++)
+        {
+            opened = OpenClipboard(IntPtr.Zero);
+            if (!opened && attempt < 4)
+            {
+                System.Threading.Thread.Sleep(10);
+            }
+        }
 
-    private static async Task<string?> TryGetClipboardTextAsync()
-    {
+        if (!opened)
+        {
+            AppLogger.Info("Dictation: OpenClipboard failed after retries.");
+            return false;
+        }
+
         try
         {
-            var clipboardContent = global::Windows.ApplicationModel.DataTransfer.Clipboard.GetContent();
-            if (!clipboardContent.Contains(global::Windows.ApplicationModel.DataTransfer.StandardDataFormats.Text))
+            EmptyClipboard();
+            int charCount = text.Length + 1;
+            IntPtr hGlobal = GlobalAlloc(GMEM_MOVEABLE, (nuint)(charCount * sizeof(char)));
+            if (hGlobal == IntPtr.Zero)
             {
-                return null;
+                return false;
             }
 
-            return await clipboardContent.GetTextAsync();
-        }
-        catch
-        {
-            return null;
-        }
-    }
+            IntPtr ptr = GlobalLock(hGlobal);
+            if (ptr == IntPtr.Zero)
+            {
+                GlobalFree(hGlobal);
+                return false;
+            }
 
-    private static async Task RestoreClipboardTextAsync(string text)
-    {
-        try
-        {
-            await Task.Delay(ClipboardRestoreDelayMs);
-            await SetClipboardTextAsync(text);
+            Marshal.Copy(text.ToCharArray(), 0, ptr, text.Length);
+            Marshal.WriteInt16(ptr + text.Length * sizeof(char), 0);
+            GlobalUnlock(hGlobal);
+
+            if (SetClipboardData(CF_UNICODETEXT, hGlobal) == IntPtr.Zero)
+            {
+                GlobalFree(hGlobal);
+                return false;
+            }
+
+            return true;
         }
-        catch
+        finally
         {
+            CloseClipboard();
         }
     }
 
