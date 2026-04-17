@@ -13,8 +13,6 @@ internal static class WindowsActionService
     {
         var actions = new List<FinderEntry>();
 
-        AddAction(actions, "AI Agent", "\uE8A5", "Assistant", FinderActionIds.AiAgent);
-
         // Display & Graphics
         AddSetting(actions, "Display Settings", "\uE7F8", "ms-settings:display");
         AddSetting(actions, "Night Light", "\uE793", "ms-settings:nightlight");

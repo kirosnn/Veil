@@ -45,7 +45,3 @@ internal sealed record FinderEntry(
     }
 }
 
-internal static class FinderActionIds
-{
-    public const string AiAgent = "ai-agent";
-}

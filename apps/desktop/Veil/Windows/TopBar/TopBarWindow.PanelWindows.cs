@@ -136,6 +136,7 @@ public sealed partial class TopBarWindow
         }
 
         _finderWindow = new FinderWindow(_screen);
+        _finderWindow.Closed += (_, _) => _finderWindow = null;
         _finderWindow.Prewarm();
     }
 

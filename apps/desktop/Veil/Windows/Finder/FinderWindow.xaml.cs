@@ -78,7 +78,6 @@ public sealed partial class FinderWindow : Window
     private int _retainedSearchSelectionStart;
     private int _retainedSearchSelectionLength;
     private Button[]? _cachedAppRows;
-    private FinderAiWindow? _aiWindow;
     private bool _shouldRestoreRetainedViewport;
 
     // Pooled scoring buffer to avoid allocations per keystroke
@@ -313,8 +312,6 @@ public sealed partial class FinderWindow : Window
         _acrylicController?.Dispose();
         _acrylicController = null;
         _backdropConfig = null;
-        _aiWindow?.Close();
-        _aiWindow = null;
         Close();
     }
 
@@ -549,11 +546,6 @@ public sealed partial class FinderWindow : Window
             _filteredEntries = result;
         }
 
-        if (trimmedQuery.Length > 0)
-        {
-            _filteredEntries = PrependAskAiEntry(trimmedQuery, _filteredEntries);
-        }
-
         RebuildResults();
         UpdateStatusBar();
     }
@@ -688,8 +680,6 @@ public sealed partial class FinderWindow : Window
 
     private void UpdateStatusBar()
     {
-        int nonAiResultCount = _filteredEntries.Count(static entry => entry.ActionId != FinderActionIds.AiAgent);
-
         if (_isLoadingApps)
         {
             SectionTitleText.Text = "Finder";
@@ -701,13 +691,9 @@ public sealed partial class FinderWindow : Window
 
         if (_fallbackActions.Length > 0)
         {
-            SectionTitleText.Text = nonAiResultCount == 0 ? "AI and quick actions" : "Results";
-            SectionSubtitleText.Text = nonAiResultCount == 0
-                ? "Ask the native AI agent or run the raw query in PowerShell, WSL, or your browser."
-                : "Ranked across AI, apps, settings, and system actions.";
-            ResultCountText.Text = nonAiResultCount == 0
-                ? $"{_fallbackActions.Length + _filteredEntries.Length} quick actions"
-                : $"{_filteredEntries.Length + _fallbackActions.Length} results";
+            SectionTitleText.Text = "Results";
+            SectionSubtitleText.Text = "Ranked across apps, settings, and system actions.";
+            ResultCountText.Text = $"{_filteredEntries.Length + _fallbackActions.Length} results";
             HintText.Text = _selectedIndex >= 0 ? "Enter open  •  ↑↓ navigate" : string.Empty;
             return;
         }
@@ -721,7 +707,7 @@ public sealed partial class FinderWindow : Window
             return;
         }
 
-        if (nonAiResultCount == 0 && _filteredEntries.Length == 0)
+        if (_filteredEntries.Length == 0)
         {
             SectionTitleText.Text = "No matches";
             SectionSubtitleText.Text = "Try another name or use the quick actions below.";
@@ -772,8 +758,7 @@ public sealed partial class FinderWindow : Window
             }
         }
 
-        bool hasNonAiResults = _filteredEntries.Any(static entry => entry.ActionId != FinderActionIds.AiAgent);
-        bool showFallbacks = !hasNonAiResults
+        bool showFallbacks = _filteredEntries.Length == 0
             && _allEntries.Length > 0
             && !_isLoadingApps
             && !string.IsNullOrWhiteSpace(SearchTextBox.Text);
@@ -1068,7 +1053,6 @@ public sealed partial class FinderWindow : Window
     {
         return category switch
         {
-            "Assistant" => "Veil Halo",
             "Settings" => "Windows setting",
             "System" => "System command",
             "Utility" => "Built-in utility",
@@ -1116,77 +1100,8 @@ public sealed partial class FinderWindow : Window
 
     private void ExecuteEntry(FinderEntry entry)
     {
-        if (entry.ActionId == FinderActionIds.AiAgent)
-        {
-            string prompt = SearchTextBox.Text.Trim();
-            OpenAiWindow(prompt, autoSubmit: prompt.Length > 0);
-            HideWindow();
-            return;
-        }
-
         entry.Execute();
         HideWindow();
-    }
-
-    private FinderEntry[] PrependAskAiEntry(string query, FinderEntry[] entries)
-    {
-        FinderEntry aiEntry = new(
-            TrimAskAiLabel(query),
-            "Assistant",
-            InstalledAppService.NormalizeText(query + " ai agent"),
-            null,
-            "\uE8A5")
-        {
-            ActionId = FinderActionIds.AiAgent
-        };
-
-        FinderEntry[] filtered = entries
-            .Where(static entry => entry.ActionId != FinderActionIds.AiAgent)
-            .ToArray();
-        var result = new FinderEntry[filtered.Length + 1];
-        result[0] = aiEntry;
-        filtered.CopyTo(result, 1);
-        return result;
-    }
-
-    private static string TrimAskAiLabel(string query)
-    {
-        string compact = query.Trim();
-        if (compact.Length > 52)
-        {
-            compact = compact[..52] + "...";
-        }
-
-        return $"Ask Halo about \"{compact}\"";
-    }
-
-    private void EnsureAiWindowCreated()
-    {
-        if (_aiWindow is not null)
-        {
-            return;
-        }
-
-        _aiWindow = new FinderAiWindow(_screen, ShowCentered);
-        _aiWindow.Closed += OnAiWindowClosed;
-    }
-
-    private void OnAiWindowClosed(object sender, WindowEventArgs args)
-    {
-        if (sender is FinderAiWindow aiWindow)
-        {
-            aiWindow.Closed -= OnAiWindowClosed;
-            if (ReferenceEquals(_aiWindow, aiWindow))
-            {
-                _aiWindow = null;
-            }
-        }
-    }
-
-    private void OpenAiWindow(string prompt, bool autoSubmit)
-    {
-        EnsureAiWindowCreated();
-        _aiWindow!.ShowCentered(prompt, autoSubmit);
     }
 
     private void ExecuteFallback(string action)
