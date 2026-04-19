@@ -45,6 +45,7 @@ public partial class App : Application
     {
         try
         {
+            EnsureWorkingDirectory();
             KillOtherInstances();
             PerformanceLogger.Start();
             AppLogger.Info("Application launch started.");
@@ -105,6 +106,24 @@ public partial class App : Application
 
             AppLogger.Error("Fatal error during launch.", ex);
             throw;
+        }
+    }
+
+    private static void EnsureWorkingDirectory()
+    {
+        try
+        {
+            string baseDirectory = AppContext.BaseDirectory;
+            if (string.IsNullOrWhiteSpace(baseDirectory) || !Directory.Exists(baseDirectory))
+            {
+                return;
+            }
+
+            Environment.CurrentDirectory = baseDirectory;
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("Failed to set process working directory.", ex);
         }
     }
 
@@ -283,10 +302,6 @@ public partial class App : Application
 
             string detectionMode = GameDetectionService.NormalizeDetectionMode(_settings.GameDetectionMode);
             bool configuredGameRunning = _gameDetectionService.IsConfiguredGameRunning(_normalizedConfiguredGameProcessNames);
-            GameDetectionService.ForegroundProcessInfo foregroundProcessInfo = default;
-
-            bool hasForegroundProcess = _gameDetectionService.TryGetForegroundProcessInfo(_topBarWindowHandles, out foregroundProcessInfo, out _);
-
             foreach (TopBarWindow topBarWindow in _topBarWindows.Values)
             {
                 try
@@ -294,6 +309,11 @@ public partial class App : Application
                     bool gameRunning = configuredGameRunning;
                     int? activeGameProcessId = null;
                     bool shouldHideForForegroundWindow = false;
+                    bool hasForegroundProcess = _gameDetectionService.TryGetVisibilityProcessInfoForScreen(
+                        _topBarWindowHandles,
+                        topBarWindow.ScreenBounds,
+                        out GameDetectionService.ForegroundProcessInfo foregroundProcessInfo,
+                        out _);
 
                     if (hasForegroundProcess)
                     {
@@ -627,6 +647,7 @@ public partial class App : Application
     private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
         AppLogger.Error("Unhandled WinUI exception.", e.Exception);
+        e.Handled = true;
     }
 
     private void OnCurrentDomainUnhandledException(object? sender, System.UnhandledExceptionEventArgs e)

@@ -82,7 +82,18 @@
       "Read(//c/Program Files \\(x86\\)/Inno Setup 6/**)",
       "Bash(winget install *)",
       "Bash(\"C:/Users/Nassim/AppData/Local/Programs/Inno Setup 6/iscc.exe\" installer/SetupVeil.iss)",
-      "Bash(start *)"
+      "Bash(start *)",
+      "Bash(cp -r 'C:\\\\Users\\\\Nassim\\\\Projects\\\\Veil\\\\apps\\\\desktop\\\\Veil\\\\bin\\\\Release\\\\net10.0-windows10.0.22621.0\\\\win-x64/.' 'C:\\\\Users\\\\Nassim\\\\AppData\\\\Local\\\\Programs\\\\Veil/')",
+      "Read(//c/Users/Nassim/AppData/Local/Programs/Veil/**)",
+      "Bash(echo \"Exit: $?\")",
+      "Skill(update-config)",
+      "Bash(pwsh -ExecutionPolicy Bypass -NoProfile -File scripts/build-setup.ps1)",
+      "Bash(pip show *)",
+      "Bash(grep -E \"\\\\.\\(xaml|cs\\)$\")",
+      "Bash(awk '{print $NF}')",
+      "Read(//c/Users/Nassim/Projects/Veil/%LOCALAPPDATA%/**)",
+      "Read(//c/Users/Nassim/Projects/Veil/%APPDATA%/**)",
+      "Bash(grep -rn \"static\\\\s\\\\+[A-Za-z].*\\(\\).*$\\\\|static\\\\s\\\\+readonly\\\\|static\\\\s\\\\+[A-Z][a-zA-Z]*\\\\s*=\" apps/desktop/Veil/Interop/ --include=\"*.cs\")"
     ]
   }
 }

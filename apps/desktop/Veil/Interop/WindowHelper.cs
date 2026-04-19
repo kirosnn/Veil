@@ -13,6 +13,10 @@ namespace Veil.Interop;
 
 internal static class WindowHelper
 {
+    private static readonly HashSet<uint> _explorerPidCache = [];
+    private static DateTime _explorerPidCacheExpiry = DateTime.MinValue;
+    private static readonly TimeSpan ExplorerPidCacheTtl = TimeSpan.FromSeconds(15);
+    private static readonly Lock _explorerPidCacheLock = new();
     private const uint DesktopSpawnWorkerMessage = 0x052C;
     private const uint SendMessageTimeoutNormal = 0x0000;
 
@@ -500,14 +504,27 @@ internal static class WindowHelper
         if (processId == 0)
             return false;
 
-        try
+        lock (_explorerPidCacheLock)
         {
-            using var process = Process.GetProcessById((int)processId);
-            return string.Equals(process.ProcessName, "explorer", StringComparison.OrdinalIgnoreCase);
-        }
-        catch
-        {
-            return false;
+            var now = DateTime.UtcNow;
+            if (now < _explorerPidCacheExpiry)
+            {
+                return _explorerPidCache.Contains(processId);
+            }
+
+            _explorerPidCache.Clear();
+            try
+            {
+                foreach (var p in Process.GetProcessesByName("explorer"))
+                {
+                    using (p)
+                        _explorerPidCache.Add((uint)p.Id);
+                }
+            }
+            catch { }
+
+            _explorerPidCacheExpiry = now + ExplorerPidCacheTtl;
+            return _explorerPidCache.Contains(processId);
         }
     }
 }

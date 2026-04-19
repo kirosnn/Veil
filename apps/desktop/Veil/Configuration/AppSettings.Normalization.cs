@@ -139,6 +139,11 @@ internal sealed partial class AppSettings
         return value is "Primary" or "All" or "Custom" ? value : "Primary";
     }
 
+    private static string NormalizeTopBarContentAlignment(string? value)
+    {
+        return value is "Center" or "Right" ? value : "Center";
+    }
+
     private static string NormalizeLocalSpeechModelId(string? value)
     {
         return LocalSpeechModelCatalog.Normalize(value);

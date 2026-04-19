@@ -15,15 +15,22 @@ public sealed partial class TopBarWindow
 {
     private void OnVisualTick(object? sender, object e)
     {
-        using var perfScope = PerformanceLogger.Measure("TopBar.OnVisualTick", 2.0);
-        if (_isGameMinimalMode || _isHidden)
+        try
         {
-            return;
-        }
+            using var perfScope = PerformanceLogger.Measure("TopBar.OnVisualTick", 2.0);
+            if (_isGameMinimalMode || _isHidden)
+            {
+                return;
+            }
 
-        if (_settings.TopBarStyle == "Adaptive")
+            if (_settings.TopBarStyle == "Adaptive")
+            {
+                UpdateAdaptiveBackground(GetEffectiveTopBarOpacity());
+            }
+        }
+        catch (Exception ex)
         {
-            UpdateAdaptiveBackground(GetEffectiveTopBarOpacity());
+            AppLogger.Error($"TopBarWindow visual tick failed for {_monitorId}.", ex);
         }
     }
 
@@ -109,16 +116,16 @@ public sealed partial class TopBarWindow
             catch { }
         }
 
-        float tintOpacity = (float)(intensity * 0.18);
-        float luminosity = (float)Math.Min(intensity * 0.85, 0.90);
-        byte tintAlpha = (byte)(intensity * 50);
+        float tintOpacity = (float)(intensity * 0.22);
+        float luminosity = (float)Math.Min(0.28 + intensity * 0.58, 0.84);
+        byte tintAlpha = (byte)Math.Min(intensity * 200, 200);
 
         _acrylicController = new DesktopAcrylicController
         {
-            TintColor = global::Windows.UI.Color.FromArgb(tintAlpha, 245, 245, 250),
+            TintColor = global::Windows.UI.Color.FromArgb(tintAlpha, 26, 26, 30),
             TintOpacity = tintOpacity,
             LuminosityOpacity = luminosity,
-            FallbackColor = global::Windows.UI.Color.FromArgb(20, 240, 240, 245)
+            FallbackColor = global::Windows.UI.Color.FromArgb(235, 20, 20, 24)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
@@ -200,8 +207,9 @@ public sealed partial class TopBarWindow
         var foregroundColor = GetTopBarForegroundColor();
         var foregroundBrush = new SolidColorBrush(foregroundColor);
         var mutedForegroundBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(204, foregroundColor.R, foregroundColor.G, foregroundColor.B));
-        var hoverBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(12, foregroundColor.R, foregroundColor.G, foregroundColor.B));
-        var pressedBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(8, foregroundColor.R, foregroundColor.G, foregroundColor.B));
+        var hoverBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(36, foregroundColor.R, foregroundColor.G, foregroundColor.B));
+        var pressedBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, foregroundColor.R, foregroundColor.G, foregroundColor.B));
+        var glassBackground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, foregroundColor.R, foregroundColor.G, foregroundColor.B));
 
         ClockText.Foreground = foregroundBrush;
         MusicIcon.Foreground = mutedForegroundBrush;
@@ -221,9 +229,9 @@ public sealed partial class TopBarWindow
         MenuButton.Resources["ButtonBackgroundPointerOver"] = foregroundBrush;
         MenuButton.Resources["ButtonBackgroundPressed"] = new SolidColorBrush(global::Windows.UI.Color.FromArgb(119, foregroundColor.R, foregroundColor.G, foregroundColor.B));
 
-        ApplyIconButtonResources(DiscordButton, hoverBrush, pressedBrush);
-        ApplyIconButtonResources(MusicButton, hoverBrush, pressedBrush);
-        ApplyIconButtonResources(RunCatButton, hoverBrush, pressedBrush);
+        ApplyIconButtonResources(DiscordButton, glassBackground, hoverBrush, pressedBrush);
+        ApplyIconButtonResources(MusicButton, glassBackground, hoverBrush, pressedBrush);
+        ApplyIconButtonResources(RunCatButton, glassBackground, hoverBrush, pressedBrush);
 
         byte bubbleAlpha = _settings.ShowFinderBubble
             ? (byte)Math.Round(_settings.FinderBubbleOpacity * 255)
@@ -301,8 +309,9 @@ public sealed partial class TopBarWindow
         return luminance < 140;
     }
 
-    private static void ApplyIconButtonResources(Button button, SolidColorBrush hoverBrush, SolidColorBrush pressedBrush)
+    private static void ApplyIconButtonResources(Button button, SolidColorBrush normalBrush, SolidColorBrush hoverBrush, SolidColorBrush pressedBrush)
     {
+        button.Resources["ButtonBackground"] = normalBrush;
         button.Resources["ButtonBackgroundPointerOver"] = hoverBrush;
         button.Resources["ButtonBackgroundPressed"] = pressedBrush;
     }

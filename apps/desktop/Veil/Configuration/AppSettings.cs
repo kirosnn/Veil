@@ -9,7 +9,7 @@ internal sealed record AppShortcutSetting(string AppName, string AppId, string D
 
 internal sealed partial class AppSettings
 {
-    internal const int MaxShortcutButtons = 4;
+    internal const int MaxShortcutButtons = 6;
     private const double DefaultTopBarOpacity = 0.92;
     private const double MinimumVisibleTopBarOpacity = 0.04;
     private const double DefaultBlurIntensity = 0.15;
@@ -28,6 +28,7 @@ internal sealed partial class AppSettings
     private double _topBarOpacity = DefaultTopBarOpacity;
     private int _clockOffset = -10;
     private double _clockBalance = 0.35;
+    private string _topBarContentAlignment = "Center";
     private double _menuTintOpacity = 0.14;
     private double _finderBubbleOpacity = 0.09;
     private bool _showFinderBubble = true;
@@ -55,6 +56,15 @@ internal sealed partial class AppSettings
     private bool _showAppButtonOutline = true;
     private string _localSpeechModelId = LocalSpeechModelCatalog.DefaultModelId;
     private AppShortcutSetting?[] _shortcutButtons = new AppShortcutSetting?[MaxShortcutButtons];
+
+    // Terminal settings
+    private string _terminalDefaultProfileId = string.Empty;
+    private string _terminalFontFamily = "Cascadia Code, Consolas, Courier New, monospace";
+    private int _terminalFontSize = 14;
+    private string _terminalCursorStyle = "block";
+    private int _terminalScrollback = 5000;
+    private int _terminalCols = 120;
+    private int _terminalRows = 30;
 
     public static AppSettings Current => _current.Value;
 

@@ -675,11 +675,20 @@ internal sealed class GamePerformanceService : IDisposable
                     continue;
                 }
 
+                if (string.IsNullOrWhiteSpace(restoreInfo.ExecutablePath) || !File.Exists(restoreInfo.ExecutablePath))
+                {
+                    _suspendedGameProcesses.Remove(processName);
+                    continue;
+                }
+
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = restoreInfo.ExecutablePath,
                     WorkingDirectory = Path.GetDirectoryName(restoreInfo.ExecutablePath) ?? string.Empty,
-                    UseShellExecute = true
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    ErrorDialog = false
                 });
 
                 AppLogger.Info($"Restarted {restoreInfo.ProcessName} after gameplay.");

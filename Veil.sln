@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Veil.Tests", "tests\Veil.Te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VeilPerfGame", "tools\VeilPerfGame\VeilPerfGame.csproj", "{6A7A29B5-AF4D-4E8E-80B7-0E2550B31725}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VeilTerminal", "apps\desktop\VeilTerminal\VeilTerminal.csproj", "{C3D4E5F6-A7B8-9012-CDEF-123456789ABC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -27,5 +29,9 @@ Global
 		{6A7A29B5-AF4D-4E8E-80B7-0E2550B31725}.Debug|x64.Build.0 = Debug|x64
 		{6A7A29B5-AF4D-4E8E-80B7-0E2550B31725}.Release|x64.ActiveCfg = Release|x64
 		{6A7A29B5-AF4D-4E8E-80B7-0E2550B31725}.Release|x64.Build.0 = Release|x64
+		{C3D4E5F6-A7B8-9012-CDEF-123456789ABC}.Debug|x64.ActiveCfg = Debug|x64
+		{C3D4E5F6-A7B8-9012-CDEF-123456789ABC}.Debug|x64.Build.0 = Debug|x64
+		{C3D4E5F6-A7B8-9012-CDEF-123456789ABC}.Release|x64.ActiveCfg = Release|x64
+		{C3D4E5F6-A7B8-9012-CDEF-123456789ABC}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal

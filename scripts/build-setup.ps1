@@ -145,6 +145,7 @@ internal static class Program
             File.Copy(Environment.ProcessPath!, setupExePath, true);
             CreateShortcut(shortcutPath, appExePath, installDir);
             RegisterUninstallEntry(installDir, appExePath, setupExePath);
+            RegisterStartupEntry(appExePath);
 
             Process.Start(new ProcessStartInfo
             {
@@ -192,6 +193,7 @@ internal static class Program
             File.Delete(shortcutPath);
         }
 
+        RemoveStartupEntry();
         Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\Veil", false);
         ScheduleDelete(installDir, parentDir);
 
@@ -250,6 +252,24 @@ internal static class Program
         key.SetValue("NoModify", 1, RegistryValueKind.DWord);
         key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
         key.SetValue("UninstallString", "\"" + setupExePath + "\" --uninstall");
+    }
+
+    private static void RegisterStartupEntry(string appExePath)
+    {
+        using RegistryKey key = Registry.CurrentUser.CreateSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\Run")
+            ?? throw new InvalidOperationException("Failed to create startup registry key.");
+
+        key.SetValue("Veil", "\"" + appExePath + "\" --startup");
+    }
+
+    private static void RemoveStartupEntry()
+    {
+        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(
+            @"Software\Microsoft\Windows\CurrentVersion\Run",
+            writable: true);
+
+        key?.DeleteValue("Veil", false);
     }
 
     private static void ScheduleDelete(string installDir, string parentDir)

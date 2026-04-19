@@ -113,6 +113,12 @@ public sealed partial class TopBarWindow
         AddElementRegion(regions, ClockText, paddingX: 1, paddingY: 1);
         AddElementRegion(regions, ShortcutGlass, paddingX: 0, paddingY: 0);
 
+        // Terminal tab strip — include when visible so tabs remain interactive
+        if (TerminalTabPanel.Visibility == Visibility.Visible)
+        {
+            AddElementRegion(regions, TerminalTabPanel, paddingX: 2, paddingY: 2);
+        }
+
         foreach (Button shortcutButton in _shortcutButtons)
         {
             AddContentRegion(regions, shortcutButton, useElementBounds: true, paddingX: 8, paddingY: 5);

@@ -1,3 +1,4 @@
+using Microsoft.UI.Xaml;
 using Veil.Diagnostics;
 using Veil.Interop;
 using Veil.Services;
@@ -55,12 +56,58 @@ public sealed partial class TopBarWindow
         _ = ApplyRunCatSettingsAsync();
         UpdateDiscordDemand(boost: true);
         UpdateBackgroundMaintenanceState(boost: true);
+
+        if (_isHidden)
+        {
+            ScheduleMinimalModeRecovery();
+        }
+    }
+
+    private void ScheduleMinimalModeRecovery()
+    {
+        var recoveryTimer = new DispatcherTimer { Interval = ShowAfterHideDelay };
+        recoveryTimer.Tick += (_, _) =>
+        {
+            recoveryTimer.Stop();
+            if (_isGameMinimalMode || !_isHidden)
+            {
+                return;
+            }
+
+            _pendingShowUtc = DateTime.MinValue;
+            _isHidden = false;
+            _lastShownUtc = DateTime.UtcNow;
+            AppLogger.Info($"TopBarWindow showing after minimal mode exit for {_monitorId}.");
+            try
+            {
+                WindowHelper.ShowWindow(this);
+                ApplyTopBarPlacement(true);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error($"Failed to show window after minimal mode exit for {_monitorId}.", ex);
+                _isHidden = true;
+                return;
+            }
+
+            UpdateVisualRefreshState(boost: true);
+            UpdateDiscordDemand(boost: true);
+            UpdateBackgroundMaintenanceState(boost: true);
+        };
+        recoveryTimer.Start();
     }
 
     private void OnBackgroundMaintenanceTick(object? sender, object e)
     {
-        UpdateBackgroundMaintenanceState();
-        QueueBackgroundMaintenance();
+        try
+        {
+            UpdateBackgroundMaintenanceState();
+            QueueBackgroundMaintenance();
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error($"TopBarWindow background maintenance tick failed for {_monitorId}.", ex);
+        }
     }
 
     private void UpdateBackgroundMaintenanceState(bool boost = false)

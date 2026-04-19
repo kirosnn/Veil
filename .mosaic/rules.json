@@ -2,7 +2,11 @@
   "bash": {
     "autoRun": [
       "git rev-list *",
-      "git status *"
+      "git status *",
+      "mkdir obsidian-mcp; *",
+      "cd obsidian-mcp; *",
+      "git status; *",
+      "git add *"
     ]
   }
 }

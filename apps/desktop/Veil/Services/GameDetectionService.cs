@@ -34,6 +34,33 @@ internal sealed class GameDetectionService
         "steamlink",
         "steamstreamingclient"
     ];
+    private static readonly HashSet<string> CaptureOverlayProcessNames =
+    [
+        "flameshot",
+        "gamebar",
+        "gamebarftserver",
+        "gamingoverlay",
+        "greenshot",
+        "lightshot",
+        "picpick",
+        "screenclippinghost",
+        "screenpresso",
+        "screensketch",
+        "sharex",
+        "snagit32",
+        "snagiteditor",
+        "snippingtool"
+    ];
+    private static readonly HashSet<string> ShellHostProcessNames =
+    [
+        "applicationframehost",
+        "explorer",
+        "searchhost",
+        "shellexperiencehost",
+        "startmenuexperiencehost",
+        "textinputhost",
+        "windowsinternal.composableshell.experiences.textinput.inputapp"
+    ];
     private static readonly HashSet<string> ForegroundFallbackDenyList =
     [
         "applicationframehost",
@@ -116,7 +143,7 @@ internal sealed class GameDetectionService
 
         EnsureCatalogRefreshScheduled(force: false);
 
-        if (!TryGetForegroundProcessInfo([veilWindowHandle], out ForegroundProcessInfo processInfo, out _))
+        if (!TryGetVisibilityProcessInfoForScreen([veilWindowHandle], screen, out ForegroundProcessInfo processInfo, out _))
         {
             return null;
         }
@@ -159,39 +186,76 @@ internal sealed class GameDetectionService
             return false;
         }
 
-        if (!GetWindowRect(foregroundWindow, out Rect rect))
+        return TryCreateForegroundProcessInfo(foregroundWindow, out processInfo);
+    }
+
+    internal bool TryGetVisibilityProcessInfoForScreen(
+        IReadOnlyCollection<IntPtr> ignoredWindowHandles,
+        ScreenBounds screen,
+        out ForegroundProcessInfo processInfo,
+        out IntPtr foregroundWindow)
+    {
+        processInfo = default;
+        foregroundWindow = IntPtr.Zero;
+
+        List<ForegroundProcessInfo> candidates = [];
+        HashSet<IntPtr> seenWindows = [];
+
+        if (TryGetForegroundProcessInfo(ignoredWindowHandles, out ForegroundProcessInfo currentForeground, out IntPtr currentForegroundWindow))
         {
-            return false;
+            candidates.Add(currentForeground);
+            seenWindows.Add(currentForegroundWindow);
         }
 
-        GetWindowThreadProcessId(foregroundWindow, out uint processId);
-        if (processId == 0)
+        EnumWindows((hwnd, _) =>
         {
-            return false;
-        }
-
-        try
-        {
-            using Process process = Process.GetProcessById((int)processId);
-            string processName = GameProcessMonitor.NormalizeProcessName(process.ProcessName);
-            string executablePath = string.Empty;
-
-            try
+            if (hwnd == IntPtr.Zero || ignoredWindowHandles.Contains(hwnd) || seenWindows.Contains(hwnd))
             {
-                executablePath = process.MainModule?.FileName ?? string.Empty;
-            }
-            catch
-            {
-                executablePath = string.Empty;
+                return true;
             }
 
-            processInfo = new ForegroundProcessInfo(process.Id, processName, executablePath, rect);
-            return !string.IsNullOrWhiteSpace(processInfo.ProcessName);
-        }
-        catch
+            if (!TryCreateForegroundProcessInfo(hwnd, out ForegroundProcessInfo candidate))
+            {
+                return true;
+            }
+
+            candidates.Add(candidate);
+            seenWindows.Add(hwnd);
+            return true;
+        }, IntPtr.Zero);
+
+        if (!TrySelectVisibilityProcessInfoForScreen(candidates, screen, out processInfo))
         {
             return false;
         }
+
+        foregroundWindow = processInfo.WindowHandle;
+        return foregroundWindow != IntPtr.Zero;
+    }
+
+    internal static bool TrySelectVisibilityProcessInfoForScreen(
+        IEnumerable<ForegroundProcessInfo> candidates,
+        ScreenBounds screen,
+        out ForegroundProcessInfo processInfo)
+    {
+        foreach (ForegroundProcessInfo candidate in candidates)
+        {
+            if (!WindowHelper.IntersectsScreen(candidate.WindowRect, screen))
+            {
+                continue;
+            }
+
+            if (ShouldIgnoreForegroundWindowForVisibility(candidate))
+            {
+                continue;
+            }
+
+            processInfo = candidate;
+            return true;
+        }
+
+        processInfo = default;
+        return false;
     }
 
     internal bool IsGameForegroundForScreen(ForegroundProcessInfo processInfo, ScreenBounds screen, IReadOnlyList<string> configuredProcessNames)
@@ -219,7 +283,8 @@ internal sealed class GameDetectionService
             : null;
 
     internal bool IsForegroundWindowFullscreenForScreen(ForegroundProcessInfo processInfo, ScreenBounds screen)
-        => IsWindowFullscreenLike(processInfo.WindowRect, screen);
+        => !ShouldIgnoreForegroundWindowForVisibility(processInfo) &&
+            IsWindowFullscreenLike(processInfo.WindowRect, screen);
 
     private static bool MatchesConfiguredList(string processName, IReadOnlySet<string> configuredProcessNames)
     {
@@ -375,6 +440,41 @@ internal sealed class GameDetectionService
         return className is "Progman" or "WorkerW" or "SHELLDLL_DefView" or "SysListView32";
     }
 
+    internal static bool ShouldIgnoreForegroundWindowForVisibility(ForegroundProcessInfo processInfo)
+    {
+        if (processInfo.WindowHandle == IntPtr.Zero)
+        {
+            return true;
+        }
+
+        if (processInfo.IsCloaked)
+        {
+            return true;
+        }
+
+        if (ShouldIgnoreForegroundWindowClassForGameDetection(processInfo.WindowClassName))
+        {
+            return true;
+        }
+
+        if (!processInfo.HasAppLikePresence)
+        {
+            return true;
+        }
+
+        if (IsCaptureOverlayProcess(processInfo.ProcessName, processInfo.ExecutablePath))
+        {
+            return true;
+        }
+
+        if (IsHostedShellOverlay(processInfo))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     private static bool IsDesktopShellWindow(IntPtr hwnd)
     {
         if (hwnd == GetShellWindow())
@@ -391,6 +491,75 @@ internal sealed class GameDetectionService
         return HasShellDesktopChild(hwnd);
     }
 
+    private static bool TryCreateForegroundProcessInfo(IntPtr hwnd, out ForegroundProcessInfo processInfo)
+    {
+        processInfo = default;
+
+        if (hwnd == IntPtr.Zero || IsDesktopShellWindow(hwnd))
+        {
+            return false;
+        }
+
+        if (!IsWindowVisible(hwnd) || IsIconic(hwnd))
+        {
+            return false;
+        }
+
+        if (!GetWindowRect(hwnd, out Rect rect))
+        {
+            return false;
+        }
+
+        GetWindowThreadProcessId(hwnd, out uint processId);
+        if (processId == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            using Process process = Process.GetProcessById((int)processId);
+            string processName = GameProcessMonitor.NormalizeProcessName(process.ProcessName);
+            if (string.IsNullOrWhiteSpace(processName))
+            {
+                return false;
+            }
+
+            string executablePath = string.Empty;
+            try
+            {
+                executablePath = process.MainModule?.FileName ?? string.Empty;
+            }
+            catch
+            {
+                executablePath = string.Empty;
+            }
+
+            string className = GetWindowClassName(hwnd);
+            string windowTitle = GetWindowTitle(hwnd);
+            int exStyle = GetWindowLongW(hwnd, GWL_EXSTYLE);
+            bool isCloaked = IsWindowCloaked(hwnd);
+            bool hasAppLikePresence = HasAppLikeWindowPresence(hwnd, exStyle);
+
+            processInfo = new ForegroundProcessInfo(
+                process.Id,
+                processName,
+                executablePath,
+                rect,
+                hwnd,
+                className,
+                windowTitle,
+                exStyle,
+                hasAppLikePresence,
+                isCloaked);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static bool HasShellDesktopChild(IntPtr hwnd)
     {
         IntPtr defView = FindWindowExW(hwnd, IntPtr.Zero, "SHELLDLL_DefView", null);
@@ -403,6 +572,77 @@ internal sealed class GameDetectionService
         return listView != IntPtr.Zero;
     }
 
+    private static bool HasAppLikeWindowPresence(IntPtr hwnd, int exStyle)
+    {
+        if (!WindowSwitcherService.HasSwitchableExtendedStyles(exStyle))
+        {
+            return false;
+        }
+
+        IntPtr owner = GetWindow(hwnd, GW_OWNER);
+        if (owner != IntPtr.Zero && (exStyle & WS_EX_APPWINDOW) == 0)
+        {
+            return false;
+        }
+
+        IntPtr rootOwner = GetAncestor(hwnd, GA_ROOTOWNER);
+        if (rootOwner == IntPtr.Zero)
+        {
+            rootOwner = hwnd;
+        }
+
+        IntPtr walk = rootOwner;
+        while (true)
+        {
+            IntPtr lastPopup = GetLastActivePopup(walk);
+            if (lastPopup == IntPtr.Zero || lastPopup == walk)
+            {
+                break;
+            }
+
+            if (IsWindowVisible(lastPopup))
+            {
+                walk = lastPopup;
+                break;
+            }
+
+            walk = lastPopup;
+        }
+
+        return walk == hwnd || rootOwner == hwnd;
+    }
+
+    private static bool IsCaptureOverlayProcess(string processName, string executablePath)
+    {
+        if (CaptureOverlayProcessNames.Contains(processName))
+        {
+            return true;
+        }
+
+        string executableName = string.IsNullOrWhiteSpace(executablePath)
+            ? string.Empty
+            : Path.GetFileNameWithoutExtension(executablePath);
+        return !string.IsNullOrWhiteSpace(executableName) &&
+            CaptureOverlayProcessNames.Contains(GameProcessMonitor.NormalizeProcessName(executableName));
+    }
+
+    private static bool IsHostedShellOverlay(ForegroundProcessInfo processInfo)
+    {
+        if (!ShellHostProcessNames.Contains(processInfo.ProcessName))
+        {
+            return false;
+        }
+
+        return string.IsNullOrWhiteSpace(processInfo.WindowTitle) ||
+            !processInfo.HasAppLikePresence;
+    }
+
+    private static bool IsWindowCloaked(IntPtr hwnd)
+    {
+        return DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, out uint cloaked, sizeof(uint)) == 0 &&
+            cloaked != 0;
+    }
+
     private static string GetWindowClassName(IntPtr hwnd)
     {
         var classNameBuffer = new char[256];
@@ -410,6 +650,15 @@ internal sealed class GameDetectionService
         return classNameLength <= 0
             ? string.Empty
             : new string(classNameBuffer, 0, classNameLength);
+    }
+
+    private static string GetWindowTitle(IntPtr hwnd)
+    {
+        var titleBuffer = new char[512];
+        int titleLength = GetWindowTextW(hwnd, titleBuffer, titleBuffer.Length);
+        return titleLength <= 0
+            ? string.Empty
+            : new string(titleBuffer, 0, titleLength);
     }
 
     private static string CreateDisplayName(GameListEntry entry)
@@ -435,5 +684,15 @@ internal sealed class GameDetectionService
         return entry.TitleId ?? string.Empty;
     }
 
-    internal readonly record struct ForegroundProcessInfo(int ProcessId, string ProcessName, string ExecutablePath, Rect WindowRect);
+    internal readonly record struct ForegroundProcessInfo(
+        int ProcessId,
+        string ProcessName,
+        string ExecutablePath,
+        Rect WindowRect,
+        IntPtr WindowHandle = default,
+        string WindowClassName = "",
+        string WindowTitle = "",
+        int ExtendedStyles = 0,
+        bool HasAppLikePresence = true,
+        bool IsCloaked = false);
 }

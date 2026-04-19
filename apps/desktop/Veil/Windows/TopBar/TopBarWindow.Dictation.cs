@@ -70,18 +70,21 @@ public sealed partial class TopBarWindow
 
     private bool CanStartDictationCapture()
     {
-        if (_isGameMinimalMode || _isDictationBusy)
-        {
-            return false;
-        }
-
-        return _localSpeechTranscriptionService.CanTranscribe(_settings);
+        return !_isGameMinimalMode && !_isDictationBusy;
     }
 
     private async void OnDictationCaptureStarted()
     {
         if (!CanStartDictationCapture())
         {
+            return;
+        }
+
+        if (!_localSpeechTranscriptionService.CanTranscribe(_settings))
+        {
+            _dictationOverlayWindow?.ShowStatus(_screen, "Setup Required", "Download a speech model in Settings to use Dictation.");
+            await Task.Delay(2500);
+            _dictationOverlayWindow?.HideOverlay();
             return;
         }
 
@@ -96,7 +99,7 @@ public sealed partial class TopBarWindow
         _dictationInsertionTarget = _focusedTextInsertionService.CaptureInsertionTarget(_dictationTargetWindow);
         AppLogger.Info(
             $"Dictation capture started targetWindow=0x{_dictationTargetWindow.ToInt64():X} capturedWindow=0x{(_dictationInsertionTarget?.WindowHandle ?? IntPtr.Zero).ToInt64():X}.");
-        _dictationOverlayWindow?.ShowStatus(_screen, "Listening", "Release Space to transcribe with the selected local model.");
+        _dictationOverlayWindow?.ShowStatus(_screen, "Listening", "Release Right Ctrl to transcribe.");
 
         try
         {

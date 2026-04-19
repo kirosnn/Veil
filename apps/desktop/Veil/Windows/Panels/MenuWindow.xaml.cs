@@ -38,6 +38,7 @@ public sealed partial class MenuWindow : Window
 
     private static readonly MenuEntry[] MenuItems =
     [
+        new("Terminal", "Terminal"),
         new("Settings", "Settings")
     ];
 

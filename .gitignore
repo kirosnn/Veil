@@ -33,3 +33,4 @@ apps/desktop/VeilSpeechCli/target/
 target/
 
 .claude/
+AGENTS.md
