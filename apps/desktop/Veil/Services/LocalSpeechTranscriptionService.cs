@@ -6,7 +6,7 @@ namespace Veil.Services;
 
 internal sealed class LocalSpeechTranscriptionService
 {
-    private const string HelperExecutableName = "veil-speech-cli.exe";
+    private const string HelperExecutableName = "handy.exe";
     private static readonly HashSet<string> SupportedModelIds = new(StringComparer.OrdinalIgnoreCase)
     {
         "parakeet-tdt-0.6b-v2",
@@ -118,12 +118,12 @@ internal sealed class LocalSpeechTranscriptionService
                 throw new InvalidOperationException("Veil speech helper executable was not found in the installed app.");
             }
 
-            string manifestPath = Path.Combine(repoRoot, "apps", "desktop", "VeilSpeechCli", "Cargo.toml");
+            string manifestPath = Path.Combine(repoRoot, "apps", "desktop", "Handy", "Cargo.toml");
             string helperPath = _cachedHelperPath ?? Path.Combine(
                 repoRoot,
                 "apps",
                 "desktop",
-                "VeilSpeechCli",
+                "Handy",
                 "target",
                 "release",
                 HelperExecutableName);
