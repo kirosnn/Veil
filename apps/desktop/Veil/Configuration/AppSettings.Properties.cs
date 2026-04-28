@@ -325,8 +325,6 @@ internal sealed partial class AppSettings
         }
     }
 
-    public IReadOnlyList<string> GameProcessNames => _gameProcessNames;
-
     public string TopBarDisplayMode
     {
         get => _topBarDisplayMode;
@@ -376,56 +374,6 @@ internal sealed partial class AppSettings
         }
     }
 
-    public string GameDetectionMode
-    {
-        get => _gameDetectionMode;
-        set
-        {
-            value = GameDetectionService.NormalizeDetectionMode(value);
-            if (_gameDetectionMode == value)
-            {
-                return;
-            }
-
-            _gameDetectionMode = value;
-            PersistAndNotify();
-        }
-    }
-
-    public void SetGameProcessNames(IEnumerable<string> processNames)
-    {
-        string[] normalizedNames = processNames
-            .Select(static name => name.Trim())
-            .Where(static name => !string.IsNullOrWhiteSpace(name))
-            .Select(GameProcessMonitor.NormalizeProcessName)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        if (_gameProcessNames.SequenceEqual(normalizedNames, StringComparer.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        _gameProcessNames = normalizedNames;
-        PersistAndNotify();
-    }
-
-    public bool HideForFullscreen
-    {
-        get => _hideForFullscreen;
-        set
-        {
-            if (_hideForFullscreen == value)
-            {
-                return;
-            }
-
-            _hideForFullscreen = value;
-            PersistAndNotify();
-        }
-    }
-
     public bool BackgroundOptimizationEnabled
     {
         get => _backgroundOptimizationEnabled;
@@ -437,36 +385,6 @@ internal sealed partial class AppSettings
             }
 
             _backgroundOptimizationEnabled = value;
-            PersistAndNotify();
-        }
-    }
-
-    public bool SystemPowerBoostEnabled
-    {
-        get => _systemPowerBoostEnabled;
-        set
-        {
-            if (_systemPowerBoostEnabled == value)
-            {
-                return;
-            }
-
-            _systemPowerBoostEnabled = value;
-            PersistAndNotify();
-        }
-    }
-
-    public bool QuietLaptopOutsideGamesEnabled
-    {
-        get => _quietLaptopOutsideGamesEnabled;
-        set
-        {
-            if (_quietLaptopOutsideGamesEnabled == value)
-            {
-                return;
-            }
-
-            _quietLaptopOutsideGamesEnabled = value;
             PersistAndNotify();
         }
     }
@@ -504,89 +422,6 @@ internal sealed partial class AppSettings
     }
 
     public IReadOnlyList<AppShortcutSetting?> ShortcutButtons => _shortcutButtons;
-
-    public string TerminalDefaultProfileId
-    {
-        get => _terminalDefaultProfileId;
-        set
-        {
-            if (string.Equals(_terminalDefaultProfileId, value, StringComparison.Ordinal)) return;
-            _terminalDefaultProfileId = value ?? string.Empty;
-            PersistAndNotify();
-        }
-    }
-
-    public string TerminalFontFamily
-    {
-        get => _terminalFontFamily;
-        set
-        {
-            string v = string.IsNullOrWhiteSpace(value) ? "Cascadia Code, Consolas, Courier New, monospace" : value.Trim();
-            if (string.Equals(_terminalFontFamily, v, StringComparison.Ordinal)) return;
-            _terminalFontFamily = v;
-            PersistAndNotify();
-        }
-    }
-
-    public int TerminalFontSize
-    {
-        get => _terminalFontSize;
-        set
-        {
-            int v = Math.Clamp(value, 8, 32);
-            if (_terminalFontSize == v) return;
-            _terminalFontSize = v;
-            PersistAndNotify();
-        }
-    }
-
-    public string TerminalCursorStyle
-    {
-        get => _terminalCursorStyle;
-        set
-        {
-            string v = value is "block" or "underline" or "bar" ? value : "block";
-            if (string.Equals(_terminalCursorStyle, v, StringComparison.Ordinal)) return;
-            _terminalCursorStyle = v;
-            PersistAndNotify();
-        }
-    }
-
-    public int TerminalScrollback
-    {
-        get => _terminalScrollback;
-        set
-        {
-            int v = Math.Clamp(value, 100, 50000);
-            if (_terminalScrollback == v) return;
-            _terminalScrollback = v;
-            PersistAndNotify();
-        }
-    }
-
-    public int TerminalCols
-    {
-        get => _terminalCols;
-        set
-        {
-            int v = Math.Clamp(value, 20, 500);
-            if (_terminalCols == v) return;
-            _terminalCols = v;
-            PersistAndNotify();
-        }
-    }
-
-    public int TerminalRows
-    {
-        get => _terminalRows;
-        set
-        {
-            int v = Math.Clamp(value, 5, 200);
-            if (_terminalRows == v) return;
-            _terminalRows = v;
-            PersistAndNotify();
-        }
-    }
 
     public void SetShortcutButton(int index, AppShortcutSetting? setting)
     {
