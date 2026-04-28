@@ -28,8 +28,6 @@ public sealed partial class TopBarWindow : Window
     private const double MinimumRenderedTopBarOpacity = 0.04;
     private const double DefaultRenderedBlurIntensity = 0.55;
     private const double MinimumRenderedBlurIntensity = 0.20;
-    private static readonly TimeSpan ShowAfterHideDelay = TimeSpan.FromMilliseconds(150);
-    private static readonly TimeSpan MinimumVisibleDurationBeforeHide = TimeSpan.FromMilliseconds(350);
     private static readonly TimeSpan AdaptiveVisualWarmRefreshInterval = TimeSpan.FromMilliseconds(700);
     private static readonly TimeSpan AdaptiveVisualRefreshInterval = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan AdaptiveVisualDeepSampleInterval = TimeSpan.FromMilliseconds(900);
@@ -59,8 +57,6 @@ public sealed partial class TopBarWindow : Window
     private readonly string _discordDemandOwnerId;
     private bool _startHiddenUntilReady;
     private bool _ownsGlobalHotkeys;
-    private bool _isHidden;
-    private bool _isGameMinimalMode;
     private bool _appBarRegistered;
     private IntPtr _hwnd;
     private global::Windows.UI.Color? _lastAdaptiveColor;
@@ -75,10 +71,9 @@ public sealed partial class TopBarWindow : Window
     private MusicControlWindow? _musicControlWindow;
     private DiscordNotificationWindow? _discordNotificationWindow;
     private readonly DiscordNotificationService _discordNotificationService;
-    private TerminalWindow? _terminalWindow;
     private readonly MediaControlService _mediaControlService = new();
     private RunCatService? _runCatService;
-    private readonly GamePerformanceService _gamePerformanceService;
+    private readonly VeilOptimizationService _veilOptimizationService;
     private Button[] _shortcutButtons = [];
     private ImageSource?[]? _runCatFrames;
     private int _runCatLoadVersion;
@@ -101,14 +96,12 @@ public sealed partial class TopBarWindow : Window
     private DateTime _lastDiscordBoostUtc = DateTime.MinValue;
     private DateTime _lastBackgroundMaintenanceBoostUtc = DateTime.MinValue;
     private double _lastAppliedBlurIntensity = -1;
-    private DateTime _pendingShowUtc = DateTime.MinValue;
-    private DateTime _lastShownUtc = DateTime.MinValue;
 
-    internal TopBarWindow(string monitorId, ScreenBounds screen, GamePerformanceService gamePerformanceService, bool ownsGlobalHotkeys, bool startHiddenUntilReady = false)
+    internal TopBarWindow(string monitorId, ScreenBounds screen, VeilOptimizationService veilOptimizationService, bool ownsGlobalHotkeys, bool startHiddenUntilReady = false)
     {
         _monitorId = monitorId;
         _screen = screen;
-        _gamePerformanceService = gamePerformanceService;
+        _veilOptimizationService = veilOptimizationService;
         _settings = AppSettings.Current;
         _startHiddenUntilReady = startHiddenUntilReady;
         _ownsGlobalHotkeys = ownsGlobalHotkeys;
@@ -203,7 +196,7 @@ public sealed partial class TopBarWindow : Window
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
-        AppLogger.Info($"TopBarWindow closed for {_monitorId}. Hidden={_isHidden} MinimalMode={_isGameMinimalMode}.");
+        AppLogger.Info($"TopBarWindow closed for {_monitorId}.");
         _clockTimer.Stop();
         _visualTimer.Stop();
         _backgroundMaintenanceTimer.Stop();
@@ -220,7 +213,7 @@ public sealed partial class TopBarWindow : Window
         DisposeFinderHotkey();
         DisposeDictationHotkey();
         _runCatService?.Dispose();
-        _gamePerformanceService.RestoreNormalOptimizations();
+        _veilOptimizationService.RestoreNormalOptimizations();
         _runCatService = null;
         if (_appBarRegistered)
         {
@@ -229,10 +222,6 @@ public sealed partial class TopBarWindow : Window
     }
 
     internal ScreenBounds ScreenBounds => _screen;
-
-    internal IntPtr WindowHandle => _hwnd;
-
-    internal bool IsMinimalModeActive => _isGameMinimalMode;
 
     internal void UpdateScreenBounds(ScreenBounds screen)
     {
@@ -248,11 +237,7 @@ public sealed partial class TopBarWindow : Window
             return;
         }
 
-        if (!_isHidden && !_isGameMinimalMode)
-        {
-            ApplyTopBarPlacement(true);
-        }
-
+        ApplyTopBarPlacement(true);
         UpdateTopBarLayout();
     }
 
@@ -278,82 +263,6 @@ public sealed partial class TopBarWindow : Window
         _appBarRegistered = true;
     }
 
-    internal void ApplyActivityState(bool gameRunning, bool shouldHideForForegroundWindow, int? activeGameProcessId)
-    {
-        try
-        {
-            bool visibilityChanged = false;
-            if (gameRunning)
-            {
-                _pendingShowUtc = DateTime.MinValue;
-                EnterMinimalMode(activeGameProcessId);
-                return;
-            }
-
-            if (_isGameMinimalMode)
-            {
-                ExitMinimalMode();
-            }
-
-            bool shouldHideWindow = shouldHideForForegroundWindow;
-
-            if (shouldHideWindow && !_isHidden)
-            {
-                if (DateTime.UtcNow - _lastShownUtc < MinimumVisibleDurationBeforeHide)
-                {
-                    return;
-                }
-
-                _pendingShowUtc = DateTime.MinValue;
-                _isHidden = true;
-                visibilityChanged = true;
-                AppLogger.Info($"TopBarWindow hiding for {_monitorId}. Foreground game fullscreen={shouldHideForForegroundWindow}.");
-                if (_appBarRegistered)
-                {
-                    WindowHelper.UnregisterAppBar(this);
-                    _appBarRegistered = false;
-                }
-                WindowHelper.HideWindow(this);
-            }
-            else if (shouldHideWindow && _isHidden)
-            {
-                _pendingShowUtc = DateTime.MinValue;
-            }
-            else if (!shouldHideWindow && _isHidden)
-            {
-                if (_pendingShowUtc == DateTime.MinValue)
-                {
-                    _pendingShowUtc = DateTime.UtcNow;
-                }
-                else if (DateTime.UtcNow - _pendingShowUtc >= ShowAfterHideDelay)
-                {
-                    _pendingShowUtc = DateTime.MinValue;
-                    _isHidden = false;
-                    _lastShownUtc = DateTime.UtcNow;
-                    visibilityChanged = true;
-                    AppLogger.Info($"TopBarWindow showing for {_monitorId}.");
-                    WindowHelper.ShowWindow(this);
-                    ApplyTopBarPlacement(true);
-                }
-            }
-            else
-            {
-                _pendingShowUtc = DateTime.MinValue;
-            }
-
-            if (visibilityChanged)
-            {
-                UpdateVisualRefreshState(boost: !_isHidden);
-                UpdateDiscordDemand(boost: !_isHidden);
-                UpdateBackgroundMaintenanceState(boost: !_isHidden);
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error($"TopBarWindow ApplyActivityState failed for {_monitorId}.", ex);
-        }
-    }
-
     private void OnClockTick(object? sender, object e)
     {
         try
@@ -372,12 +281,7 @@ public sealed partial class TopBarWindow : Window
 
     private void UpdateClock()
     {
-        if (_isGameMinimalMode)
-        {
-            return;
-        }
-
-        var now = DateTime.Now;
+            var now = DateTime.Now;
         string dayName = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(now.DayOfWeek);
         dayName = string.IsNullOrWhiteSpace(dayName) ? now.ToString("ddd", CultureInfo.CurrentCulture) : dayName;
         dayName = dayName.TrimEnd('.');
@@ -573,20 +477,15 @@ public sealed partial class TopBarWindow : Window
             RightButtonsPanel.Margin = new Thickness(0, 0, reservedTrailingWidth, 0);
             ClockText.HorizontalAlignment = HorizontalAlignment.Right;
             ClockText.Margin = new Thickness(0, 0, Math.Max(0, RightAlignedEdgeInset - _settings.ClockOffset), 0);
-            TerminalTabPanel.HorizontalAlignment = HorizontalAlignment.Right;
-            TerminalTabPanel.Margin = new Thickness(0, 0, RightAlignedEdgeInset, 0);
         }
         else
         {
             RightButtonsPanel.Margin = new Thickness(0, 0, 8, 0);
             ClockText.HorizontalAlignment = HorizontalAlignment.Center;
             ClockText.Margin = new Thickness(_settings.ClockOffset, 0, 0, 0);
-            TerminalTabPanel.HorizontalAlignment = HorizontalAlignment.Center;
-            TerminalTabPanel.Margin = new Thickness(0);
         }
 
         Canvas.SetZIndex(ClockText, 2);
-        Canvas.SetZIndex(TerminalTabPanel, 2);
     }
 
     private double GetCenterReservedWidth()
@@ -598,11 +497,6 @@ public sealed partial class TopBarWindow : Window
 
     private double GetTrailingContentWidth()
     {
-        if (TerminalTabPanel.Visibility == Visibility.Visible && TerminalTabPanel.ActualWidth > 0)
-        {
-            return TerminalTabPanel.ActualWidth;
-        }
-
         if (ClockText.Visibility == Visibility.Visible)
         {
             if (ClockText.ActualWidth > 0)
