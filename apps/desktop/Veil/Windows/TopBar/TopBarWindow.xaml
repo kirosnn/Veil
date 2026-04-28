@@ -207,48 +207,5 @@
                    VerticalAlignment="Center"
                    IsHitTestVisible="False" />
 
-        <!-- Terminal tab strip — visible when terminal is open -->
-        <StackPanel
-            x:Name="TerminalTabPanel"
-            Orientation="Horizontal"
-            Spacing="2"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Center"
-            Visibility="Collapsed">
-            <ScrollViewer
-                HorizontalScrollBarVisibility="Hidden"
-                HorizontalScrollMode="Enabled"
-                VerticalScrollBarVisibility="Disabled"
-                VerticalScrollMode="Disabled"
-                MaxWidth="700">
-                <StackPanel
-                    x:Name="TerminalTabStrip"
-                    Orientation="Horizontal"
-                    Spacing="2"
-                    VerticalAlignment="Center" />
-            </ScrollViewer>
-            <Button
-                x:Name="TerminalNewTabButton"
-                Width="22"
-                Height="22"
-                Padding="0"
-                CornerRadius="5"
-                BorderThickness="0"
-                Background="Transparent"
-                Foreground="#55FFFFFF"
-                FontSize="14"
-                IsTabStop="False"
-                VerticalAlignment="Center"
-                ToolTipService.ToolTip="New Terminal Tab"
-                Click="OnTerminalNewTabClick">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver">#18FFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBackgroundPressed">#10FFFFFF</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
-                </Button.Resources>
-                <TextBlock Text="+" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Center" />
-            </Button>
-        </StackPanel>
     </Grid>
 </Window>
