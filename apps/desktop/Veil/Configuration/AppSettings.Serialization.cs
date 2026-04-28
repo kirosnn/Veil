@@ -35,12 +35,7 @@ internal sealed partial class AppSettings
             TopBarMonitorIds = _topBarMonitorIds,
             ShowAppButtonOutline = _showAppButtonOutline,
             LocalSpeechModelId = _localSpeechModelId,
-            GameDetectionMode = _gameDetectionMode,
-            GameProcessNames = _gameProcessNames,
             BackgroundOptimizationEnabled = _backgroundOptimizationEnabled,
-            SystemPowerBoostEnabled = _systemPowerBoostEnabled,
-            QuietLaptopOutsideGamesEnabled = _quietLaptopOutsideGamesEnabled,
-            HideForFullscreen = _hideForFullscreen,
             ShortcutButtons = _shortcutButtons
                 .Select(setting => setting is null
                     ? null
@@ -51,13 +46,6 @@ internal sealed partial class AppSettings
                         DisplayName = setting.DisplayName
                     })
                 .ToArray(),
-            TerminalDefaultProfileId = _terminalDefaultProfileId,
-            TerminalFontFamily       = _terminalFontFamily,
-            TerminalFontSize         = _terminalFontSize,
-            TerminalCursorStyle      = _terminalCursorStyle,
-            TerminalScrollback       = _terminalScrollback,
-            TerminalCols             = _terminalCols,
-            TerminalRows             = _terminalRows,
         };
 
         File.WriteAllText(_settingsPath, JsonSerializer.Serialize(payload, _jsonOptions));
@@ -116,21 +104,8 @@ internal sealed partial class AppSettings
                 settings._topBarMonitorIds = NormalizeTopBarMonitorIds(dto.TopBarMonitorIds);
                 settings._showAppButtonOutline = dto.ShowAppButtonOutline;
                 settings._localSpeechModelId = NormalizeLocalSpeechModelId(dto.LocalSpeechModelId);
-                settings._gameDetectionMode = GameDetectionService.NormalizeDetectionMode(dto.GameDetectionMode);
-                settings._gameProcessNames = NormalizeGameProcessNames(dto.GameProcessNames);
                 settings._backgroundOptimizationEnabled = dto.BackgroundOptimizationEnabled;
-                settings._systemPowerBoostEnabled = dto.SystemPowerBoostEnabled;
-                settings._quietLaptopOutsideGamesEnabled = dto.QuietLaptopOutsideGamesEnabled;
-                settings._hideForFullscreen = dto.HideForFullscreen;
                 settings._shortcutButtons = NormalizeShortcutButtons(dto.ShortcutButtons);
-                settings._terminalDefaultProfileId = dto.TerminalDefaultProfileId ?? string.Empty;
-                settings._terminalFontFamily       = string.IsNullOrWhiteSpace(dto.TerminalFontFamily) ? "Cascadia Code, Consolas, Courier New, monospace" : dto.TerminalFontFamily;
-                settings._terminalFontSize         = Math.Clamp(dto.TerminalFontSize, 8, 32);
-                settings._terminalCursorStyle      = dto.TerminalCursorStyle is "block" or "underline" or "bar" ? dto.TerminalCursorStyle : "block";
-                settings._terminalScrollback       = Math.Clamp(dto.TerminalScrollback, 100, 50000);
-                settings._terminalCols             = Math.Clamp(dto.TerminalCols, 20, 500);
-                settings._terminalRows             = Math.Clamp(dto.TerminalRows, 5, 200);
-
                 if (requiresSave)
                 {
                     settings.Save();
@@ -171,20 +146,8 @@ internal sealed partial class AppSettings
         public string[]? TopBarMonitorIds { get; set; }
         public bool ShowAppButtonOutline { get; set; } = true;
         public string LocalSpeechModelId { get; set; } = LocalSpeechModelCatalog.DefaultModelId;
-        public string GameDetectionMode { get; set; } = GameDetectionService.HybridMode;
-        public string[]? GameProcessNames { get; set; }
         public bool BackgroundOptimizationEnabled { get; set; } = true;
-        public bool SystemPowerBoostEnabled { get; set; } = true;
-        public bool QuietLaptopOutsideGamesEnabled { get; set; } = true;
-        public bool HideForFullscreen { get; set; } = true;
         public AppShortcutDto?[]? ShortcutButtons { get; set; }
-        public string TerminalDefaultProfileId { get; set; } = string.Empty;
-        public string TerminalFontFamily       { get; set; } = "Cascadia Code, Consolas, Courier New, monospace";
-        public int    TerminalFontSize         { get; set; } = 14;
-        public string TerminalCursorStyle      { get; set; } = "block";
-        public int    TerminalScrollback       { get; set; } = 5000;
-        public int    TerminalCols             { get; set; } = 120;
-        public int    TerminalRows             { get; set; } = 30;
     }
 
     private sealed class AppShortcutDto
