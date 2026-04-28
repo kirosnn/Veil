@@ -1,9 +1,8 @@
 #define AppName        "Veil"
-#define AppVersion     "1.0.0"
+#define AppVersion     "0.0.2"
 #define AppPublisher   "Veil"
 #define AppURL         "https://github.com/kirosnn/veil"
 #define VeilExe        "Veil.exe"
-#define TerminalExe    "VeilTerminal.exe"
 
 [Setup]
 AppId={{B4C1D2E3-F5A6-7890-BCDE-F12345678901}
@@ -25,7 +24,7 @@ Compression=lzma2/max
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=yes
-CloseApplicationsFilter={#VeilExe},{#TerminalExe}
+CloseApplicationsFilter={#VeilExe}
 UninstallDisplayName=Veil
 UninstallDisplayIcon={app}\{#VeilExe}
 ; No UAC prompt — per-user install
@@ -35,28 +34,21 @@ PrivilegesRequiredOverridesAllowed=
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon_veil";     Description: "Veil shortcut on Desktop";          GroupDescription: "Additional shortcuts:"; Flags: unchecked
-Name: "desktopicon_terminal"; Description: "Veil Terminal shortcut on Desktop"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
+Name: "desktopicon_veil"; Description: "Veil shortcut on Desktop"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Dirs]
 Name: "{app}"
-Name: "{app}\Terminal"
 
 [Files]
 ; ── Veil ─────────────────────────────────────────────────────────────────────
 Source: "..\artifacts\build\Veil\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; ── Veil Terminal ─────────────────────────────────────────────────────────────
-Source: "..\artifacts\build\VeilTerminal\*"; DestDir: "{app}\Terminal"; Flags: ignoreversion recursesubdirs createallsubdirs
-
 [Icons]
 ; Start menu
-Name: "{userprograms}\Veil\Veil";          Filename: "{app}\{#VeilExe}";          WorkingDir: "{app}";          IconFilename: "{app}\{#VeilExe}"
-Name: "{userprograms}\Veil\Veil Terminal"; Filename: "{app}\Terminal\{#TerminalExe}"; WorkingDir: "{app}\Terminal"; IconFilename: "{app}\Terminal\{#TerminalExe}"
+Name: "{userprograms}\Veil\Veil"; Filename: "{app}\{#VeilExe}"; WorkingDir: "{app}"; IconFilename: "{app}\{#VeilExe}"
 
-; Desktop (optional tasks)
-Name: "{userdesktop}\Veil";          Filename: "{app}\{#VeilExe}";                 Tasks: desktopicon_veil
-Name: "{userdesktop}\Veil Terminal"; Filename: "{app}\Terminal\{#TerminalExe}";    Tasks: desktopicon_terminal
+; Desktop (optional task)
+Name: "{userdesktop}\Veil"; Filename: "{app}\{#VeilExe}"; Tasks: desktopicon_veil
 
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Veil"; ValueData: """{app}\{#VeilExe}"" --startup"; Flags: uninsdeletevalue
@@ -75,6 +67,15 @@ var
 begin
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM Veil.exe',         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM VeilTerminal.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+procedure RemoveTerminalFolder();
+var
+  TerminalDir: String;
+begin
+  TerminalDir := ExpandConstant('{localappdata}') + '\Programs\Veil\Terminal';
+  if DirExists(TerminalDir) then
+    DelTree(TerminalDir, True, True, True);
 end;
 
 function ContainsVeilMarker(const Value: String): Boolean;
@@ -280,6 +281,9 @@ end;
 procedure CleanupLegacyInstalls();
 begin
   StopApps();
+
+  { Remove the old VeilTerminal subfolder if it exists }
+  RemoveTerminalFolder();
 
   { Wipe every registry entry that mentions Veil, whatever key name it used }
   CleanupAllVeilUninstallKeys();
