@@ -139,12 +139,6 @@ internal static class WindowsActionService
         AddSetting(actions, "Closed Captions", "\uE8D2", "ms-settings:easeofaccess-closedcaptioning");
         AddSetting(actions, "Cursor & Pointer Speed", "\uE962", "ms-settings:easeofaccess-cursor");
 
-        // Gaming
-        AddSetting(actions, "Gaming Settings", "\uE7FC", "ms-settings:gaming");
-        AddSetting(actions, "Game Bar", "\uE7FC", "ms-settings:gaming-gamebar");
-        AddSetting(actions, "Game Mode", "\uE7FC", "ms-settings:gaming-gamemode");
-        AddSetting(actions, "Game DVR", "\uE714", "ms-settings:gaming-gamedvr");
-
         // System Info
         AddSetting(actions, "About This PC", "\uE7F4", "ms-settings:about");
         AddSetting(actions, "System Info", "\uE946", "ms-settings:about");
