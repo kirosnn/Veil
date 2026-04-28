@@ -20,7 +20,7 @@ namespace Veil.Windows;
 
 public sealed partial class TopBarWindow : Window
 {
-    private const int BarHeight = 32;
+    private int BarHeight => _settings.TopBarHeight;
     private const double MinimumClockClearance = 164;
     private const double RightAlignedTrailingGap = 10;
     private const double RightAlignedEdgeInset = 2;
@@ -82,6 +82,7 @@ public sealed partial class TopBarWindow : Window
     private readonly DispatcherTimer _backgroundMaintenanceTimer;
     private int _backgroundMaintenanceInFlight;
     private string _lastWindowRegionSignature = string.Empty;
+    private int _lastAppliedBarHeight = 32;
     private double _lastKnownClockWidth = MinimumClockClearance;
     private string _lastClockText = string.Empty;
     private string _lastSettingsSignature = string.Empty;
@@ -309,7 +310,13 @@ public sealed partial class TopBarWindow : Window
                 return;
             }
 
+            bool heightChanged = _lastAppliedBarHeight != _settings.TopBarHeight;
             _lastSettingsSignature = settingsSignature;
+            _lastAppliedBarHeight = _settings.TopBarHeight;
+            if (heightChanged)
+            {
+                ApplyTopBarPlacement(true);
+            }
             ApplySettings();
             RebuildShortcutButtons();
             _finderHotkeyService?.SetEnabled(_settings.FinderHotkeyEnabled);
@@ -398,6 +405,7 @@ public sealed partial class TopBarWindow : Window
             _settings.RunCatEnabled,
             _settings.RunCatRunner,
             _settings.BackgroundOptimizationEnabled,
+            _settings.TopBarHeight,
             shortcutSignature);
     }
 

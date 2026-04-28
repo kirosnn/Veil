@@ -169,6 +169,12 @@ public sealed partial class SettingsWindow : Window
         MenuTintSlider.Value = _settings.MenuTintOpacity;
         FinderBubbleSlider.Value = _settings.FinderBubbleOpacity;
         BlurIntensitySlider.Value = _settings.BlurIntensity;
+
+        TopBarHeightSlider.Minimum = 20;
+        TopBarHeightSlider.Maximum = 60;
+        TopBarHeightSlider.StepFrequency = 1;
+        TopBarHeightSlider.Value = _settings.TopBarHeight;
+
         SolidColorTextBox.Text = _settings.SolidColor;
         TopBarForegroundColorTextBox.Text = _settings.TopBarForegroundColor;
         InitializeAiSpeechModelPicker();
@@ -229,6 +235,41 @@ public sealed partial class SettingsWindow : Window
         ApplyReadableContrast();
         RestoreRetainedViewport();
         AppLogger.Info("SettingsWindow.ShowCenteredCore completed.");
+    }
+
+    private void OnTopBarHeightChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _settings.TopBarHeight = (int)Math.Round(e.NewValue);
+        UpdateTopBarHeightUi();
+    }
+
+    private void OnTopBarHeightPresetClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag } || !int.TryParse(tag, out int height))
+        {
+            return;
+        }
+
+        _settings.TopBarHeight = height;
+        _isInitializing = true;
+        TopBarHeightSlider.Value = _settings.TopBarHeight;
+        _isInitializing = false;
+        UpdateTopBarHeightUi();
+    }
+
+    private void UpdateTopBarHeightUi()
+    {
+        int h = _settings.TopBarHeight;
+        TopBarHeightValueText.Text = $"{h}px";
+        UpdateTopBarStyleButton(TopBarHeightSButton, h == 24);
+        UpdateTopBarStyleButton(TopBarHeightMButton, h == 32);
+        UpdateTopBarStyleButton(TopBarHeightLButton, h == 40);
+        UpdateTopBarStyleButton(TopBarHeightXLButton, h == 48);
     }
 
     private void OnTopBarOpacityChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -861,6 +902,7 @@ public sealed partial class SettingsWindow : Window
         UpdateTopBarStyleButton(TopBarContentAlignmentCenterButton, _settings.TopBarContentAlignment == "Center");
         UpdateTopBarStyleButton(TopBarContentAlignmentRightButton, _settings.TopBarContentAlignment == "Right");
         UpdateTopBarMonitorSelection();
+        UpdateTopBarHeightUi();
         SolidColorPanel.Visibility = _settings.TopBarStyle == "Solid" ? Visibility.Visible : Visibility.Collapsed;
         BlurIntensityPanel.Visibility = _settings.TopBarStyle == "Blur" ? Visibility.Visible : Visibility.Collapsed;
         TopBarOpacityPanel.Visibility = _settings.TopBarStyle is "Solid" or "Blur"

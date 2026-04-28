@@ -51,6 +51,7 @@ internal sealed partial class AppSettings
     private bool _showAppButtonOutline = true;
     private string _localSpeechModelId = LocalSpeechModelCatalog.DefaultModelId;
     private AppShortcutSetting?[] _shortcutButtons = new AppShortcutSetting?[MaxShortcutButtons];
+    private int _topBarHeight = 32;
 
     public static AppSettings Current => _current.Value;
 

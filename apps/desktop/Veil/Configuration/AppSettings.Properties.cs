@@ -423,6 +423,18 @@ internal sealed partial class AppSettings
 
     public IReadOnlyList<AppShortcutSetting?> ShortcutButtons => _shortcutButtons;
 
+    public int TopBarHeight
+    {
+        get => _topBarHeight;
+        set
+        {
+            int v = Math.Clamp(value, 20, 60);
+            if (_topBarHeight == v) return;
+            _topBarHeight = v;
+            PersistAndNotify();
+        }
+    }
+
     public void SetShortcutButton(int index, AppShortcutSetting? setting)
     {
         if (index < 0 || index >= MaxShortcutButtons)

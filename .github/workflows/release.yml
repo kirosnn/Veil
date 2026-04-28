@@ -49,12 +49,15 @@ jobs:
           } else {
             $version = "${{ github.ref_name }}"
           }
+          $isPrerelease = $version -match '-beta|-alpha|-rc'
           "tag=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$($isPrerelease.ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}
           name: Veil ${{ steps.release.outputs.tag }}
+          prerelease: ${{ steps.release.outputs.prerelease }}
           target_commitish: ${{ github.sha }}
           files: artifacts/inno/VeilSetup.exe
