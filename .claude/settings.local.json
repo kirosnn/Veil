@@ -93,7 +93,11 @@
       "Bash(awk '{print $NF}')",
       "Read(//c/Users/Nassim/Projects/Veil/%LOCALAPPDATA%/**)",
       "Read(//c/Users/Nassim/Projects/Veil/%APPDATA%/**)",
-      "Bash(grep -rn \"static\\\\s\\\\+[A-Za-z].*\\(\\).*$\\\\|static\\\\s\\\\+readonly\\\\|static\\\\s\\\\+[A-Z][a-zA-Z]*\\\\s*=\" apps/desktop/Veil/Interop/ --include=\"*.cs\")"
+      "Bash(grep -rn \"static\\\\s\\\\+[A-Za-z].*\\(\\).*$\\\\|static\\\\s\\\\+readonly\\\\|static\\\\s\\\\+[A-Z][a-zA-Z]*\\\\s*=\" apps/desktop/Veil/Interop/ --include=\"*.cs\")",
+      "Bash(grep -v \"^\\\\.$\")",
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }

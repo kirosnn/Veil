@@ -29,7 +29,7 @@ artifacts/
 # .NET tool cache
 .dotnet/
 .dotnet-cli/
-apps/desktop/VeilSpeechCli/target/
+apps/desktop/Handy/target/
 target/
 
 .claude/
