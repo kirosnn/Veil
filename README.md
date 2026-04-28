@@ -38,8 +38,8 @@ tools/
 scripts/
   dev.ps1                    Local hot-reload style development runner
   benchmark-perf.ps1         Performance benchmark and regression assertions
-  build-setup.ps1            Local installer builder
-artifacts/                   Generated publish, benchmark, and setup outputs
+  build-setup.ps1            Inno Setup installer builder
+artifacts/                   Generated publish, benchmark, and installer outputs
 UnicodeAnimations/           Shared spinner/animation assets and support code
 .github/workflows/           CI workflow definitions
 Veil.sln                     Solution entry point
@@ -199,13 +199,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-setup.ps1
 
 By default this:
 
-- builds the desktop app for `win-x64`
-- stages the output into `artifacts/setup/publish`
-- creates a payload archive
-- generates a small setup project
-- publishes a single-file installer at `artifacts/setup/VeilSetup.exe`
+- builds Veil and Veil Terminal for `win-x64`
+- stages the outputs into `artifacts/build/Veil` and `artifacts/build/VeilTerminal`
+- compiles the Inno Setup script at `installer/veil.iss`
+- publishes the installer at `artifacts/inno/VeilSetup.exe`
 
-The installer currently performs per-user install/uninstall behavior and registers an uninstall entry in the current user registry hive.
+The installer performs per-user install/uninstall behavior, registers an uninstall entry in the current user registry hive, and cleans up legacy Veil installer entries.
+
+## Release
+
+Create and publish a GitHub release with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\release.ps1 -Version 1.0.0
+```
+
+The release script requires a clean Git working tree. Commit and push your changes before running it.
+
+This creates and pushes the `v1.0.0` tag. GitHub Actions then builds the Inno Setup installer and attaches `VeilSetup.exe` to the release.
 
 ## CI
 
