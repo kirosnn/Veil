@@ -18,11 +18,6 @@ public sealed partial class TopBarWindow
         try
         {
             using var perfScope = PerformanceLogger.Measure("TopBar.OnVisualTick", 2.0);
-            if (_isGameMinimalMode || _isHidden)
-            {
-                return;
-            }
-
             if (_settings.TopBarStyle == "Adaptive")
             {
                 UpdateAdaptiveBackground(GetEffectiveTopBarOpacity());
@@ -46,7 +41,7 @@ public sealed partial class TopBarWindow
 
     private ModuleDemand EvaluateAdaptiveVisualDemand()
     {
-        if (_isGameMinimalMode || _isHidden || _settings.TopBarStyle != "Adaptive")
+        if (_settings.TopBarStyle != "Adaptive")
         {
             return ModuleDemand.Cold("adaptive-disabled");
         }
