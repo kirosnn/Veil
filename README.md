@@ -2,7 +2,7 @@
 
 Veil is a Windows desktop overlay built with WinUI 3 on .NET 10.
 
-The project focuses on a lightweight top bar and companion panels designed for everyday desktop use without getting in the way during fullscreen gaming. The app combines launcher-style search, system actions, media controls, local dictation, AI integration, Discord notifications, weather visuals, performance monitoring, and game-aware optimizations.
+The project focuses on a lightweight top bar and companion panels designed for everyday desktop use without getting in the way. The app combines launcher-style search, system actions, media controls, local dictation, AI integration, Discord notifications, weather visuals, performance monitoring, and Veil-only background maintenance.
 
 ## What Veil Does
 
@@ -12,7 +12,7 @@ The project focuses on a lightweight top bar and companion panels designed for e
 - Displays system stats and animated runners
 - Surfaces Discord notifications in a dedicated panel
 - Supports local speech dictation with downloadable speech models
-- Detects game processes and can reduce background activity while gaming
+- Runs lightweight maintenance for Veil's own memory use
 - Exposes a settings window for visuals, monitor targeting, shortcuts, AI providers, speech models, and performance behavior
 
 ## Tech Stack
@@ -22,7 +22,7 @@ The project focuses on a lightweight top bar and companion panels designed for e
 - Windows App SDK 1.8
 - Win32 interop for hotkeys, monitor handling, tray behavior, shell actions, and window management
 - TypeScript for the embedded Finder AI web UI
-- Rust for the local speech transcription CLI
+- Rust for the local Handy helper
 
 ## Repository Layout
 
@@ -30,16 +30,13 @@ The project focuses on a lightweight top bar and companion panels designed for e
 apps/
   desktop/
     Veil/                    Main WinUI desktop application
-    VeilSpeechCli/           Local speech transcription helper written in Rust
+    Handy/                   Local Handy fork used by Veil
 tests/
   Veil.Tests/                MSTest project for service-level coverage
-tools/
-  VeilPerfGame/              Synthetic fullscreen workload used by perf benchmarks
 scripts/
   dev.ps1                    Local hot-reload style development runner
-  benchmark-perf.ps1         Performance benchmark and regression assertions
   build-setup.ps1            Inno Setup installer builder
-artifacts/                   Generated publish, benchmark, and installer outputs
+artifacts/                   Generated publish and installer outputs
 UnicodeAnimations/           Shared spinner/animation assets and support code
 .github/workflows/           CI workflow definitions
 Veil.sln                     Solution entry point
@@ -54,7 +51,7 @@ Inside `apps/desktop/Veil`:
 - `Configuration/`: persisted settings and normalization logic
 - `Diagnostics/`: application and performance logging
 - `Interop/`: native Windows bindings and monitor/window helpers
-- `Services/`: app discovery, AI providers, media, dictation, game detection, startup, tray, and shell integrations
+- `Services/`: app discovery, AI providers, media, dictation, startup, tray, optimization, and shell integrations
 - `Windows/`: top bar, finder, dictation overlay, panels, settings, and Alt+Tab related windows
 
 ## Runtime Requirements
@@ -68,7 +65,7 @@ Inside `apps/desktop/Veil`:
 Why `cargo` and `tsc` are required:
 
 - `dotnet build` for the desktop app runs `tsc` to rebuild `Assets/Web/FinderAi`
-- `dotnet build` also runs `cargo build --release` for `apps/desktop/VeilSpeechCli`
+- `dotnet build` also runs `cargo build --release` for `apps/desktop/Handy`
 
 ## Getting Started
 
@@ -155,39 +152,7 @@ Local speech models are downloaded into:
 - Finder uses `Ctrl+Space`
 - Dictation uses a learned low-level keyboard trigger with a fallback to right control if no Fn-like key is detected during the learning window
 
-Some behavior depends on Windows shell state, active media sessions, monitor configuration, and fullscreen app detection.
-
-## Performance Benchmark
-
-The repository includes a benchmark runner that compares desktop and fullscreen game-like scenarios with and without Veil.
-
-Run it with:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\benchmark-perf.ps1
-```
-
-Example with shorter duration and stricter thresholds:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\benchmark-perf.ps1 `
-  -SkipBuild `
-  -DurationSeconds 15 `
-  -WarmupSeconds 4 `
-  -MaxGameFpsDropPercent 3 `
-  -MaxGameP95FrameIncreaseMs 2
-```
-
-Artifacts are written under `artifacts/perf/<timestamp>/` and include:
-
-- `summary.md`
-- `summary.json`
-- `assertions.json`
-- per-scenario `samples.json`
-- per-scenario `workload-report.json`
-- per-scenario `veil.log`
-
-The benchmark exits with a non-zero code when configured non-regression thresholds are exceeded unless assertions are explicitly skipped.
+Some behavior depends on Windows shell state, active media sessions, and monitor configuration.
 
 ## Packaging
 
@@ -235,7 +200,7 @@ At the moment, the workflow does not run the MSTest suite.
 
 ## Current State
 
-- The solution contains the main WinUI app, a Rust speech CLI, MSTest coverage, and a benchmark workload tool
+- The solution contains the main WinUI app, the local Handy helper, and MSTest coverage
 - Local settings, AI secrets, and downloaded speech models live under `%LOCALAPPDATA%\Veil`
 - The README assumes a Windows-only development environment and does not attempt to support cross-platform build or runtime scenarios
 
