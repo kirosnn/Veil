@@ -45,26 +45,12 @@ internal sealed partial class AppSettings
     private double _blurIntensity = DefaultBlurIntensity;
     private bool _runCatEnabled;
     private string _runCatRunner = "Cat";
-    private string _gameDetectionMode = GameDetectionService.HybridMode;
-    private string[] _gameProcessNames = [];
     private bool _backgroundOptimizationEnabled = true;
-    private bool _systemPowerBoostEnabled = true;
-    private bool _quietLaptopOutsideGamesEnabled = true;
-    private bool _hideForFullscreen = true;
     private string _topBarDisplayMode = "Primary";
     private string[] _topBarMonitorIds = [];
     private bool _showAppButtonOutline = true;
     private string _localSpeechModelId = LocalSpeechModelCatalog.DefaultModelId;
     private AppShortcutSetting?[] _shortcutButtons = new AppShortcutSetting?[MaxShortcutButtons];
-
-    // Terminal settings
-    private string _terminalDefaultProfileId = string.Empty;
-    private string _terminalFontFamily = "Cascadia Code, Consolas, Courier New, monospace";
-    private int _terminalFontSize = 14;
-    private string _terminalCursorStyle = "block";
-    private int _terminalScrollback = 5000;
-    private int _terminalCols = 120;
-    private int _terminalRows = 30;
 
     public static AppSettings Current => _current.Value;
 
