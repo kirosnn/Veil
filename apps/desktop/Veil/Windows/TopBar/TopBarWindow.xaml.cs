@@ -83,6 +83,7 @@ public sealed partial class TopBarWindow : Window
     private int _backgroundMaintenanceInFlight;
     private string _lastWindowRegionSignature = string.Empty;
     private int _lastAppliedBarHeight = 32;
+    private DispatcherTimer? _heightPlacementDebounce;
     private double _lastKnownClockWidth = MinimumClockClearance;
     private string _lastClockText = string.Empty;
     private string _lastSettingsSignature = string.Empty;
@@ -264,6 +265,19 @@ public sealed partial class TopBarWindow : Window
         _appBarRegistered = true;
     }
 
+    private void ScheduleHeightPlacement()
+    {
+        _heightPlacementDebounce?.Stop();
+        _heightPlacementDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+        _heightPlacementDebounce.Tick += (_, _) =>
+        {
+            _heightPlacementDebounce?.Stop();
+            _heightPlacementDebounce = null;
+            ApplyTopBarPlacement(true);
+        };
+        _heightPlacementDebounce.Start();
+    }
+
     private void OnClockTick(object? sender, object e)
     {
         try
@@ -315,7 +329,7 @@ public sealed partial class TopBarWindow : Window
             _lastAppliedBarHeight = _settings.TopBarHeight;
             if (heightChanged)
             {
-                ApplyTopBarPlacement(true);
+                ScheduleHeightPlacement();
             }
             ApplySettings();
             RebuildShortcutButtons();

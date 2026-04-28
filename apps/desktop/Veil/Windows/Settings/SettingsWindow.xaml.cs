@@ -170,7 +170,7 @@ public sealed partial class SettingsWindow : Window
         FinderBubbleSlider.Value = _settings.FinderBubbleOpacity;
         BlurIntensitySlider.Value = _settings.BlurIntensity;
 
-        TopBarHeightSlider.Minimum = 20;
+        TopBarHeightSlider.Minimum = 28;
         TopBarHeightSlider.Maximum = 60;
         TopBarHeightSlider.StepFrequency = 1;
         TopBarHeightSlider.Value = _settings.TopBarHeight;
@@ -266,10 +266,10 @@ public sealed partial class SettingsWindow : Window
     {
         int h = _settings.TopBarHeight;
         TopBarHeightValueText.Text = $"{h}px";
-        UpdateTopBarStyleButton(TopBarHeightSButton, h == 24);
-        UpdateTopBarStyleButton(TopBarHeightMButton, h == 32);
-        UpdateTopBarStyleButton(TopBarHeightLButton, h == 40);
-        UpdateTopBarStyleButton(TopBarHeightXLButton, h == 48);
+        UpdateTopBarStyleButton(TopBarHeightSButton, h == 30);
+        UpdateTopBarStyleButton(TopBarHeightMButton, h == 34);
+        UpdateTopBarStyleButton(TopBarHeightLButton, h == 42);
+        UpdateTopBarStyleButton(TopBarHeightXLButton, h == 52);
     }
 
     private void OnTopBarOpacityChanged(object sender, RangeBaseValueChangedEventArgs e)

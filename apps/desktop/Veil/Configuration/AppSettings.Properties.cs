@@ -428,7 +428,7 @@ internal sealed partial class AppSettings
         get => _topBarHeight;
         set
         {
-            int v = Math.Clamp(value, 20, 60);
+            int v = Math.Clamp(value, 28, 60);
             if (_topBarHeight == v) return;
             _topBarHeight = v;
             PersistAndNotify();

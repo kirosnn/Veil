@@ -200,12 +200,12 @@
                                                     <ColumnDefinition Width="*" />
                                                     <ColumnDefinition Width="*" />
                                                 </Grid.ColumnDefinitions>
-                                                <Button x:Name="TopBarHeightSButton" Grid.Column="0" Height="28" CornerRadius="7" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="24" Click="OnTopBarHeightPresetClick" Content="S — 24" />
-                                                <Button x:Name="TopBarHeightMButton" Grid.Column="1" Height="28" CornerRadius="7" BorderThickness="0" Background="#20FFFFFF" Foreground="White" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="32" Click="OnTopBarHeightPresetClick" Content="M — 32" />
-                                                <Button x:Name="TopBarHeightLButton" Grid.Column="2" Height="28" CornerRadius="7" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="40" Click="OnTopBarHeightPresetClick" Content="L — 40" />
-                                                <Button x:Name="TopBarHeightXLButton" Grid.Column="3" Height="28" CornerRadius="7" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="48" Click="OnTopBarHeightPresetClick" Content="XL — 48" />
+                                                <Button x:Name="TopBarHeightSButton" Grid.Column="0" Height="28" CornerRadius="7" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="30" Click="OnTopBarHeightPresetClick" Content="S — 30" />
+                                                <Button x:Name="TopBarHeightMButton" Grid.Column="1" Height="28" CornerRadius="7" BorderThickness="0" Background="#20FFFFFF" Foreground="White" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="34" Click="OnTopBarHeightPresetClick" Content="M — 34" />
+                                                <Button x:Name="TopBarHeightLButton" Grid.Column="2" Height="28" CornerRadius="7" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="42" Click="OnTopBarHeightPresetClick" Content="L — 42" />
+                                                <Button x:Name="TopBarHeightXLButton" Grid.Column="3" Height="28" CornerRadius="7" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="52" Click="OnTopBarHeightPresetClick" Content="XL — 52" />
                                             </Grid>
-                                            <Slider x:Name="TopBarHeightSlider" Minimum="20" Maximum="60" StepFrequency="1" IsTabStop="False" ValueChanged="OnTopBarHeightChanged" />
+                                            <Slider x:Name="TopBarHeightSlider" Minimum="28" Maximum="60" StepFrequency="1" IsTabStop="False" ValueChanged="OnTopBarHeightChanged" />
                                         </StackPanel>
 
                                         <StackPanel Spacing="6">

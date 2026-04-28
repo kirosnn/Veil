@@ -107,7 +107,7 @@ internal sealed partial class AppSettings
                 settings._localSpeechModelId = NormalizeLocalSpeechModelId(dto.LocalSpeechModelId);
                 settings._backgroundOptimizationEnabled = dto.BackgroundOptimizationEnabled;
                 settings._shortcutButtons = NormalizeShortcutButtons(dto.ShortcutButtons);
-                settings._topBarHeight = Math.Clamp(dto.TopBarHeight, 20, 60);
+                settings._topBarHeight = Math.Clamp(dto.TopBarHeight, 28, 60);
                 if (requiresSave)
                 {
                     settings.Save();
@@ -150,7 +150,7 @@ internal sealed partial class AppSettings
         public string LocalSpeechModelId { get; set; } = LocalSpeechModelCatalog.DefaultModelId;
         public bool BackgroundOptimizationEnabled { get; set; } = true;
         public AppShortcutDto?[]? ShortcutButtons { get; set; }
-        public int TopBarHeight { get; set; } = 32;
+        public int TopBarHeight { get; set; } = 34;
     }
 
     private sealed class AppShortcutDto
