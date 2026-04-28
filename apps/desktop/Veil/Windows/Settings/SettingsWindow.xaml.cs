@@ -2,7 +2,6 @@ using Veil.Configuration;
 using Veil.Diagnostics;
 using Veil.Interop;
 using Veil.Services;
-using Veil.Services.Terminal;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
@@ -84,7 +83,6 @@ public sealed partial class SettingsWindow : Window
             SetupAcrylic();
             ApplyWindowSize();
             LoadSettings();
-            _ = LoadDetectedGamesAsync();
             _ = LoadInstalledAppsAsync();
             AppLogger.Info("SettingsWindow first activation completed.");
 
@@ -144,7 +142,6 @@ public sealed partial class SettingsWindow : Window
     private void LoadSettings()
     {
         _isInitializing = true;
-        _settings.GameDetectionMode = GameDetectionService.HybridMode;
         LoadMonitorOptions();
 
         TopBarOpacitySlider.Minimum = 0;
@@ -172,22 +169,9 @@ public sealed partial class SettingsWindow : Window
         MenuTintSlider.Value = _settings.MenuTintOpacity;
         FinderBubbleSlider.Value = _settings.FinderBubbleOpacity;
         BlurIntensitySlider.Value = _settings.BlurIntensity;
-        GameProcessesTextBox.Text = string.Join(Environment.NewLine, _settings.GameProcessNames);
         SolidColorTextBox.Text = _settings.SolidColor;
         TopBarForegroundColorTextBox.Text = _settings.TopBarForegroundColor;
         InitializeAiSpeechModelPicker();
-
-        TerminalFontSizeSlider.Minimum = 8;
-        TerminalFontSizeSlider.Maximum = 32;
-        TerminalFontSizeSlider.StepFrequency = 1;
-        TerminalScrollbackSlider.Minimum = 100;
-        TerminalScrollbackSlider.Maximum = 20000;
-        TerminalScrollbackSlider.StepFrequency = 100;
-
-        TerminalFontFamilyTextBox.Text = _settings.TerminalFontFamily;
-        TerminalFontSizeSlider.Value = _settings.TerminalFontSize;
-        TerminalScrollbackSlider.Value = _settings.TerminalScrollback;
-        LoadTerminalProfiles();
 
         SyncLabels();
         UpdateSectionUi();
@@ -485,17 +469,6 @@ public sealed partial class SettingsWindow : Window
         UpdateSectionUi();
     }
 
-    private void OnHideForFullscreenButtonClick(object sender, RoutedEventArgs e)
-    {
-        if (_isInitializing)
-        {
-            return;
-        }
-
-        _settings.HideForFullscreen = !_settings.HideForFullscreen;
-        UpdateSectionUi();
-    }
-
     private void OnBackgroundOptimizationEnabledButtonClick(object sender, RoutedEventArgs e)
     {
         if (_isInitializing)
@@ -515,28 +488,6 @@ public sealed partial class SettingsWindow : Window
         }
 
         _settings.ShowAppButtonOutline = !_settings.ShowAppButtonOutline;
-        UpdateSectionUi();
-    }
-
-    private void OnSystemPowerBoostEnabledButtonClick(object sender, RoutedEventArgs e)
-    {
-        if (_isInitializing)
-        {
-            return;
-        }
-
-        _settings.SystemPowerBoostEnabled = !_settings.SystemPowerBoostEnabled;
-        UpdateSectionUi();
-    }
-
-    private void OnQuietLaptopOutsideGamesEnabledButtonClick(object sender, RoutedEventArgs e)
-    {
-        if (_isInitializing)
-        {
-            return;
-        }
-
-        _settings.QuietLaptopOutsideGamesEnabled = !_settings.QuietLaptopOutsideGamesEnabled;
         UpdateSectionUi();
     }
 
@@ -601,7 +552,6 @@ public sealed partial class SettingsWindow : Window
         FinderBubbleValueText.Text = $"{Math.Round(_settings.FinderBubbleOpacity * 100):0}%";
         BlurIntensityValueText.Text = $"{Math.Round(_settings.BlurIntensity * 100):0}%";
         RunCatRunnerValueText.Text = _settings.RunCatRunner;
-        GameDetectionModeValueText.Text = "Hybrid";
     }
 
     private void LoadMonitorOptions()
@@ -727,18 +677,6 @@ public sealed partial class SettingsWindow : Window
         UpdateSectionUi();
     }
 
-    private async Task LoadDetectedGamesAsync()
-    {
-        IReadOnlyList<string> gameNames = await GameDetectionService.GetCatalogGameDisplayNamesAsync();
-
-        DispatcherQueue.TryEnqueue(() =>
-        {
-            DetectedGamesTextBox.Text = gameNames.Count == 0
-                ? "No Windows or Xbox games were detected on this machine."
-                : string.Join(Environment.NewLine, gameNames);
-        });
-    }
-
     private async Task LoadInstalledAppsAsync()
     {
         try
@@ -783,20 +721,6 @@ public sealed partial class SettingsWindow : Window
             SyncLabels();
             UpdateSectionUi();
         }
-    }
-
-    private void OnGameProcessesChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_isInitializing)
-        {
-            return;
-        }
-
-        IEnumerable<string> processNames = GameProcessesTextBox.Text
-            .Split(["\r\n", "\n"], StringSplitOptions.None)
-            .Select(static value => value.Trim());
-
-        _settings.SetGameProcessNames(processNames);
     }
 
     private void OnDoneClick(object sender, RoutedEventArgs e)
@@ -915,19 +839,17 @@ public sealed partial class SettingsWindow : Window
         AiSectionPanel.Visibility = _selectedSection == "AI" ? Visibility.Visible : Visibility.Collapsed;
         DiscordSectionPanel.Visibility = _selectedSection == "Discord" ? Visibility.Visible : Visibility.Collapsed;
         MusicSectionPanel.Visibility = _selectedSection == "Music" ? Visibility.Visible : Visibility.Collapsed;
-        GamesSectionPanel.Visibility = _selectedSection == "Games" ? Visibility.Visible : Visibility.Collapsed;
+        OptimizationSectionPanel.Visibility = _selectedSection == "Optimization" ? Visibility.Visible : Visibility.Collapsed;
         MenuSectionPanel.Visibility = _selectedSection == "Menu" ? Visibility.Visible : Visibility.Collapsed;
         RunCatSectionPanel.Visibility = _selectedSection == "RunCat" ? Visibility.Visible : Visibility.Collapsed;
-        TerminalSectionPanel.Visibility = _selectedSection == "Terminal" ? Visibility.Visible : Visibility.Collapsed;
 
         UpdateSectionButton(TopBarSectionButton, _selectedSection == "TopBar");
         UpdateSectionButton(AiSectionButton, _selectedSection == "AI");
         UpdateSectionButton(DiscordSectionButton, _selectedSection == "Discord");
         UpdateSectionButton(MusicSectionButton, _selectedSection == "Music");
-        UpdateSectionButton(GamesSectionButton, _selectedSection == "Games");
+        UpdateSectionButton(OptimizationSectionButton, _selectedSection == "Optimization");
         UpdateSectionButton(MenuSectionButton, _selectedSection == "Menu");
         UpdateSectionButton(RunCatSectionButton, _selectedSection == "RunCat");
-        UpdateSectionButton(TerminalSectionButton, _selectedSection == "Terminal");
 
         UpdateTopBarStyleButton(TopBarStyleSolidButton, _settings.TopBarStyle == "Solid");
         UpdateTopBarStyleButton(TopBarStyleBlurButton, _settings.TopBarStyle == "Blur");
@@ -951,9 +873,8 @@ public sealed partial class SettingsWindow : Window
         UpdateAppButtonOutlineButton();
         UpdateDiscordButtons();
         UpdateMusicButtons();
-        UpdateGameButtons();
+        UpdateOptimizationButtons();
         UpdateRunCatButtons();
-        if (_selectedSection == "Terminal") UpdateTerminalCursorButtons();
     }
 
     private void UpdateSectionButton(Button button, bool isSelected)
@@ -1288,27 +1209,12 @@ public sealed partial class SettingsWindow : Window
     }
 
 
-    private void UpdateGameButtons()
+    private void UpdateOptimizationButtons()
     {
-        bool isHideForFullscreen = _settings.HideForFullscreen;
-        HideForFullscreenButton.Content = isHideForFullscreen ? "Enabled" : "Disabled";
-        HideForFullscreenButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isHideForFullscreen ? (byte)48 : (byte)0, 255, 255, 255));
-        HideForFullscreenButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isHideForFullscreen ? (byte)255 : (byte)214);
-
         bool isBackgroundOptimizationEnabled = _settings.BackgroundOptimizationEnabled;
         BackgroundOptimizationEnabledButton.Content = isBackgroundOptimizationEnabled ? "Enabled" : "Disabled";
         BackgroundOptimizationEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isBackgroundOptimizationEnabled ? (byte)48 : (byte)0, 255, 255, 255));
         BackgroundOptimizationEnabledButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isBackgroundOptimizationEnabled ? (byte)255 : (byte)214);
-
-        bool isSystemPowerBoostEnabled = _settings.SystemPowerBoostEnabled;
-        SystemPowerBoostEnabledButton.Content = isSystemPowerBoostEnabled ? "Enabled" : "Disabled";
-        SystemPowerBoostEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isSystemPowerBoostEnabled ? (byte)48 : (byte)0, 255, 255, 255));
-        SystemPowerBoostEnabledButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isSystemPowerBoostEnabled ? (byte)255 : (byte)214);
-
-        bool isQuietLaptopOutsideGamesEnabled = _settings.QuietLaptopOutsideGamesEnabled;
-        QuietLaptopOutsideGamesEnabledButton.Content = isQuietLaptopOutsideGamesEnabled ? "Enabled" : "Disabled";
-        QuietLaptopOutsideGamesEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isQuietLaptopOutsideGamesEnabled ? (byte)48 : (byte)0, 255, 255, 255));
-        QuietLaptopOutsideGamesEnabledButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isQuietLaptopOutsideGamesEnabled ? (byte)255 : (byte)214);
     }
 
     private void ApplyReadableContrast()
@@ -1379,78 +1285,6 @@ public sealed partial class SettingsWindow : Window
         }
 
         return AppSettings.TryNormalizeHexColor(trimmed, out normalizedColor);
-    }
-
-    private void LoadTerminalProfiles()
-    {
-        var profiles = ShellProfileService.GetProfiles();
-        TerminalDefaultProfileComboBox.ItemsSource = profiles.Select(static p => p.DisplayName).ToList();
-
-        int selectedIndex = profiles
-            .Select((p, i) => (p, i))
-            .FirstOrDefault(x => string.Equals(x.p.Id, _settings.TerminalDefaultProfileId, StringComparison.OrdinalIgnoreCase))
-            .i;
-
-        TerminalDefaultProfileComboBox.SelectedIndex = selectedIndex >= 0 ? selectedIndex : 0;
-        TerminalDetectedShellsTextBox.Text = string.Join(Environment.NewLine, profiles.Select(static p => $"{p.DisplayName}  —  {p.ExecutablePath}"));
-    }
-
-    private void OnTerminalDefaultProfileChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isInitializing) return;
-        var profiles = ShellProfileService.GetProfiles();
-        int index = TerminalDefaultProfileComboBox.SelectedIndex;
-        if (index >= 0 && index < profiles.Count)
-        {
-            _settings.TerminalDefaultProfileId = profiles[index].Id;
-        }
-    }
-
-    private void OnTerminalFontFamilyChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_isInitializing) return;
-        string value = TerminalFontFamilyTextBox.Text?.Trim() ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(value))
-        {
-            _settings.TerminalFontFamily = value;
-        }
-    }
-
-    private void OnTerminalFontSizeChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-    {
-        if (_isInitializing) return;
-        _settings.TerminalFontSize = (int)Math.Round(e.NewValue);
-        TerminalFontSizeValueText.Text = $"{_settings.TerminalFontSize}px";
-    }
-
-    private void OnTerminalCursorStyleClick(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: string style }) return;
-        _settings.TerminalCursorStyle = style;
-        UpdateTerminalCursorButtons();
-    }
-
-    private void OnTerminalScrollbackChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-    {
-        if (_isInitializing) return;
-        _settings.TerminalScrollback = (int)Math.Round(e.NewValue / 100) * 100;
-        TerminalScrollbackValueText.Text = $"{_settings.TerminalScrollback:N0}";
-    }
-
-    private void OnTerminalScanRuntimesClick(object sender, RoutedEventArgs e)
-    {
-        RuntimeDetectionService.InvalidateCache();
-        var runtimes = RuntimeDetectionService.GetRuntimes();
-        TerminalDetectedRuntimesTextBox.Text = runtimes.Count == 0
-            ? "No common runtimes detected on this machine."
-            : string.Join(Environment.NewLine, runtimes.Select(static r => $"{r.Name}  —  {r.Version}  —  {r.ExecutablePath}"));
-    }
-
-    private void UpdateTerminalCursorButtons()
-    {
-        UpdateTopBarStyleButton(TerminalCursorBlockButton,     _settings.TerminalCursorStyle == "block");
-        UpdateTopBarStyleButton(TerminalCursorUnderlineButton, _settings.TerminalCursorStyle == "underline");
-        UpdateTopBarStyleButton(TerminalCursorBarButton,       _settings.TerminalCursorStyle == "bar");
     }
 
     private void ScheduleSessionKeepAlive()
