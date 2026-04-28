@@ -868,6 +868,7 @@ public sealed partial class SettingsWindow : Window
         InitializeAiSpeechModelPicker();
         SyncSolidColorPreview();
         SyncTopBarForegroundColorPreview();
+        RaycastNoticeBorder.Visibility = RaycastService.IsInstalled ? Visibility.Visible : Visibility.Collapsed;
         UpdateFinderBubbleButton();
         UpdateFinderHotkeyButton();
         UpdateAppButtonOutlineButton();

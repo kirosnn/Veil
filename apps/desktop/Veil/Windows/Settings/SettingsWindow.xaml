@@ -211,6 +211,17 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- Raycast detected notice -->
+                                <Border x:Name="RaycastNoticeBorder" Background="#0C4ADE94" CornerRadius="12" Padding="14,10" Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="✦" FontSize="13" Foreground="#4ADE94" VerticalAlignment="Center" />
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Raycast detected" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#4ADE94" />
+                                            <TextBlock Text="Finder is delegated to Raycast. The Ctrl+Space hotkey is disabled to avoid conflicts." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" TextWrapping="WrapWholeWords" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- Toggles -->
                                 <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
                                     <StackPanel Spacing="14">
