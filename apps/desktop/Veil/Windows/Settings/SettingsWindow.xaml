@@ -44,14 +44,11 @@
                         <Button x:Name="MusicSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="Music" Click="OnSectionButtonClick">
                             <TextBlock Text="Music" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
                         </Button>
-                        <Button x:Name="GamesSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="Games" Click="OnSectionButtonClick">
-                            <TextBlock Text="Games" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
+                        <Button x:Name="OptimizationSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="Optimization" Click="OnSectionButtonClick">
+                            <TextBlock Text="Optimization" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
                         </Button>
                         <Button x:Name="RunCatSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="RunCat" Click="OnSectionButtonClick">
                             <TextBlock Text="RunCat" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
-                        </Button>
-                        <Button x:Name="TerminalSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="Terminal" Click="OnSectionButtonClick">
-                            <TextBlock Text="Terminal" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
                         </Button>
                     </StackPanel>
                 </Border>
@@ -372,96 +369,26 @@
                             </StackPanel>
                         </Grid>
 
-                        <!-- ── Games ── -->
-                        <Grid x:Name="GamesSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
+                        <Grid x:Name="OptimizationSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
-                                    <TextBlock Text="Games" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
-                                    <TextBlock Text="Control how Veil detects games and enters its lightest, pressure-aware mode." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
+                                    <TextBlock Text="Optimization" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
+                                    <TextBlock Text="Control Veil's own background maintenance without changing game, app, or system process behavior." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
                                 </StackPanel>
 
                                 <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
                                     <StackPanel Spacing="14">
-                                        <TextBlock Text="Veil uses a hybrid game detection mode. It checks the Windows and Xbox game catalog first, then falls back to your spared games list and a conservative fullscreen heuristic." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
-
-                                        <Border Height="1" Background="#08FFFFFF" />
-
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Spacing="2">
-                                                <TextBlock Text="Background system care" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                                <TextBlock Text="Keep optimization active outside games to trim memory, calm low-value helpers, and shut down Xbox background apps when no game is active." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
+                                                <TextBlock Text="Veil memory maintenance" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock Text="Periodically compact Veil's managed memory and trim Veil's working set when it grows too large." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
                                             </StackPanel>
                                             <Button x:Name="BackgroundOptimizationEnabledButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnBackgroundOptimizationEnabledButtonClick" Content="Enabled" />
                                         </Grid>
-
-                                        <Border Height="1" Background="#08FFFFFF" />
-
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Spacing="2">
-                                                <TextBlock Text="System power boost" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                                <TextBlock Text="Temporarily switch to a more aggressive performance power plan while gaming on AC power." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
-                                            </StackPanel>
-                                            <Button x:Name="SystemPowerBoostEnabledButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnSystemPowerBoostEnabledButtonClick" Content="Enabled" />
-                                        </Grid>
-
-                                        <Border Height="1" Background="#08FFFFFF" />
-
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Spacing="2">
-                                                <TextBlock Text="Quiet laptops outside games" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                                <TextBlock Text="If Veil detects a laptop, it switches to a distinctly quieter Windows power profile outside games, including on AC power, to reduce fan noise without unnecessarily disabling Windows transparency." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
-                                            </StackPanel>
-                                            <Button x:Name="QuietLaptopOutsideGamesEnabledButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnQuietLaptopOutsideGamesEnabledButtonClick" Content="Enabled" />
-                                        </Grid>
-
-                                        <Border Height="1" Background="#08FFFFFF" />
-
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Spacing="2">
-                                                <TextBlock Text="Hide for fullscreen apps" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                                <TextBlock Text="Automatically hide the top bar when any window (video player, browser, etc.) goes fullscreen." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
-                                            </StackPanel>
-                                            <Button x:Name="HideForFullscreenButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnHideForFullscreenButtonClick" Content="Enabled" />
-                                        </Grid>
-
-                                        <Border Height="1" Background="#08FFFFFF" />
-
-                                        <Grid>
-                                            <TextBlock Text="Detection mode" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" VerticalAlignment="Center" />
-                                            <TextBlock x:Name="GameDetectionModeValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" VerticalAlignment="Center" />
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
-
-                                <TextBlock Text="Detected Games" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
-                                <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
-                                    <StackPanel Spacing="10">
-                                        <TextBlock Text="Auto-detected from Windows and Xbox" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
-                                        <TextBox x:Name="DetectedGamesTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" PlaceholderText="No auto-detected games yet." />
-                                    </StackPanel>
-                                </Border>
-
-                                <TextBlock Text="Spared Games" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
-                                <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
-                                    <StackPanel Spacing="10">
-                                        <TextBlock Text="One process name per line to force Veil into game mode." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
-                                        <TextBox x:Name="GameProcessesTextBox" Header="Spared game process list" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" PlaceholderText="valorant&#10;eldenring&#10;cs2" TextChanged="OnGameProcessesChanged" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -606,82 +533,6 @@
                                                 <Button x:Name="RunCatHorseButton" Grid.Column="2" Height="32" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="Horse" Click="OnRunCatRunnerButtonClick" Content="Horse" />
                                             </Grid>
                                         </StackPanel>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Grid>
-                        <!-- ── Terminal ── -->
-                        <Grid x:Name="TerminalSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
-                            <StackPanel Spacing="16">
-                                <StackPanel Spacing="4" Margin="0,0,0,4">
-                                    <TextBlock Text="Terminal" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
-                                    <TextBlock Text="Configure the integrated terminal and its default shell profile." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
-                                </StackPanel>
-
-                                <TextBlock Text="Shell &amp; Profile" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,0,0,0" CharacterSpacing="40" />
-                                <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
-                                    <StackPanel Spacing="14">
-                                        <StackPanel Spacing="6">
-                                            <TextBlock Text="Default Profile" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                            <ComboBox x:Name="TerminalDefaultProfileComboBox" HorizontalAlignment="Stretch" SelectionChanged="OnTerminalDefaultProfileChanged" />
-                                        </StackPanel>
-                                        <Border Height="1" Background="#08FFFFFF" />
-                                        <TextBlock Text="Detected Shells" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" CharacterSpacing="30" />
-                                        <TextBox x:Name="TerminalDetectedShellsTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
-                                    </StackPanel>
-                                </Border>
-
-                                <TextBlock Text="Font" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
-                                <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
-                                    <StackPanel Spacing="14">
-                                        <StackPanel Spacing="6">
-                                            <TextBlock Text="Font Family" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                            <TextBox x:Name="TerminalFontFamilyTextBox" PlaceholderText="Cascadia Code, Consolas, monospace" TextChanged="OnTerminalFontFamilyChanged" />
-                                        </StackPanel>
-                                        <Border Height="1" Background="#08FFFFFF" />
-                                        <StackPanel Spacing="6">
-                                            <Grid>
-                                                <TextBlock Text="Font Size" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                                <TextBlock x:Name="TerminalFontSizeValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
-                                            </Grid>
-                                            <Slider x:Name="TerminalFontSizeSlider" Minimum="8" Maximum="32" StepFrequency="1" IsTabStop="False" ValueChanged="OnTerminalFontSizeChanged" />
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Border>
-
-                                <TextBlock Text="Behavior" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
-                                <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
-                                    <StackPanel Spacing="14">
-                                        <StackPanel Spacing="6">
-                                            <TextBlock Text="Cursor Style" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                            <Grid ColumnSpacing="6">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <Button x:Name="TerminalCursorBlockButton" Grid.Column="0" Height="32" CornerRadius="8" BorderThickness="0" Background="#20FFFFFF" Foreground="White" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="block" Click="OnTerminalCursorStyleClick" Content="Block" />
-                                                <Button x:Name="TerminalCursorUnderlineButton" Grid.Column="1" Height="32" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="underline" Click="OnTerminalCursorStyleClick" Content="Underline" />
-                                                <Button x:Name="TerminalCursorBarButton" Grid.Column="2" Height="32" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="bar" Click="OnTerminalCursorStyleClick" Content="Bar" />
-                                            </Grid>
-                                        </StackPanel>
-                                        <Border Height="1" Background="#08FFFFFF" />
-                                        <StackPanel Spacing="6">
-                                            <Grid>
-                                                <TextBlock Text="Scrollback Lines" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
-                                                <TextBlock x:Name="TerminalScrollbackValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
-                                            </Grid>
-                                            <Slider x:Name="TerminalScrollbackSlider" Minimum="100" Maximum="20000" StepFrequency="100" IsTabStop="False" ValueChanged="OnTerminalScrollbackChanged" />
-                                        </StackPanel>
-                                    </StackPanel>
-                                </Border>
-
-                                <TextBlock Text="Detected Runtimes" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
-                                <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
-                                    <StackPanel Spacing="10">
-                                        <TextBlock Text="Languages and tools detected on this machine." FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
-                                        <TextBox x:Name="TerminalDetectedRuntimesTextBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" PlaceholderText="Click Scan to detect installed runtimes." />
-                                        <Button x:Name="TerminalScanRuntimesButton" Content="Scan" Height="32" Padding="16,0" CornerRadius="8" BorderThickness="0" Background="#18FFFFFF" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnTerminalScanRuntimesClick" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
