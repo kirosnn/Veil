@@ -197,7 +197,7 @@ public sealed partial class TopBarWindow
 
     private ModuleDemand EvaluateDiscordDemand()
     {
-        if (_isGameMinimalMode || _isHidden || !_settings.DiscordButtonEnabled)
+        if (!_settings.DiscordButtonEnabled)
         {
             return ModuleDemand.Cold("discord-hidden");
         }
@@ -220,7 +220,7 @@ public sealed partial class TopBarWindow
 
     private async Task ApplyRunCatSettingsAsync()
     {
-        bool shouldRun = _settings.RunCatEnabled && !_isGameMinimalMode;
+        bool shouldRun = _settings.RunCatEnabled;
         string runner = _settings.RunCatRunner;
         int loadVersion = ++_runCatLoadVersion;
 
