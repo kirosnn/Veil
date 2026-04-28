@@ -10,14 +10,11 @@ Set-StrictMode -Version Latest
 $projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $targetFramework = "net10.0-windows10.0.22621.0"
 $veilProject = Join-Path $projectRoot "apps\desktop\Veil\Veil.csproj"
-$terminalProject = Join-Path $projectRoot "apps\desktop\VeilTerminal\VeilTerminal.csproj"
 
 $veilBuildDir = Join-Path $projectRoot "apps\desktop\Veil\bin\$Configuration\$targetFramework\$RuntimeIdentifier"
-$terminalBuildDir = Join-Path $projectRoot "apps\desktop\VeilTerminal\bin\$Configuration\$targetFramework\$RuntimeIdentifier"
 
 $artifactsRoot = Join-Path $projectRoot "artifacts"
 $veilDestination = Join-Path $artifactsRoot "build\Veil"
-$terminalDestination = Join-Path $artifactsRoot "build\VeilTerminal"
 $installerOutput = Join-Path $artifactsRoot "inno"
 
 $dotnetCliHome = Join-Path $projectRoot ".dotnet-cli"
@@ -64,12 +61,8 @@ if (-not $iscc) {
 Write-Host "Inno Setup: $iscc"
 
 Write-Host ""
-Write-Host "=== Generating terminal icons ==="
-python (Join-Path $projectRoot "scripts\make-terminal-icons.py")
-
-Write-Host ""
 Write-Host "=== Cleaning installer staging ==="
-foreach ($directory in @($veilDestination, $terminalDestination, $installerOutput)) {
+foreach ($directory in @($veilDestination, $installerOutput)) {
     if (Test-Path $directory) {
         Remove-Item $directory -Recurse -Force
     }
@@ -85,16 +78,6 @@ if (-not (Test-Path $veilBuildDir)) {
 Get-ChildItem $veilBuildDir -Force |
     Where-Object { $_.Name -ne "publish" } |
     Copy-Item -Destination $veilDestination -Recurse -Force
-
-Write-Host ""
-Write-Host "=== Building VeilTerminal ==="
-dotnet build $terminalProject -c $Configuration -r $RuntimeIdentifier --self-contained false
-if (-not (Test-Path $terminalBuildDir)) {
-    throw "VeilTerminal build output was not created at $terminalBuildDir."
-}
-Get-ChildItem $terminalBuildDir -Force |
-    Where-Object { $_.Name -ne "publish" } |
-    Copy-Item -Destination $terminalDestination -Recurse -Force
 
 Write-Host ""
 Write-Host "=== Compiling Inno Setup installer ==="
