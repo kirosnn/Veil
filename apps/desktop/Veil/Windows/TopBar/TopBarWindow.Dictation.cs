@@ -70,7 +70,7 @@ public sealed partial class TopBarWindow
 
     private bool CanStartDictationCapture()
     {
-        return !_isGameMinimalMode && !_isDictationBusy;
+        return !_isDictationBusy;
     }
 
     private async void OnDictationCaptureStarted()
