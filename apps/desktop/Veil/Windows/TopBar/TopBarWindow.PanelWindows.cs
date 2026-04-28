@@ -53,11 +53,20 @@ public sealed partial class TopBarWindow
 
     private void OnFinderButtonClick(object sender, RoutedEventArgs e)
     {
+        if (RaycastService.IsInstalled)
+        {
+            RaycastService.Activate();
+            return;
+        }
+
         OpenFinderWindow();
     }
 
     private void InitializeFinderHotkey()
     {
+        // Raycast manages its own global hotkey — don't compete with it.
+        if (RaycastService.IsInstalled) return;
+
         if (_finderHotkeyService is not null)
         {
             return;
@@ -116,6 +125,8 @@ public sealed partial class TopBarWindow
 
     private void EnsureFinderWindowCreated()
     {
+        if (RaycastService.IsInstalled) return;
+
         if (_finderWindow != null)
         {
             return;
@@ -186,6 +197,12 @@ public sealed partial class TopBarWindow
 
     private void OpenFinderWindow()
     {
+        if (RaycastService.IsInstalled)
+        {
+            RaycastService.Activate();
+            return;
+        }
+
         try
         {
             EnsureFinderWindowCreated();
