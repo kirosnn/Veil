@@ -10,10 +10,8 @@ namespace Veil;
 
 public partial class App : Application
 {
-    private static readonly TimeSpan TopBarActivityInterval = TimeSpan.FromMilliseconds(1000);
     private readonly AppSettings _settings;
-    private readonly GameDetectionService _gameDetectionService = new();
-    private readonly GamePerformanceService _gamePerformanceService = new();
+    private readonly VeilOptimizationService _veilOptimizationService = new();
     private readonly Dictionary<string, TopBarWindow> _topBarWindows = new(StringComparer.OrdinalIgnoreCase);
     private DesktopIconVisibilityService? _desktopIconVisibilityService;
     private DesktopContextMenuService? _desktopContextMenu;
@@ -23,9 +21,6 @@ public partial class App : Application
     private IReadOnlyList<WindowSwitchEntry> _windowSwitchEntries = [];
     private int _windowSwitchSelectedIndex = -1;
     private DispatcherTimer? _monitorRefreshTimer;
-    private DispatcherTimer? _topBarActivityTimer;
-    private HashSet<string> _normalizedConfiguredGameProcessNames = new(StringComparer.OrdinalIgnoreCase);
-    private IntPtr[] _topBarWindowHandles = [];
     private string _lastTopologySignature = string.Empty;
     private bool _isSyncingTopBars;
     private int _emptyMonitorRefreshCount;
@@ -35,7 +30,6 @@ public partial class App : Application
     {
         InitializeComponent();
         _settings = AppSettings.Current;
-        RefreshCachedGameDetectionConfiguration();
         UnhandledException += OnUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnCurrentDomainUnhandledException;
         _settings.Changed += OnSettingsChanged;
@@ -81,11 +75,9 @@ public partial class App : Application
             _trayIcon.Initialize();
 
             InitializeAltTabSwitcher();
-            _gameDetectionService.WarmUp();
             _ = InstalledAppService.PreloadAsync();
             SyncTopBarWindows(true);
             StartMonitorRefresh();
-            StartTopBarActivityRefresh();
 
             if (_settings.IsFirstLaunch)
             {
@@ -218,16 +210,14 @@ public partial class App : Application
         AppLogger.Info("Tray quit requested.");
         _monitorRefreshTimer?.Stop();
         _monitorRefreshTimer = null;
-        _topBarActivityTimer?.Stop();
-        _topBarActivityTimer = null;
         DisposeAltTabSwitcher();
         _desktopContextMenu?.Dispose();
         _desktopContextMenu = null;
         _trayIcon?.Dispose();
         _trayIcon = null;
         CloseAllTopBarWindows();
-        _gamePerformanceService.RestoreNormalOptimizations();
-        _gamePerformanceService.Dispose();
+        _veilOptimizationService.RestoreNormalOptimizations();
+        _veilOptimizationService.Dispose();
         _desktopIconVisibilityService?.RestoreLaunchState();
         _desktopIconVisibilityService = null;
         PerformanceLogger.Stop();
@@ -235,13 +225,7 @@ public partial class App : Application
 
     private void OnSettingsChanged()
     {
-        RefreshCachedGameDetectionConfiguration();
         SyncTopBarWindows();
-    }
-
-    private void RefreshCachedGameDetectionConfiguration()
-    {
-        _normalizedConfiguredGameProcessNames = GameProcessMonitor.CreateNormalizedProcessNameSet(_settings.GameProcessNames);
     }
 
     private void StartMonitorRefresh()
@@ -264,92 +248,6 @@ public partial class App : Application
         catch (Exception ex)
         {
             AppLogger.Error("Monitor refresh tick failed.", ex);
-        }
-    }
-
-    private void StartTopBarActivityRefresh()
-    {
-        _topBarActivityTimer?.Stop();
-        _topBarActivityTimer = new DispatcherTimer
-        {
-            Interval = TopBarActivityInterval
-        };
-        _topBarActivityTimer.Tick += OnTopBarActivityTick;
-        _topBarActivityTimer.Start();
-        RefreshTopBarActivityState();
-    }
-
-    private void OnTopBarActivityTick(object? sender, object e)
-    {
-        try
-        {
-            RefreshTopBarActivityState();
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("Top bar activity refresh tick failed.", ex);
-        }
-    }
-
-    private void RefreshTopBarActivityState()
-    {
-        try
-        {
-            if (_isSyncingTopBars || _topBarWindows.Count == 0)
-            {
-                return;
-            }
-
-            string detectionMode = GameDetectionService.NormalizeDetectionMode(_settings.GameDetectionMode);
-            bool configuredGameRunning = _gameDetectionService.IsConfiguredGameRunning(_normalizedConfiguredGameProcessNames);
-            foreach (TopBarWindow topBarWindow in _topBarWindows.Values)
-            {
-                try
-                {
-                    bool gameRunning = configuredGameRunning;
-                    int? activeGameProcessId = null;
-                    bool shouldHideForForegroundWindow = false;
-                    bool hasForegroundProcess = _gameDetectionService.TryGetVisibilityProcessInfoForScreen(
-                        _topBarWindowHandles,
-                        topBarWindow.ScreenBounds,
-                        out GameDetectionService.ForegroundProcessInfo foregroundProcessInfo,
-                        out _);
-
-                    if (hasForegroundProcess)
-                    {
-                        if (detectionMode == GameDetectionService.HybridMode)
-                        {
-                            activeGameProcessId = _gameDetectionService.TryGetForegroundGameProcessIdForScreen(
-                                foregroundProcessInfo,
-                                topBarWindow.ScreenBounds,
-                                _normalizedConfiguredGameProcessNames);
-                            shouldHideForForegroundWindow = activeGameProcessId.HasValue;
-
-                            if (!gameRunning)
-                            {
-                                gameRunning = activeGameProcessId.HasValue;
-                            }
-                        }
-
-                        if (!shouldHideForForegroundWindow && _settings.HideForFullscreen)
-                        {
-                            shouldHideForForegroundWindow = _gameDetectionService.IsForegroundWindowFullscreenForScreen(
-                                foregroundProcessInfo,
-                                topBarWindow.ScreenBounds);
-                        }
-                    }
-
-                    topBarWindow.ApplyActivityState(gameRunning, shouldHideForForegroundWindow, activeGameProcessId);
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Error($"Failed to refresh top bar activity state for {topBarWindow.ScreenBounds}.", ex);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error("Failed to refresh top bar activity state.", ex);
         }
     }
 
@@ -443,7 +341,7 @@ public partial class App : Application
                         TopBarWindow createdWindow = new(
                             monitor.Id,
                             monitor.ToScreenBounds(),
-                            _gamePerformanceService,
+                            _veilOptimizationService,
                             ownsGlobalHotkeys,
                             _startTopBarsHiddenUntilReady);
                         createdWindow.Activate();
@@ -474,10 +372,6 @@ public partial class App : Application
                 _startTopBarsHiddenUntilReady = false;
             }
 
-            _topBarWindowHandles = _topBarWindows.Values
-                .Select(static window => window.WindowHandle)
-                .Where(static handle => handle != IntPtr.Zero)
-                .ToArray();
         }
         catch (Exception ex)
         {
@@ -487,8 +381,6 @@ public partial class App : Application
         {
             _isSyncingTopBars = false;
         }
-
-        RefreshTopBarActivityState();
     }
 
     private TopBarWindow? GetPreferredTopBarWindow()
@@ -528,7 +420,6 @@ public partial class App : Application
         }
 
         _topBarWindows.Clear();
-        _topBarWindowHandles = [];
     }
 
     private void InitializeDesktopContextMenu()
