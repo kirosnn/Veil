@@ -48,25 +48,22 @@
     <Content Include="Assets\Web\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Assets\Terminal\**\*.*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
 
-  <Target Name="BuildVeilSpeechCli"
+  <Target Name="BuildHandy"
           BeforeTargets="BeforeBuild"
-          Inputs="..\VeilSpeechCli\Cargo.toml;..\VeilSpeechCli\src\main.rs"
-          Outputs="..\VeilSpeechCli\target\release\veil-speech-cli.exe">
-    <Exec Command='cargo build --manifest-path "..\VeilSpeechCli\Cargo.toml" --release' />
+          Inputs="..\Handy\Cargo.toml;..\Handy\src\main.rs"
+          Outputs="..\Handy\target\release\handy.exe">
+    <Exec Command='cargo build --manifest-path "..\Handy\Cargo.toml" --release' />
   </Target>
 
-  <Target Name="CopyVeilSpeechCli"
+  <Target Name="CopyHandy"
           AfterTargets="Build"
-          DependsOnTargets="BuildVeilSpeechCli"
-          Inputs="..\VeilSpeechCli\target\release\veil-speech-cli.exe"
-          Outputs="$(OutDir)veil-speech-cli.exe">
-    <Copy SourceFiles="..\VeilSpeechCli\target\release\veil-speech-cli.exe"
-          DestinationFiles="$(OutDir)veil-speech-cli.exe"
+          DependsOnTargets="BuildHandy"
+          Inputs="..\Handy\target\release\handy.exe"
+          Outputs="$(OutDir)handy.exe">
+    <Copy SourceFiles="..\Handy\target\release\handy.exe"
+          DestinationFiles="$(OutDir)handy.exe"
           SkipUnchangedFiles="true" />
   </Target>
 
