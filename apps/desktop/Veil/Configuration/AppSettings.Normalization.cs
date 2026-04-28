@@ -119,21 +119,6 @@ internal sealed partial class AppSettings
         return Math.Max(value, MinimumVisibleBlurIntensity);
     }
 
-    private static string[] NormalizeGameProcessNames(string[]? processNames)
-    {
-        if (processNames == null)
-        {
-            return [];
-        }
-
-        return processNames
-            .Select(GameProcessMonitor.NormalizeProcessName)
-            .Where(static name => !string.IsNullOrWhiteSpace(name))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(static name => name, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-    }
-
     private static string NormalizeTopBarDisplayMode(string? value)
     {
         return value is "Primary" or "All" or "Custom" ? value : "Primary";
