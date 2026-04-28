@@ -21,7 +21,10 @@ internal sealed class DesktopIconVisibilityService
     {
         _capturedDesktopIconsHidden = _bridge.AreDesktopIconsHidden();
         _hasCapturedState = true;
-        _bridge.SetDesktopIconsHidden(true);
+        if (!_capturedDesktopIconsHidden)
+        {
+            _bridge.SetDesktopIconsHidden(true);
+        }
     }
 
     internal void RestoreLaunchState()
