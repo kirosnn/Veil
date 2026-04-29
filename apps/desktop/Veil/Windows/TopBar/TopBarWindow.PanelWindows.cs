@@ -116,6 +116,7 @@ public sealed partial class TopBarWindow
 
         _ownsGlobalHotkeys = ownsGlobalHotkeys;
         ApplyHotkeyOwnership();
+        ApplyTopBarRole();
     }
 
     private void OnFinderHotkeyTriggered()
@@ -182,6 +183,11 @@ public sealed partial class TopBarWindow
     {
         EnsureFinderWindowCreated();
 
+        if (!_ownsGlobalHotkeys)
+        {
+            return;
+        }
+
         if (_settings.RunCatEnabled)
         {
             EnsureSystemStatsWindowCreated();
@@ -233,7 +239,7 @@ public sealed partial class TopBarWindow
         }
 
         int barWidth = _screen.Right - _screen.Left;
-        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
+        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + GetBarHeightInPhysicalPixels());
     }
 
     private void OnMusicButtonClick(object sender, RoutedEventArgs e)
@@ -252,7 +258,7 @@ public sealed partial class TopBarWindow
         }
 
         int barWidth = _screen.Right - _screen.Left;
-        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
+        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + GetBarHeightInPhysicalPixels());
     }
 
     private void OnDiscordButtonClick(object sender, RoutedEventArgs e)
@@ -273,7 +279,7 @@ public sealed partial class TopBarWindow
         }
 
         int barWidth = _screen.Right - _screen.Left;
-        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
+        window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + GetBarHeightInPhysicalPixels());
     }
 
     private void OnRightButtonsToggleClick(object sender, RoutedEventArgs e)
@@ -284,6 +290,13 @@ public sealed partial class TopBarWindow
 
     private void ApplyRightButtonsToggleState()
     {
+        if (!_ownsGlobalHotkeys)
+        {
+            RightButtonsToggleButton.Visibility = Visibility.Collapsed;
+            RightButtonsPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+
         bool hasButtons = HasVisibleRightButton();
 
         if (!hasButtons)
