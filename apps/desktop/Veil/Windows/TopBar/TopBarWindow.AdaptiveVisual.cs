@@ -202,7 +202,6 @@ public sealed partial class TopBarWindow
         var foregroundColor = GetTopBarForegroundColor();
         var foregroundBrush = new SolidColorBrush(foregroundColor);
         var mutedForegroundBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(204, foregroundColor.R, foregroundColor.G, foregroundColor.B));
-        var hoverBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(36, foregroundColor.R, foregroundColor.G, foregroundColor.B));
         var pressedBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, foregroundColor.R, foregroundColor.G, foregroundColor.B));
         var glassBackground = new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, foregroundColor.R, foregroundColor.G, foregroundColor.B));
 
@@ -219,14 +218,18 @@ public sealed partial class TopBarWindow
         DiscordButton.Opacity = buttonOpacity;
         MusicButton.Opacity = buttonOpacity;
         RunCatButton.Opacity = buttonOpacity;
+        RightButtonsToggleButton.Opacity = buttonOpacity;
 
         MenuButton.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(170, foregroundColor.R, foregroundColor.G, foregroundColor.B));
         MenuButton.Resources["ButtonBackgroundPointerOver"] = foregroundBrush;
         MenuButton.Resources["ButtonBackgroundPressed"] = new SolidColorBrush(global::Windows.UI.Color.FromArgb(119, foregroundColor.R, foregroundColor.G, foregroundColor.B));
 
-        ApplyIconButtonResources(DiscordButton, glassBackground, hoverBrush, pressedBrush);
-        ApplyIconButtonResources(MusicButton, glassBackground, hoverBrush, pressedBrush);
-        ApplyIconButtonResources(RunCatButton, glassBackground, hoverBrush, pressedBrush);
+        ApplyIconButtonResources(DiscordButton, glassBackground);
+        ApplyIconButtonResources(MusicButton, glassBackground);
+        ApplyIconButtonResources(RunCatButton, glassBackground);
+        ApplyIconButtonResources(RightButtonsToggleButton, glassBackground);
+        RightButtonsToggleButton.Background = glassBackground;
+        RightButtonsToggleIcon.Foreground = foregroundBrush;
 
         byte bubbleAlpha = _settings.ShowFinderBubble
             ? (byte)Math.Round(_settings.FinderBubbleOpacity * 255)
@@ -304,11 +307,11 @@ public sealed partial class TopBarWindow
         return luminance < 140;
     }
 
-    private static void ApplyIconButtonResources(Button button, SolidColorBrush normalBrush, SolidColorBrush hoverBrush, SolidColorBrush pressedBrush)
+    private static void ApplyIconButtonResources(Button button, SolidColorBrush normalBrush)
     {
         button.Resources["ButtonBackground"] = normalBrush;
-        button.Resources["ButtonBackgroundPointerOver"] = hoverBrush;
-        button.Resources["ButtonBackgroundPressed"] = pressedBrush;
+        button.Resources["ButtonBackgroundPointerOver"] = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
+        button.Resources["ButtonBackgroundPressed"] = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
     }
 
     private void UpdateAdaptiveBackground(double effectiveTopBarOpacity, bool force = false)
