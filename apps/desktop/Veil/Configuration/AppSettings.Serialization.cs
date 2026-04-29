@@ -18,6 +18,8 @@ internal sealed partial class AppSettings
             FinderBubbleOpacity = _finderBubbleOpacity,
             ShowFinderBubble = _showFinderBubble,
             FinderHotkeyEnabled = _finderHotkeyEnabled,
+            FinderDelegateToRaycast = _finderDelegateToRaycast,
+            RaycastHotkeyOverride = _raycastHotkeyOverride,
             DiscordButtonEnabled = _discordButtonEnabled,
             MusicButtonEnabled = _musicButtonEnabled,
             MusicShowVolume = _musicShowVolume,
@@ -87,6 +89,8 @@ internal sealed partial class AppSettings
                 settings._finderBubbleOpacity = Math.Clamp(dto.FinderBubbleOpacity, 0.04, 0.3);
                 settings._showFinderBubble = dto.ShowFinderBubble;
                 settings._finderHotkeyEnabled = dto.FinderHotkeyEnabled;
+                settings._finderDelegateToRaycast = dto.FinderDelegateToRaycast;
+                settings._raycastHotkeyOverride = dto.RaycastHotkeyOverride?.Trim() ?? string.Empty;
                 settings._discordButtonEnabled = dto.DiscordButtonEnabled;
                 settings._musicButtonEnabled = dto.MusicButtonEnabled;
                 settings._musicShowVolume = dto.MusicShowVolume;
@@ -129,6 +133,8 @@ internal sealed partial class AppSettings
         public double FinderBubbleOpacity { get; set; } = 0.09;
         public bool ShowFinderBubble { get; set; } = true;
         public bool FinderHotkeyEnabled { get; set; } = true;
+        public bool FinderDelegateToRaycast { get; set; } = true;
+        public string RaycastHotkeyOverride { get; set; } = string.Empty;
         public bool DiscordButtonEnabled { get; set; } = true;
         public bool MusicButtonEnabled { get; set; } = true;
         public bool MusicShowVolume { get; set; } = true;
