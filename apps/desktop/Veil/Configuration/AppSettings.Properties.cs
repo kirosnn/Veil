@@ -130,6 +130,33 @@ internal sealed partial class AppSettings
         }
     }
 
+    public string RaycastHotkeyOverride
+    {
+        get => _raycastHotkeyOverride;
+        set
+        {
+            value = value?.Trim() ?? string.Empty;
+            if (_raycastHotkeyOverride == value) return;
+            _raycastHotkeyOverride = value;
+            PersistAndNotify();
+        }
+    }
+
+    public bool FinderDelegateToRaycast
+    {
+        get => _finderDelegateToRaycast;
+        set
+        {
+            if (_finderDelegateToRaycast == value)
+            {
+                return;
+            }
+
+            _finderDelegateToRaycast = value;
+            PersistAndNotify();
+        }
+    }
+
     public string TopBarStyle
     {
         get => _topBarStyle;
