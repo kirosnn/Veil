@@ -157,6 +157,10 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool BringWindowToTop(IntPtr hWnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool PrintWindow(
         IntPtr hwnd,
         IntPtr hdcBlt,
@@ -441,6 +445,135 @@ internal static partial class NativeMethods
     internal const int WH_KEYBOARD_LL = 13;
     internal const int HC_ACTION = 0;
     internal const uint LLKHF_INJECTED = 0x00000010;
+
+    internal const uint ENUM_CURRENT_SETTINGS = unchecked((uint)-1);
+    internal const uint CDS_UPDATEREGISTRY = 0x00000001;
+    internal const uint CDS_NORESET = 0x10000000;
+    internal const int DISP_CHANGE_SUCCESSFUL = 0;
+    internal const uint DISPLAY_DEVICE_ATTACHED_TO_DESKTOP = 0x00000001;
+    internal const uint DISPLAY_DEVICE_PRIMARY_DEVICE = 0x00000004;
+
+    internal const uint SPI_GETANIMATION = 0x0048;
+    internal const uint SPI_SETANIMATION = 0x0049;
+    internal const uint SPIF_UPDATEINIFILE = 0x0001;
+    internal const uint SPIF_SENDCHANGE = 0x0002;
+    internal const uint WM_SETTINGCHANGE = 0x001A;
+    internal const uint SMTO_ABORTIFHUNG = 0x0002;
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct ANIMATIONINFO
+    {
+        public uint cbSize;
+        public int iMinAnimate;
+    }
+
+    [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SystemParametersInfoAnimationW(
+        uint uiAction,
+        uint uiParam,
+        ref ANIMATIONINFO pvParam,
+        uint fWinIni);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct DISPLAY_DEVICE
+    {
+        public uint cb;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string DeviceName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceString;
+        public uint StateFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceID;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceKey;
+
+        public static DISPLAY_DEVICE Create() => new()
+        {
+            cb = (uint)Marshal.SizeOf<DISPLAY_DEVICE>(),
+            DeviceName = string.Empty,
+            DeviceString = string.Empty,
+            DeviceID = string.Empty,
+            DeviceKey = string.Empty
+        };
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct DEVMODE
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string dmDeviceName;
+        public ushort dmSpecVersion;
+        public ushort dmDriverVersion;
+        public ushort dmSize;
+        public ushort dmDriverExtra;
+        public uint dmFields;
+        public int dmPositionX;
+        public int dmPositionY;
+        public uint dmDisplayOrientation;
+        public uint dmDisplayFixedOutput;
+        public short dmColor;
+        public short dmDuplex;
+        public short dmYResolution;
+        public short dmTTOption;
+        public short dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string dmFormName;
+        public ushort dmLogPixels;
+        public uint dmBitsPerPel;
+        public uint dmPelsWidth;
+        public uint dmPelsHeight;
+        public uint dmDisplayFlags;
+        public uint dmDisplayFrequency;
+        public uint dmICMMethod;
+        public uint dmICMIntent;
+        public uint dmMediaType;
+        public uint dmDitherType;
+        public uint dmReserved1;
+        public uint dmReserved2;
+        public uint dmPanningWidth;
+        public uint dmPanningHeight;
+
+        public static DEVMODE Create() => new()
+        {
+            dmDeviceName = string.Empty,
+            dmFormName = string.Empty,
+            dmSize = (ushort)Marshal.SizeOf<DEVMODE>()
+        };
+    }
+
+    [DllImport("user32.dll", EntryPoint = "EnumDisplayDevicesW", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumDisplayDevicesW(
+        string? lpDevice,
+        uint iDevNum,
+        ref DISPLAY_DEVICE lpDisplayDevice,
+        uint dwFlags);
+
+    [DllImport("user32.dll", EntryPoint = "EnumDisplaySettingsExW", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumDisplaySettingsExW(
+        string lpszDeviceName,
+        uint iModeNum,
+        ref DEVMODE lpDevMode,
+        uint dwFlags);
+
+    [DllImport("user32.dll", EntryPoint = "ChangeDisplaySettingsExW", CharSet = CharSet.Unicode)]
+    internal static extern int ChangeDisplaySettingsExW(
+        string lpszDeviceName,
+        ref DEVMODE lpDevMode,
+        IntPtr hwnd,
+        uint dwflags,
+        IntPtr lParam);
+
+    [DllImport("user32.dll", EntryPoint = "ChangeDisplaySettingsExW", CharSet = CharSet.Unicode)]
+    internal static extern int ChangeDisplaySettingsExW(
+        string? lpszDeviceName,
+        IntPtr lpDevMode,
+        IntPtr hwnd,
+        uint dwflags,
+        IntPtr lParam);
 
     internal const uint NIF_MESSAGE = 0x00000001;
     internal const uint NIF_ICON = 0x00000002;
