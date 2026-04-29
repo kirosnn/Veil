@@ -790,9 +790,6 @@ public sealed partial class SettingsWindow : Window
         CancelSessionKeepAlive();
         _sessionKeepAliveTimer.Stop();
         SizeChanged -= OnSettingsWindowSizeChanged;
-        _speechModelDownloadCancellationSource?.Cancel();
-        _speechModelDownloadCancellationSource?.Dispose();
-        _speechModelDownloadCancellationSource = null;
         _acrylicController?.Dispose();
         _acrylicController = null;
         _backdropConfig = null;
