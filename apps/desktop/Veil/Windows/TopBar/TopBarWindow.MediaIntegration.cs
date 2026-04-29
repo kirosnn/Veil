@@ -32,7 +32,7 @@ public sealed partial class TopBarWindow
 
     private void UpdateMusicButtonVisibility()
     {
-        bool isVisible = _settings.MusicButtonEnabled && _mediaControlService.IsMusicApp;
+        bool isVisible = _ownsGlobalHotkeys && _settings.MusicButtonEnabled && _mediaControlService.IsMusicApp;
         MusicButton.Visibility = isVisible
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -136,7 +136,8 @@ public sealed partial class TopBarWindow
     private void UpdateDiscordButtonVisibility()
     {
         bool isDiscordRunning = _discordNotificationService.IsDiscordRunning;
-        bool isVisible = _settings.DiscordButtonEnabled
+        bool isVisible = _ownsGlobalHotkeys
+            && _settings.DiscordButtonEnabled
             && (isDiscordRunning
                 || _discordNotificationService.UnreadCount > 0
                 || _discordNotificationService.HasActiveCall);
@@ -187,7 +188,7 @@ public sealed partial class TopBarWindow
 
     private ModuleDemand EvaluateDiscordDemand()
     {
-        if (!_settings.DiscordButtonEnabled)
+        if (!_ownsGlobalHotkeys || !_settings.DiscordButtonEnabled)
         {
             return ModuleDemand.Cold("discord-hidden");
         }
@@ -210,7 +211,7 @@ public sealed partial class TopBarWindow
 
     private async Task ApplyRunCatSettingsAsync()
     {
-        bool shouldRun = _settings.RunCatEnabled;
+        bool shouldRun = _ownsGlobalHotkeys && _settings.RunCatEnabled;
         string runner = _settings.RunCatRunner;
         int loadVersion = ++_runCatLoadVersion;
 
