@@ -47,6 +47,8 @@ internal static partial class NativeMethods
     internal const int ABE_BOTTOM = 3;
 
     internal const int MONITOR_DEFAULTTOPRIMARY = 1;
+    internal const int MONITOR_DEFAULTTONEAREST = 2;
+    internal const int MDT_EFFECTIVE_DPI = 0;
     internal const int UserDefaultScreenDpi = 96;
 
     internal const int SW_HIDE = 0;
@@ -115,6 +117,16 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     internal static partial IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [LibraryImport("user32.dll")]
+    internal static partial IntPtr MonitorFromPoint(Point pt, uint dwFlags);
+
+    [DllImport("shcore.dll")]
+    internal static extern int GetDpiForMonitor(
+        IntPtr hmonitor,
+        int dpiType,
+        out uint dpiX,
+        out uint dpiY);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
