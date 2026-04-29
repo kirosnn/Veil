@@ -433,6 +433,17 @@ internal sealed partial class AppSettings
 
     public IReadOnlyList<AppShortcutSetting?> ShortcutButtons => _shortcutButtons;
 
+    public bool HideOnFullscreen
+    {
+        get => _hideOnFullscreen;
+        set
+        {
+            if (_hideOnFullscreen == value) return;
+            _hideOnFullscreen = value;
+            PersistAndNotify();
+        }
+    }
+
     public int TopBarHeight
     {
         get => _topBarHeight;
