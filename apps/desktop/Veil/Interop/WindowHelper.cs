@@ -56,14 +56,43 @@ internal static class WindowHelper
         return 1.0;
     }
 
+    internal static double GetRasterizationScale(ScreenBounds screen)
+    {
+        int centerX = screen.Left + Math.Max(0, (screen.Right - screen.Left) / 2);
+        int centerY = screen.Top + Math.Max(0, (screen.Bottom - screen.Top) / 2);
+        IntPtr monitor = MonitorFromPoint(
+            new Point { X = centerX, Y = centerY },
+            MONITOR_DEFAULTTONEAREST);
+
+        if (monitor != IntPtr.Zero
+            && GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, out uint dpiX, out _) == 0
+            && dpiX > 0)
+        {
+            return dpiX / (double)UserDefaultScreenDpi;
+        }
+
+        return 1.0;
+    }
+
     internal static int ViewPixelsToPhysical(Window window, double viewPixels)
     {
         return Math.Max(0, (int)Math.Round(viewPixels * GetRasterizationScale(window)));
     }
 
+    internal static int ViewPixelsToPhysical(ScreenBounds screen, double viewPixels)
+    {
+        return Math.Max(0, (int)Math.Round(viewPixels * GetRasterizationScale(screen)));
+    }
+
     internal static double PhysicalPixelsToView(Window window, double physicalPixels)
     {
         double scale = GetRasterizationScale(window);
+        return scale <= 0.01 ? physicalPixels : physicalPixels / scale;
+    }
+
+    internal static double PhysicalPixelsToView(ScreenBounds screen, double physicalPixels)
+    {
+        double scale = GetRasterizationScale(screen);
         return scale <= 0.01 ? physicalPixels : physicalPixels / scale;
     }
 
@@ -146,6 +175,37 @@ internal static class WindowHelper
     {
         var hwnd = GetHwnd(window);
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    }
+
+    internal static void EnsureWindowBounds(IntPtr hwnd, global::Windows.Graphics.RectInt32 bounds)
+    {
+        if (hwnd == IntPtr.Zero || bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+
+        if (GetWindowRect(hwnd, out Rect current)
+            && current.Left == bounds.X
+            && current.Top == bounds.Y
+            && current.Right - current.Left == bounds.Width
+            && current.Bottom - current.Top == bounds.Height)
+        {
+            return;
+        }
+
+        SetWindowPos(hwnd, HWND_TOPMOST, bounds.X, bounds.Y, bounds.Width, bounds.Height,
+            SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    }
+
+    internal static void MaintainAppBarOcclusion(IntPtr appBarHwnd)
+    {
+        if (appBarHwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        SetWindowPos(appBarHwnd, HWND_TOPMOST, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
     }
 
@@ -243,6 +303,7 @@ internal static class WindowHelper
 
         SHAppBarMessage(ABM_NEW, ref abd);
         SHAppBarMessage(ABM_QUERYPOS, ref abd);
+        ApplyAppBarThickness(ref abd, edge, barSize);
         SHAppBarMessage(ABM_SETPOS, ref abd);
 
         return new global::Windows.Graphics.RectInt32(
@@ -250,6 +311,18 @@ internal static class WindowHelper
             abd.rc.Top,
             Math.Max(1, abd.rc.Right - abd.rc.Left),
             Math.Max(1, abd.rc.Bottom - abd.rc.Top));
+    }
+
+    private static void ApplyAppBarThickness(ref AppBarData appBarData, uint edge, int barSize)
+    {
+        if (edge == ABE_TOP)
+        {
+            appBarData.rc.Bottom = appBarData.rc.Top + barSize;
+        }
+        else if (edge == ABE_BOTTOM)
+        {
+            appBarData.rc.Top = appBarData.rc.Bottom - barSize;
+        }
     }
 
     internal static void UnregisterAppBar(Window window)
