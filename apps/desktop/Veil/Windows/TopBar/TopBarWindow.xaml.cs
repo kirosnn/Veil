@@ -88,6 +88,7 @@ public sealed partial class TopBarWindow : Window
     private string _lastClockText = string.Empty;
     private string _lastSettingsSignature = string.Empty;
     private string _lastShortcutGlassBlurRegionSignature = string.Empty;
+    private bool _rightButtonsExpanded = true;
     private bool _isAdaptiveClearModeActive;
     private bool _hasAdaptiveModeState;
     private bool? _pendingAdaptiveClearMode;
@@ -155,7 +156,7 @@ public sealed partial class TopBarWindow : Window
         _settings.Changed += OnSettingsChanged;
         SizeChanged += OnTopBarSizeChanged;
         LeftButtonsPanel.SizeChanged += OnLeftButtonsPanelSizeChanged;
-        RightButtonsPanel.SizeChanged += OnRightButtonsPanelSizeChanged;
+        RightControlsPanel.SizeChanged += OnRightControlsPanelSizeChanged;
         ApplySettings();
         _lastSettingsSignature = CreateSettingsSignature();
     }
@@ -208,7 +209,7 @@ public sealed partial class TopBarWindow : Window
         _discordNotificationService.ReleaseDemand(_discordDemandOwnerId);
         SizeChanged -= OnTopBarSizeChanged;
         LeftButtonsPanel.SizeChanged -= OnLeftButtonsPanelSizeChanged;
-        RightButtonsPanel.SizeChanged -= OnRightButtonsPanelSizeChanged;
+        RightControlsPanel.SizeChanged -= OnRightControlsPanelSizeChanged;
         _acrylicController?.Dispose();
         _finderWindow?.Destroy();
         _finderWindow = null;
@@ -332,7 +333,7 @@ public sealed partial class TopBarWindow : Window
             }
             ApplySettings();
             RebuildShortcutButtons();
-            _finderHotkeyService?.SetEnabled(_settings.FinderHotkeyEnabled);
+            ApplyHotkeyOwnership();
             _musicControlWindow?.RefreshLayout();
             _discordNotificationWindow?.RefreshLayout();
             _systemStatsWindow?.RefreshAppearance();
@@ -431,7 +432,7 @@ public sealed partial class TopBarWindow : Window
         UpdateTopBarLayout();
     }
 
-    private void OnRightButtonsPanelSizeChanged(object sender, SizeChangedEventArgs e)
+    private void OnRightControlsPanelSizeChanged(object sender, SizeChangedEventArgs e)
     {
         UpdateTopBarLayout();
     }
@@ -463,7 +464,7 @@ public sealed partial class TopBarWindow : Window
     {
         double screenWidth = GetScreenWidthInViewPixels();
         double leftMargin = LeftButtonsPanel.Margin.Left + LeftButtonsPanel.Margin.Right;
-        double rightWidth = RightButtonsPanel.ActualWidth + RightButtonsPanel.Margin.Left + RightButtonsPanel.Margin.Right;
+        double rightWidth = RightControlsPanel.ActualWidth + RightControlsPanel.Margin.Left + RightControlsPanel.Margin.Right;
         double centerClearance = _settings.TopBarContentAlignment == "Center"
             ? GetCenterReservedWidth()
             : 0;
@@ -509,13 +510,13 @@ public sealed partial class TopBarWindow : Window
 
         if (_settings.TopBarContentAlignment == "Right")
         {
-            RightButtonsPanel.Margin = new Thickness(0, 0, trailingContentWidth + RightAlignedGap + RightAlignedEdgeGap, 0);
+            RightControlsPanel.Margin = new Thickness(0, 0, trailingContentWidth + RightAlignedGap + RightAlignedEdgeGap, 0);
             ClockText.HorizontalAlignment = HorizontalAlignment.Right;
             ClockText.Margin = new Thickness(0, 0, RightAlignedEdgeGap, 0);
         }
         else
         {
-            RightButtonsPanel.Margin = new Thickness(0, 0, 8, 0);
+            RightControlsPanel.Margin = new Thickness(0, 0, 8, 0);
             ClockText.HorizontalAlignment = HorizontalAlignment.Center;
             ClockText.Margin = new Thickness(_settings.ClockOffset, 0, 0, 0);
         }
