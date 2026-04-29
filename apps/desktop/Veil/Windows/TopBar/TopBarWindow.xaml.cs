@@ -339,7 +339,6 @@ public sealed partial class TopBarWindow : Window
             UpdateMusicButtonVisibility();
             UpdateDiscordButtonVisibility();
             UpdateDiscordDemand(boost: true);
-            _ = ApplyRunCatSettingsAsync();
         });
     }
 
