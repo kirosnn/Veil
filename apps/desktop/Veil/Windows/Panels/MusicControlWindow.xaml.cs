@@ -20,7 +20,7 @@ public sealed partial class MusicControlWindow : Window
 {
     private const int PanelWidth = 336;
     private const int MinimumPanelWidth = 300;
-    private const int PanelCornerRadius = 14;
+    private const int PanelCornerRadius = 8;
     private const int ContentInset = 16;
     private const int MinimumPanelHeight = 260;
     private const int PanelWidthPadding = 16;
