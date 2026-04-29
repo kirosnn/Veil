@@ -344,6 +344,7 @@ public partial class App : Application
                             _veilOptimizationService,
                             ownsGlobalHotkeys,
                             _startTopBarsHiddenUntilReady);
+                        createdWindow.PrepareForActivation();
                         createdWindow.Activate();
                         _topBarWindows[monitor.Id] = createdWindow;
                         AppLogger.Info($"TopBarWindow activated for {monitor.Id}.");
