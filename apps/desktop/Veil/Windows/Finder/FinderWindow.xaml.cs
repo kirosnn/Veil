@@ -79,15 +79,16 @@ public sealed partial class FinderWindow : Window
     private int _retainedSearchSelectionLength;
     private Button[]? _cachedAppRows;
     private bool _shouldRestoreRetainedViewport;
+    private int _lastAppliedX = int.MinValue;
+    private int _lastAppliedY = int.MinValue;
+    private int _lastAppliedWidth;
+    private int _lastAppliedHeight;
 
-    // Pooled scoring buffer to avoid allocations per keystroke
     private (FinderEntry entry, int score)[] _scoreBuffer = [];
 
-    // Sorted names for binary-search autocomplete
     private string[] _sortedNames = [];
     private FinderEntry[] _sortedNameEntries = [];
 
-    // Pooled StringBuilder for NormalizeSearch
     [ThreadStatic]
     private static StringBuilder? t_normalizeBuilder;
 
@@ -118,10 +119,6 @@ public sealed partial class FinderWindow : Window
         Closed += OnClosed;
     }
 
-    /// <summary>
-    /// Pre-initializes the window off-screen so that acrylic, chrome, and app data
-    /// are ready before the user ever triggers the Finder. Call once after construction.
-    /// </summary>
     internal void Prewarm()
     {
         Activate();
@@ -135,9 +132,7 @@ public sealed partial class FinderWindow : Window
         ConfigureWindowChrome();
         SetupAcrylic();
 
-        // Position off-screen and hide immediately so the prewarm is invisible
-        SetWindowPos(_hwnd, IntPtr.Zero, -10000, -10000, 1, 1,
-            SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        ApplyWindowSizeCore();
         ShowWindowNative(_hwnd, SW_HIDE);
 
         _ = EnsureAppsLoadedAsync();
@@ -231,12 +226,11 @@ public sealed partial class FinderWindow : Window
             }
         }
 
-        ShowWindowNative(_hwnd, SW_SHOW);
-        Activate();
+        ShowWindowNative(_hwnd, SW_SHOWNOACTIVATE);
         SetForegroundWindow(_hwnd);
+        BringWindowToTop(_hwnd);
         SearchTextBox.Focus(FocusState.Programmatic);
 
-        // Only load if not yet loaded - await silently so no "Loading..." is visible
         if (_allEntries.Length == 0)
         {
             _ = EnsureAppsLoadedAsync();
@@ -266,12 +260,6 @@ public sealed partial class FinderWindow : Window
         _retainedSearchSelectionStart = SearchTextBox.SelectionStart;
         _retainedSearchSelectionLength = SearchTextBox.SelectionLength;
         CacheSessionState();
-        // Detach cached rows so they can be re-added on next show
-        if (ReferenceEquals(_displayedEntries, _appEntries) && _cachedAppRows is not null)
-        {
-            ResultsPanel.Children.Clear();
-            _displayedEntries = [];
-        }
 
         if (keepSessionWarm)
         {
@@ -295,9 +283,37 @@ public sealed partial class FinderWindow : Window
 
         int width = Math.Clamp((int)(screenWidth * 0.38), 620, 760);
         int height = Math.Clamp((int)(screenHeight * 0.56), 440, 620);
-
         int x = _screen.Left + ((screenWidth - width) / 2);
         int y = _screen.Top + (int)(screenHeight * 0.16);
+
+        if (x == _lastAppliedX && y == _lastAppliedY && width == _lastAppliedWidth && height == _lastAppliedHeight)
+        {
+            return;
+        }
+
+        _lastAppliedX = x;
+        _lastAppliedY = y;
+        _lastAppliedWidth = width;
+        _lastAppliedHeight = height;
+
+        WindowHelper.PositionOnMonitor(this, x, y, width, height);
+        WindowHelper.ApplyRoundedRegion(_hwnd, width, height, WindowCornerRadius);
+    }
+
+    private void ApplyWindowSizeCore()
+    {
+        int screenWidth = _screen.Right - _screen.Left;
+        int screenHeight = _screen.Bottom - _screen.Top;
+
+        int width = Math.Clamp((int)(screenWidth * 0.38), 620, 760);
+        int height = Math.Clamp((int)(screenHeight * 0.56), 440, 620);
+        int x = _screen.Left + ((screenWidth - width) / 2);
+        int y = _screen.Top + (int)(screenHeight * 0.16);
+
+        _lastAppliedX = x;
+        _lastAppliedY = y;
+        _lastAppliedWidth = width;
+        _lastAppliedHeight = height;
 
         WindowHelper.PositionOnMonitor(this, x, y, width, height);
         WindowHelper.ApplyRoundedRegion(_hwnd, width, height, WindowCornerRadius);
@@ -337,9 +353,6 @@ public sealed partial class FinderWindow : Window
 
         _isLoadingApps = true;
 
-        // Don't show "Loading..." - the preload from App.OnLaunched should already be in flight.
-        // If apps arrive quickly the user never sees an empty state.
-
         try
         {
             var apps = await InstalledAppService.GetAppsAsync();
@@ -363,13 +376,10 @@ public sealed partial class FinderWindow : Window
             _appEntries = appEntries;
             _allEntries = allEntries;
 
-            // Allocate pooled scoring buffer once
             _scoreBuffer = new (FinderEntry, int)[allEntries.Length];
 
-            // Build sorted name index for fast autocomplete
             BuildAutocompleteIndex(allEntries);
 
-            // Pre-build the default rows (all apps, no filter)
             _cachedAppRows = new Button[appEntries.Length];
             for (int i = 0; i < appEntries.Length; i++)
             {
@@ -397,7 +407,6 @@ public sealed partial class FinderWindow : Window
 
     private void BuildAutocompleteIndex(FinderEntry[] entries)
     {
-        // Sort entries by lowercase name for binary-search prefix matching
         var pairs = new (string lower, FinderEntry entry)[entries.Length];
         for (int i = 0; i < entries.Length; i++)
         {
@@ -515,7 +524,6 @@ public sealed partial class FinderWindow : Window
         }
         else
         {
-            // Reuse pooled buffer
             var buffer = _scoreBuffer;
             if (buffer.Length < _allEntries.Length)
             {
@@ -555,40 +563,33 @@ public sealed partial class FinderWindow : Window
         string token = entry.SearchToken;
         int kindBonus = entry.App is not null ? 2 : 0;
 
-        // Exact prefix match - best score
         if (token.StartsWith(query, StringComparison.Ordinal))
         {
-            // Bonus for shorter names (more precise match)
             int lengthBonus = Math.Max(0, 20 - (token.Length - query.Length));
             return 200 + kindBonus + lengthBonus;
         }
 
-        // Word-boundary match: query matches the start of any word
         int wordBoundaryScore = ScoreWordBoundary(token, query);
         if (wordBoundaryScore > 0)
         {
             return 120 + kindBonus + wordBoundaryScore;
         }
 
-        // Substring match
         if (token.Contains(query, StringComparison.Ordinal))
         {
             return 80 + kindBonus;
         }
 
-        // Abbreviation match: first letters of words
         if (query.Length >= 2 && MatchesAbbreviation(token, query))
         {
             return 70 + kindBonus;
         }
 
-        // Category match for non-app entries
         if (entry.App is null && entry.CategoryLower.Contains(query, StringComparison.Ordinal))
         {
             return 30;
         }
 
-        // Fuzzy: all characters present in order
         if (query.Length >= 3 && FuzzyContains(token, query))
         {
             return 15 + kindBonus;
@@ -599,8 +600,6 @@ public sealed partial class FinderWindow : Window
 
     private static int ScoreWordBoundary(string token, string query)
     {
-        // Check if query matches the start of any "word" in the token
-        // Words start after non-alphanumeric chars or at uppercase letters in camelCase
         int tokenLen = token.Length;
         int queryLen = query.Length;
 
@@ -609,7 +608,6 @@ public sealed partial class FinderWindow : Window
             char prev = token[i - 1];
             char curr = token[i];
 
-            // Word boundary: previous char is non-letter or transition to uppercase
             bool isBoundary = !char.IsLetterOrDigit(prev) ||
                               (char.IsLower(prev) && char.IsUpper(curr));
 
@@ -629,7 +627,6 @@ public sealed partial class FinderWindow : Window
 
     private static bool MatchesAbbreviation(string token, string query)
     {
-        // Check if query chars match the first letter of consecutive words
         int qi = 0;
         bool atWordStart = true;
 
@@ -740,7 +737,6 @@ public sealed partial class FinderWindow : Window
         ResultsPanel.Children.Clear();
         _fallbackActions = [];
 
-        // Fast path: reuse pre-built rows for the default (all apps) view
         if (ReferenceEquals(_filteredEntries, _appEntries) && _cachedAppRows is not null)
         {
             for (int i = 0; i < _cachedAppRows.Length; i++)
@@ -1245,7 +1241,6 @@ public sealed partial class FinderWindow : Window
             return;
         }
 
-        // Binary search for the first name that starts with the query (case-insensitive)
         string queryLower = query.ToLowerInvariant();
         string? best = FindShortestPrefixMatch(queryLower, query.Length);
 
@@ -1272,7 +1267,6 @@ public sealed partial class FinderWindow : Window
 
     private string? FindShortestPrefixMatch(string queryLower, int queryLength)
     {
-        // Binary search to find the leftmost name >= queryLower
         int lo = 0;
         int hi = _sortedNames.Length - 1;
         int firstCandidate = -1;
@@ -1296,7 +1290,6 @@ public sealed partial class FinderWindow : Window
             }
             else
             {
-                // Found a prefix match - look for the shortest one
                 firstCandidate = mid;
                 hi = mid - 1;
             }
@@ -1307,8 +1300,6 @@ public sealed partial class FinderWindow : Window
             return null;
         }
 
-        // The sorted array is ordered by (name, length), so the first match at firstCandidate
-        // is already among the shortest. But scan forward to find the absolute shortest.
         string? bestName = null;
         int bestLen = int.MaxValue;
 
@@ -1326,7 +1317,6 @@ public sealed partial class FinderWindow : Window
                 break;
             }
 
-            // Must be strictly longer than query to show a completion
             string originalName = _sortedNameEntries[i].Name;
             if (originalName.Length > queryLength && originalName.Length < bestLen)
             {
