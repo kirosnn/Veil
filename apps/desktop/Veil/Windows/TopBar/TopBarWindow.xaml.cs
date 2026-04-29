@@ -250,6 +250,7 @@ public sealed partial class TopBarWindow : Window
             return;
         }
 
+        DismissTransientPanels();
         ApplyTopBarPlacement(true);
         UpdateTopBarLayout();
     }
@@ -366,6 +367,7 @@ public sealed partial class TopBarWindow : Window
         try
         {
             using var perfScope = PerformanceLogger.Measure("TopBar.OnClockTick", 1.5);
+            CheckFullscreenState();
             UpdateClock();
             UpdateVisualRefreshState();
             UpdateDiscordDemand();
@@ -508,6 +510,7 @@ public sealed partial class TopBarWindow : Window
             _settings.RunCatRunner,
             _settings.BackgroundOptimizationEnabled,
             _settings.TopBarHeight,
+            _settings.HideOnFullscreen,
             shortcutSignature);
     }
 

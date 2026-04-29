@@ -223,6 +223,24 @@ public sealed partial class TopBarWindow
         }
     }
 
+    private void DismissTransientPanels(SystemStatsWindow? exceptStats = null, MusicControlWindow? exceptMusic = null, DiscordNotificationWindow? exceptDiscord = null)
+    {
+        if (!ReferenceEquals(_systemStatsWindow, exceptStats))
+        {
+            _systemStatsWindow?.Hide();
+        }
+
+        if (!ReferenceEquals(_musicControlWindow, exceptMusic))
+        {
+            _musicControlWindow?.Hide();
+        }
+
+        if (!ReferenceEquals(_discordNotificationWindow, exceptDiscord))
+        {
+            _discordNotificationWindow?.Hide();
+        }
+    }
+
     private void OnRunCatButtonClick(object sender, RoutedEventArgs e)
     {
         if (_systemStatsWindow is { IsStatsVisible: true })
@@ -238,6 +256,7 @@ public sealed partial class TopBarWindow
             return;
         }
 
+        DismissTransientPanels(exceptStats: window);
         int barWidth = _screen.Right - _screen.Left;
         window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + GetBarHeightInPhysicalPixels());
     }
@@ -257,6 +276,7 @@ public sealed partial class TopBarWindow
             return;
         }
 
+        DismissTransientPanels(exceptMusic: window);
         int barWidth = _screen.Right - _screen.Left;
         window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + GetBarHeightInPhysicalPixels());
     }
@@ -278,6 +298,7 @@ public sealed partial class TopBarWindow
             return;
         }
 
+        DismissTransientPanels(exceptDiscord: window);
         int barWidth = _screen.Right - _screen.Left;
         window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + GetBarHeightInPhysicalPixels());
     }

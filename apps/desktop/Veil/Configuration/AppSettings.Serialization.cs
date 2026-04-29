@@ -47,6 +47,7 @@ internal sealed partial class AppSettings
                     })
                 .ToArray(),
             TopBarHeight = _topBarHeight,
+            HideOnFullscreen = _hideOnFullscreen,
         };
 
         File.WriteAllText(_settingsPath, JsonSerializer.Serialize(payload, _jsonOptions));
@@ -109,6 +110,7 @@ internal sealed partial class AppSettings
                 settings._backgroundOptimizationEnabled = dto.BackgroundOptimizationEnabled;
                 settings._shortcutButtons = NormalizeShortcutButtons(dto.ShortcutButtons);
                 settings._topBarHeight = Math.Clamp(dto.TopBarHeight, 28, 60);
+                settings._hideOnFullscreen = dto.HideOnFullscreen;
                 if (requiresSave)
                 {
                     settings.Save();
@@ -153,6 +155,7 @@ internal sealed partial class AppSettings
         public bool BackgroundOptimizationEnabled { get; set; } = true;
         public AppShortcutDto?[]? ShortcutButtons { get; set; }
         public int TopBarHeight { get; set; } = 34;
+        public bool HideOnFullscreen { get; set; } = true;
     }
 
     private sealed class AppShortcutDto
