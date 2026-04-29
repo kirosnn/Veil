@@ -72,9 +72,9 @@
             </Border>
         </StackPanel>
 
-        <StackPanel x:Name="RightButtonsPanel"
+        <StackPanel x:Name="RightControlsPanel"
                     Orientation="Horizontal"
-                    Spacing="4"
+                    Spacing="5"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Center"
                     Margin="0,0,8,0">
@@ -87,112 +87,146 @@
                     <Setter Property="VerticalContentAlignment" Value="Center" />
                 </Style>
             </StackPanel.Resources>
-            <Button x:Name="DiscordButton"
-                    Style="{StaticResource TopBarRightButtonStyle}"
-                    VerticalAlignment="Center"
-                    Padding="2,2"
-                    MinWidth="0"
-                    MinHeight="0"
-                    CornerRadius="4"
-                    BorderThickness="0"
-                    Background="Transparent"
-                    IsTabStop="False"
-                    Visibility="Collapsed"
-                    Click="OnDiscordButtonClick">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackground">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrush">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushDisabled">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBackgroundDisabled">Transparent</SolidColorBrush>
-                </Button.Resources>
-                <Grid Width="16" Height="16">
-                    <Image x:Name="DiscordIcon"
-                           Width="14"
-                           Height="14"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           IsHitTestVisible="False" />
-                    <Border x:Name="DiscordBadge"
-                            MinWidth="8"
-                            Height="8"
-                            Padding="0"
-                            CornerRadius="5"
-                            Background="#ED4245"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Top"
-                            Margin="0,-2,-2,0"
-                            Visibility="Collapsed">
-                        <TextBlock x:Name="DiscordBadgeText"
-                                   FontSize="7"
-                                   FontFamily="{StaticResource SfTextSemibold}"
-                                   Foreground="White"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   Visibility="Collapsed" />
-                    </Border>
-                </Grid>
-            </Button>
-            <Button x:Name="MusicButton"
-                    Style="{StaticResource TopBarRightButtonStyle}"
-                    VerticalAlignment="Center"
-                    Padding="4,2"
-                    MinWidth="0"
-                    MinHeight="0"
-                    CornerRadius="4"
-                    BorderThickness="0"
-                    Background="Transparent"
-                    IsTabStop="False"
-                    Visibility="Collapsed"
-                    Click="OnMusicButtonClick">
-                <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackground">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrush">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBorderBrushDisabled">Transparent</SolidColorBrush>
-                    <SolidColorBrush x:Key="ButtonBackgroundDisabled">Transparent</SolidColorBrush>
-                </Button.Resources>
-                <Grid Width="18" Height="18">
-                    <Image x:Name="MusicAlbumArt"
-                           Width="18"
-                           Height="18"
-                           Stretch="UniformToFill"
-                           Visibility="Collapsed" />
-                    <TextBlock x:Name="MusicIcon"
-                               Text="&#xE8D6;"
-                               FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                               FontSize="14"
-                               Foreground="#CCFFFFFF"
+            <StackPanel x:Name="RightButtonsPanel"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        VerticalAlignment="Center">
+                <Button x:Name="DiscordButton"
+                        Style="{StaticResource TopBarRightButtonStyle}"
+                        VerticalAlignment="Center"
+                        Padding="2,2"
+                        MinWidth="0"
+                        MinHeight="0"
+                        CornerRadius="4"
+                        BorderThickness="0"
+                        Background="Transparent"
+                        IsTabStop="False"
+                        Visibility="Collapsed"
+                        Click="OnDiscordButtonClick">
+                    <Button.Resources>
+                        <SolidColorBrush x:Key="ButtonBackground">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrush">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushDisabled">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBackgroundDisabled">Transparent</SolidColorBrush>
+                    </Button.Resources>
+                    <Grid Width="16" Height="16">
+                        <Image x:Name="DiscordIcon"
+                               Width="14"
+                               Height="14"
                                HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
-                </Grid>
-            </Button>
-            <Button x:Name="RunCatButton"
+                               VerticalAlignment="Center"
+                               IsHitTestVisible="False" />
+                        <Border x:Name="DiscordBadge"
+                                MinWidth="8"
+                                Height="8"
+                                Padding="0"
+                                CornerRadius="5"
+                                Background="#ED4245"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Margin="0,-2,-2,0"
+                                Visibility="Collapsed">
+                            <TextBlock x:Name="DiscordBadgeText"
+                                       FontSize="7"
+                                       FontFamily="{StaticResource SfTextSemibold}"
+                                       Foreground="White"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Visibility="Collapsed" />
+                        </Border>
+                    </Grid>
+                </Button>
+                <Button x:Name="MusicButton"
+                        Style="{StaticResource TopBarRightButtonStyle}"
+                        VerticalAlignment="Center"
+                        Padding="4,2"
+                        MinWidth="0"
+                        MinHeight="0"
+                        CornerRadius="4"
+                        BorderThickness="0"
+                        Background="Transparent"
+                        IsTabStop="False"
+                        Visibility="Collapsed"
+                        Click="OnMusicButtonClick">
+                    <Button.Resources>
+                        <SolidColorBrush x:Key="ButtonBackground">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrush">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushDisabled">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBackgroundDisabled">Transparent</SolidColorBrush>
+                    </Button.Resources>
+                    <Grid Width="18" Height="18">
+                        <Image x:Name="MusicAlbumArt"
+                               Width="18"
+                               Height="18"
+                               Stretch="UniformToFill"
+                               Visibility="Collapsed" />
+                        <TextBlock x:Name="MusicIcon"
+                                   Text="&#xE8D6;"
+                                   FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                   FontSize="14"
+                                   Foreground="#CCFFFFFF"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </Button>
+                <Button x:Name="RunCatButton"
+                        Style="{StaticResource TopBarRightButtonStyle}"
+                        VerticalAlignment="Center"
+                        Padding="4,2"
+                        MinWidth="0"
+                        MinHeight="0"
+                        CornerRadius="4"
+                        BorderThickness="0"
+                        Background="Transparent"
+                        IsTabStop="False"
+                        Visibility="Collapsed"
+                        Click="OnRunCatButtonClick">
+                    <Button.Resources>
+                        <SolidColorBrush x:Key="ButtonBackground">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrush">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBorderBrushDisabled">Transparent</SolidColorBrush>
+                        <SolidColorBrush x:Key="ButtonBackgroundDisabled">Transparent</SolidColorBrush>
+                    </Button.Resources>
+                    <Image x:Name="RunCatImage"
+                           Width="20"
+                           Height="20"
+                           IsHitTestVisible="False" />
+                </Button>
+            </StackPanel>
+            <Button x:Name="RightButtonsToggleButton"
                     Style="{StaticResource TopBarRightButtonStyle}"
-                    VerticalAlignment="Center"
-                    Padding="4,2"
+                    Width="32"
+                    Height="22"
                     MinWidth="0"
                     MinHeight="0"
-                    CornerRadius="4"
+                    Padding="0"
+                    CornerRadius="11"
                     BorderThickness="0"
-                    Background="Transparent"
+                    Background="#14FFFFFF"
                     IsTabStop="False"
                     Visibility="Collapsed"
-                    Click="OnRunCatButtonClick">
+                    Click="OnRightButtonsToggleClick">
                 <Button.Resources>
-                    <SolidColorBrush x:Key="ButtonBackground">Transparent</SolidColorBrush>
+                    <SolidColorBrush x:Key="ButtonBackground">#14FFFFFF</SolidColorBrush>
                     <SolidColorBrush x:Key="ButtonBorderBrush">Transparent</SolidColorBrush>
                     <SolidColorBrush x:Key="ButtonBorderBrushPointerOver">Transparent</SolidColorBrush>
                     <SolidColorBrush x:Key="ButtonBorderBrushPressed">Transparent</SolidColorBrush>
                     <SolidColorBrush x:Key="ButtonBorderBrushDisabled">Transparent</SolidColorBrush>
                     <SolidColorBrush x:Key="ButtonBackgroundDisabled">Transparent</SolidColorBrush>
                 </Button.Resources>
-                <Image x:Name="RunCatImage"
-                       Width="20"
-                       Height="20"
-                       IsHitTestVisible="False" />
+                <TextBlock x:Name="RightButtonsToggleIcon"
+                           Text="&#xE76C;"
+                           FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                           FontSize="12"
+                           Foreground="#E6FFFFFF"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
             </Button>
         </StackPanel>
 
