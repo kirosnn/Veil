@@ -32,6 +32,8 @@ internal sealed partial class AppSettings
     private double _finderBubbleOpacity = 0.09;
     private bool _showFinderBubble = true;
     private bool _finderHotkeyEnabled = true;
+    private bool _finderDelegateToRaycast = true;
+    private string _raycastHotkeyOverride = string.Empty;
     private bool _discordButtonEnabled = true;
     private bool _musicButtonEnabled = true;
     private bool _musicShowVolume = true;
