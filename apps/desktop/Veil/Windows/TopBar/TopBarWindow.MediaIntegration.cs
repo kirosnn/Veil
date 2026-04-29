@@ -249,6 +249,25 @@ public sealed partial class TopBarWindow
             return;
         }
 
+        // Load new frames while keeping the current animation running to avoid freeze.
+        var newService = new RunCatService();
+        newService.Start(runner);
+
+        var tintedFrames = new ImageSource[newService.FrameCount];
+        var tintColor = GetTopBarForegroundColor();
+        for (int i = 0; i < newService.FrameCount; i++)
+        {
+            tintedFrames[i] = await CreateTintedRunCatFrameAsync(newService.GetFramePath(i), tintColor);
+        }
+
+        if (loadVersion != _runCatLoadVersion)
+        {
+            newService.Stop();
+            newService.Dispose();
+            return;
+        }
+
+        // Frames ready — atomically swap out the old service.
         if (_runCatService != null)
         {
             _runCatService.FrameChanged -= OnRunCatFrameChanged;
@@ -256,22 +275,7 @@ public sealed partial class TopBarWindow
             _runCatService.Dispose();
         }
 
-        _runCatService = new RunCatService();
-        _runCatService.Start(runner);
-
-        var tintedFrames = new ImageSource[_runCatService.FrameCount];
-        var tintColor = GetTopBarForegroundColor();
-        for (int i = 0; i < _runCatService.FrameCount; i++)
-        {
-            var path = _runCatService.GetFramePath(i);
-            tintedFrames[i] = await CreateTintedRunCatFrameAsync(path, tintColor);
-        }
-
-        if (loadVersion != _runCatLoadVersion || _runCatService == null || _runCatService.RunnerName != runner)
-        {
-            return;
-        }
-
+        _runCatService = newService;
         _runCatFrames = tintedFrames;
         _lastRunCatTintHex = effectiveTintHex;
         RunCatImage.Source = _runCatFrames[0];
