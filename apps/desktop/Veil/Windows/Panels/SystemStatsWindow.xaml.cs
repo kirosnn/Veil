@@ -52,6 +52,7 @@ public sealed partial class SystemStatsWindow : Window
         Activated += OnWindowActivated;
         Closed += OnClosed;
         _settings.Changed += OnSettingsChanged;
+        WindowsProfileStore.Current.Changed += OnProfileStoreChanged;
 
         Task.Run(InitHardwareInfo);
     }
@@ -184,9 +185,15 @@ public sealed partial class SystemStatsWindow : Window
         DispatcherQueue.TryEnqueue(RefreshAppearance);
     }
 
+    private void OnProfileStoreChanged()
+    {
+        DispatcherQueue.TryEnqueue(RefreshAppearance);
+    }
+
     private void OnClosed(object sender, WindowEventArgs args)
     {
         _settings.Changed -= OnSettingsChanged;
+        WindowsProfileStore.Current.Changed -= OnProfileStoreChanged;
     }
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
@@ -233,6 +240,8 @@ public sealed partial class SystemStatsWindow : Window
     private void BuildAndRefresh()
     {
         StatsPanel.Children.Clear();
+
+        AddProfileSummary();
 
         AddTitle("System", topMargin: 0);
 
@@ -294,6 +303,26 @@ public sealed partial class SystemStatsWindow : Window
             string ramDetailText = $"{FormatBytes(veilStats.WorkingSetBytes)} working set  •  {FormatBytes(veilStats.PrivateBytes)} private";
             AddStatSection("RAM", $"{veilStats.MemoryPercent:F1}%", veilStats.MemoryPercent, ramDetailText);
         }
+    }
+
+    private void AddProfileSummary()
+    {
+        var store = WindowsProfileStore.Current;
+        WindowsProfile? activeProfile = store.Profiles.FirstOrDefault(p => p.Id == store.ActiveProfileId);
+
+        if (activeProfile is not null)
+        {
+            AddInfoSection("PROFILE", activeProfile.Name, activeProfile.BuildSummary());
+            return;
+        }
+
+        if (store.BaseProfile is not null)
+        {
+            AddInfoSection("PROFILE", "Previous State", store.BaseProfile.BuildSummary());
+            return;
+        }
+
+        AddInfoSection("PROFILE", "Windows", "No Veil profile active");
     }
 
     private void AddTitle(string title, double topMargin)
@@ -390,6 +419,59 @@ public sealed partial class SystemStatsWindow : Window
         var section = new StackPanel { Spacing = 0 };
         section.Children.Add(headerRow);
         section.Children.Add(barGrid);
+        section.Children.Add(detailText);
+
+        StatsPanel.Children.Add(section);
+    }
+
+    private void AddInfoSection(string label, string valueStr, string detail)
+    {
+        var headerRow = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition { Width = GridLength.Auto },
+                new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) },
+                new ColumnDefinition { Width = GridLength.Auto }
+            },
+            Margin = new Thickness(0, 0, 0, 2)
+        };
+
+        var labelText = new TextBlock
+        {
+            Text = label,
+            FontSize = 11,
+            FontFamily = (FontFamily)Application.Current.Resources["SfTextMedium"],
+            Foreground = CreateLabelBrush(120, 138)
+        };
+
+        var valueText = new TextBlock
+        {
+            Text = valueStr,
+            FontSize = 11,
+            FontFamily = (FontFamily)Application.Current.Resources["SfTextMedium"],
+            Foreground = CreateValueBrush(220, 34),
+            TextAlignment = Microsoft.UI.Xaml.TextAlignment.Right,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = Math.Max(72, _panelViewWidth - 112)
+        };
+
+        Grid.SetColumn(labelText, 0);
+        Grid.SetColumn(valueText, 2);
+        headerRow.Children.Add(labelText);
+        headerRow.Children.Add(valueText);
+
+        var detailText = new TextBlock
+        {
+            Text = detail,
+            FontSize = 10,
+            FontFamily = (FontFamily)Application.Current.Resources["SfTextRegular"],
+            Foreground = CreateSubValueBrush(80, 118),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+
+        var section = new StackPanel { Spacing = 2 };
+        section.Children.Add(headerRow);
         section.Children.Add(detailText);
 
         StatsPanel.Children.Add(section);
