@@ -27,7 +27,8 @@ public sealed partial class SettingsWindow : Window
     private IntPtr _hwnd;
     private DesktopAcrylicController? _acrylicController;
     private SystemBackdropConfiguration? _backdropConfig;
-    private bool _isInitializing;
+    private bool _isInitializing = true;
+    private bool _settingsLoaded;
     private bool _showRequested;
     private bool _persistSessionStateOnClose = true;
     private DateTime _openedAtUtc;
@@ -134,47 +135,54 @@ public sealed partial class SettingsWindow : Window
     private void LoadSettings()
     {
         _isInitializing = true;
-        LoadMonitorOptions();
+        try
+        {
+            LoadMonitorOptions();
 
-        TopBarOpacitySlider.Minimum = 0;
-        TopBarOpacitySlider.Maximum = 1.0;
-        TopBarOpacitySlider.StepFrequency = 0.01;
+            TopBarOpacitySlider.Minimum = 0;
+            TopBarOpacitySlider.Maximum = 1.0;
+            TopBarOpacitySlider.StepFrequency = 0.01;
 
-        ClockOffsetSlider.Minimum = -40;
-        ClockOffsetSlider.Maximum = 40;
-        ClockOffsetSlider.StepFrequency = 1;
+            ClockOffsetSlider.Minimum = -40;
+            ClockOffsetSlider.Maximum = 40;
+            ClockOffsetSlider.StepFrequency = 1;
 
-        MenuTintSlider.Minimum = 0.04;
-        MenuTintSlider.Maximum = 0.3;
-        MenuTintSlider.StepFrequency = 0.01;
+            MenuTintSlider.Minimum = 0.04;
+            MenuTintSlider.Maximum = 0.3;
+            MenuTintSlider.StepFrequency = 0.01;
 
-        FinderBubbleSlider.Minimum = 0.04;
-        FinderBubbleSlider.Maximum = 0.3;
-        FinderBubbleSlider.StepFrequency = 0.01;
+            FinderBubbleSlider.Minimum = 0.04;
+            FinderBubbleSlider.Maximum = 0.3;
+            FinderBubbleSlider.StepFrequency = 0.01;
 
-        BlurIntensitySlider.Minimum = 0;
-        BlurIntensitySlider.Maximum = 1;
-        BlurIntensitySlider.StepFrequency = 0.01;
+            BlurIntensitySlider.Minimum = 0;
+            BlurIntensitySlider.Maximum = 1;
+            BlurIntensitySlider.StepFrequency = 0.01;
 
-        TopBarOpacitySlider.Value = _settings.TopBarOpacity;
-        ClockOffsetSlider.Value = _settings.ClockOffset;
-        MenuTintSlider.Value = _settings.MenuTintOpacity;
-        FinderBubbleSlider.Value = _settings.FinderBubbleOpacity;
-        BlurIntensitySlider.Value = _settings.BlurIntensity;
+            TopBarOpacitySlider.Value = _settings.TopBarOpacity;
+            ClockOffsetSlider.Value = _settings.ClockOffset;
+            MenuTintSlider.Value = _settings.MenuTintOpacity;
+            FinderBubbleSlider.Value = _settings.FinderBubbleOpacity;
+            BlurIntensitySlider.Value = _settings.BlurIntensity;
 
-        TopBarHeightSlider.Minimum = 28;
-        TopBarHeightSlider.Maximum = 60;
-        TopBarHeightSlider.StepFrequency = 1;
-        TopBarHeightSlider.Value = _settings.TopBarHeight;
+            TopBarHeightSlider.Minimum = 28;
+            TopBarHeightSlider.Maximum = 60;
+            TopBarHeightSlider.StepFrequency = 1;
+            TopBarHeightSlider.Value = _settings.TopBarHeight;
 
-        SolidColorTextBox.Text = _settings.SolidColor;
-        TopBarForegroundColorTextBox.Text = _settings.TopBarForegroundColor;
+            SolidColorTextBox.Text = _settings.SolidColor;
+            TopBarForegroundColorTextBox.Text = _settings.TopBarForegroundColor;
 
-        SyncLabels();
-        UpdateSectionUi();
-        ApplyShortcutSelections();
-        UpdateContentHostWidth();
-        _isInitializing = false;
+            SyncLabels();
+            UpdateSectionUi();
+            ApplyShortcutSelections();
+            UpdateContentHostWidth();
+            _settingsLoaded = true;
+        }
+        finally
+        {
+            _isInitializing = false;
+        }
     }
 
     internal void ShowCentered()
@@ -230,7 +238,7 @@ public sealed partial class SettingsWindow : Window
 
     private void OnTopBarHeightChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
-        if (_isInitializing)
+        if (_isInitializing || !_settingsLoaded)
         {
             return;
         }
@@ -241,6 +249,11 @@ public sealed partial class SettingsWindow : Window
 
     private void OnTopBarHeightPresetClick(object sender, RoutedEventArgs e)
     {
+        if (_isInitializing || !_settingsLoaded)
+        {
+            return;
+        }
+
         if (sender is not Button { Tag: string tag } || !int.TryParse(tag, out int height))
         {
             return;
