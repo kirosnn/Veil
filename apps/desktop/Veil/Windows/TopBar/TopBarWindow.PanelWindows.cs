@@ -53,9 +53,9 @@ public sealed partial class TopBarWindow
 
     private void OnFinderButtonClick(object sender, RoutedEventArgs e)
     {
-        if (RaycastService.IsInstalled)
+        if (_settings.FinderDelegateToRaycast && RaycastService.IsInstalled)
         {
-            RaycastService.Activate();
+            RaycastService.Activate(_settings.RaycastHotkeyOverride);
             return;
         }
 
@@ -64,8 +64,7 @@ public sealed partial class TopBarWindow
 
     private void InitializeFinderHotkey()
     {
-        // Raycast manages its own global hotkey — don't compete with it.
-        if (RaycastService.IsInstalled) return;
+        if (_settings.FinderDelegateToRaycast && RaycastService.IsInstalled) return;
 
         if (_finderHotkeyService is not null)
         {
@@ -92,6 +91,12 @@ public sealed partial class TopBarWindow
 
     private void ApplyHotkeyOwnership()
     {
+        if (_settings.FinderDelegateToRaycast && RaycastService.IsInstalled)
+        {
+            DisposeFinderHotkey();
+            return;
+        }
+
         if (_ownsGlobalHotkeys)
         {
             InitializeFinderHotkey();
@@ -123,7 +128,7 @@ public sealed partial class TopBarWindow
 
     private void EnsureFinderWindowCreated()
     {
-        if (RaycastService.IsInstalled) return;
+        if (_settings.FinderDelegateToRaycast && RaycastService.IsInstalled) return;
 
         if (_finderWindow != null)
         {
@@ -195,9 +200,9 @@ public sealed partial class TopBarWindow
 
     private void OpenFinderWindow()
     {
-        if (RaycastService.IsInstalled)
+        if (_settings.FinderDelegateToRaycast && RaycastService.IsInstalled)
         {
-            RaycastService.Activate();
+            RaycastService.Activate(_settings.RaycastHotkeyOverride);
             return;
         }
 
@@ -270,6 +275,41 @@ public sealed partial class TopBarWindow
         int barWidth = _screen.Right - _screen.Left;
         window.ShowAt(_screen.Left + barWidth - 6, _screen.Top + BarHeight);
     }
+
+    private void OnRightButtonsToggleClick(object sender, RoutedEventArgs e)
+    {
+        _rightButtonsExpanded = !_rightButtonsExpanded;
+        ApplyRightButtonsToggleState();
+    }
+
+    private void ApplyRightButtonsToggleState()
+    {
+        bool hasButtons = HasVisibleRightButton();
+
+        if (!hasButtons)
+        {
+            _rightButtonsExpanded = true;
+        }
+
+        RightButtonsToggleButton.Visibility = hasButtons
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        RightButtonsPanel.Visibility = hasButtons && !_rightButtonsExpanded
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+
+        RightButtonsToggleIcon.Text = _rightButtonsExpanded
+            ? "\uE76C"
+            : "\uE76B";
+
+        UpdateTopBarLayout();
+    }
+
+    private bool HasVisibleRightButton()
+        => DiscordButton.Visibility == Visibility.Visible
+            || MusicButton.Visibility == Visibility.Visible
+            || RunCatButton.Visibility == Visibility.Visible;
 
     private void RebuildShortcutButtons()
     {
