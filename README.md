@@ -8,8 +8,9 @@ The project focuses on a lightweight top bar and companion panels designed for e
 
 - Draws a compact top bar on the primary monitor, all monitors, or a custom monitor selection
 - Opens a Finder-style launcher with apps, Windows settings links, and AI entry points
+- Delegates the Finder button to Raycast when installed (configurable per-setting)
 - Shows media controls with artwork, source switching, and optional volume controls
-- Displays system stats and animated runners
+- Displays system stats and animated runners (Cat, Parrot, Horse)
 - Surfaces Discord notifications in a dedicated panel
 - Runs lightweight maintenance for Veil's own memory use
 - Exposes a settings window for visuals, monitor targeting, shortcuts, and performance behavior
@@ -35,6 +36,7 @@ tests/
 scripts/
   dev.ps1                    Local hot-reload style development runner
   build-setup.ps1            Inno Setup installer builder
+  release.ps1                Tag + push to trigger GitHub Actions release
 artifacts/                   Generated publish and installer outputs
 UnicodeAnimations/           Shared spinner/animation assets and support code
 .github/workflows/           CI workflow definitions
@@ -120,7 +122,7 @@ Watched file types include:
 
 ## Hotkeys and Interaction Notes
 
-- Finder uses `Ctrl+Space`
+- Finder uses `Ctrl+Space` (disabled automatically when Raycast is installed and delegation is enabled)
 
 Some behavior depends on Windows shell state, active media sessions, and monitor configuration.
 
@@ -134,8 +136,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-setup.ps1
 
 By default this:
 
-- builds Veil and Veil Terminal for `win-x64`
-- stages the outputs into `artifacts/build/Veil` and `artifacts/build/VeilTerminal`
+- builds Veil for `win-x64`
+- stages the output into `artifacts/build/Veil`
 - compiles the Inno Setup script at `installer/veil.iss`
 - publishes the installer at `artifacts/inno/VeilSetup.exe`
 
@@ -178,3 +180,4 @@ At the moment, the workflow does not run the MSTest suite.
 
 - Successful desktop builds depend on both `cargo` and `tsc` being available
 - Some runtime features depend on local Windows capabilities or external services
+- The `cargo build` step requires MSVC linker (`link.exe`) on `PATH` — run builds from a Visual Studio Developer Command Prompt or prefix with `VsDevCmd.bat`
