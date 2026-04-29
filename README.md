@@ -2,7 +2,7 @@
 
 Veil is a Windows desktop overlay built with WinUI 3 on .NET 10.
 
-The project focuses on a lightweight top bar and companion panels designed for everyday desktop use without getting in the way. The app combines launcher-style search, system actions, media controls, local dictation, AI integration, Discord notifications, weather visuals, performance monitoring, and Veil-only background maintenance.
+The project focuses on a lightweight top bar and companion panels designed for everyday desktop use without getting in the way. The app combines launcher-style search, system actions, media controls, Discord notifications, weather visuals, performance monitoring, and Veil-only background maintenance.
 
 ## What Veil Does
 
@@ -11,9 +11,8 @@ The project focuses on a lightweight top bar and companion panels designed for e
 - Shows media controls with artwork, source switching, and optional volume controls
 - Displays system stats and animated runners
 - Surfaces Discord notifications in a dedicated panel
-- Supports local speech dictation with downloadable speech models
 - Runs lightweight maintenance for Veil's own memory use
-- Exposes a settings window for visuals, monitor targeting, shortcuts, AI providers, speech models, and performance behavior
+- Exposes a settings window for visuals, monitor targeting, shortcuts, and performance behavior
 
 ## Tech Stack
 
@@ -51,8 +50,8 @@ Inside `apps/desktop/Veil`:
 - `Configuration/`: persisted settings and normalization logic
 - `Diagnostics/`: application and performance logging
 - `Interop/`: native Windows bindings and monitor/window helpers
-- `Services/`: app discovery, AI providers, media, dictation, startup, tray, optimization, and shell integrations
-- `Windows/`: top bar, finder, dictation overlay, panels, settings, and Alt+Tab related windows
+- `Services/`: app discovery, media, startup, tray, optimization, and shell integrations
+- `Windows/`: top bar, finder, panels, settings, and Alt+Tab related windows
 
 ## Runtime Requirements
 
@@ -119,38 +118,9 @@ Watched file types include:
 - `.css`
 - `.json`
 
-## AI and Dictation
-
-Veil includes an AI section in settings and supports multiple provider modes:
-
-- OpenAI OAuth
-- OpenAI API
-- Anthropic
-- Mistral
-- Ollama
-- Ollama Cloud
-
-Local provider configuration is stored under:
-
-- `%LOCALAPPDATA%\Veil\settings.json`
-
-Encrypted AI secrets are stored under:
-
-- `%LOCALAPPDATA%\Veil\secrets\ai`
-
-For OpenAI OAuth, Veil can import an auth payload from common local paths such as:
-
-- `%USERPROFILE%\.codex\auth.json`
-- `%USERPROFILE%\.chatgpt-local\auth.json`
-
-Local speech models are downloaded into:
-
-- `%LOCALAPPDATA%\Veil\models\speech`
-
 ## Hotkeys and Interaction Notes
 
 - Finder uses `Ctrl+Space`
-- Dictation uses a learned low-level keyboard trigger with a fallback to right control if no Fn-like key is detected during the learning window
 
 Some behavior depends on Windows shell state, active media sessions, and monitor configuration.
 

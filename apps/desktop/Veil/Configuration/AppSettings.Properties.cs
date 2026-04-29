@@ -1,5 +1,4 @@
 using Veil.Interop;
-using Veil.Services;
 
 namespace Veil.Configuration;
 
@@ -354,22 +353,6 @@ internal sealed partial class AppSettings
             }
 
             _showAppButtonOutline = value;
-            PersistAndNotify();
-        }
-    }
-
-    public string LocalSpeechModelId
-    {
-        get => _localSpeechModelId;
-        set
-        {
-            value = NormalizeLocalSpeechModelId(value);
-            if (_localSpeechModelId == value)
-            {
-                return;
-            }
-
-            _localSpeechModelId = value;
             PersistAndNotify();
         }
     }

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Veil.Diagnostics;
-using Veil.Services;
 
 namespace Veil.Configuration;
 
@@ -34,7 +33,6 @@ internal sealed partial class AppSettings
             TopBarDisplayMode = _topBarDisplayMode,
             TopBarMonitorIds = _topBarMonitorIds,
             ShowAppButtonOutline = _showAppButtonOutline,
-            LocalSpeechModelId = _localSpeechModelId,
             BackgroundOptimizationEnabled = _backgroundOptimizationEnabled,
             ShortcutButtons = _shortcutButtons
                 .Select(setting => setting is null
@@ -104,7 +102,6 @@ internal sealed partial class AppSettings
                 settings._topBarDisplayMode = NormalizeTopBarDisplayMode(dto.TopBarDisplayMode);
                 settings._topBarMonitorIds = NormalizeTopBarMonitorIds(dto.TopBarMonitorIds);
                 settings._showAppButtonOutline = dto.ShowAppButtonOutline;
-                settings._localSpeechModelId = NormalizeLocalSpeechModelId(dto.LocalSpeechModelId);
                 settings._backgroundOptimizationEnabled = dto.BackgroundOptimizationEnabled;
                 settings._shortcutButtons = NormalizeShortcutButtons(dto.ShortcutButtons);
                 settings._topBarHeight = Math.Clamp(dto.TopBarHeight, 28, 60);
@@ -147,7 +144,6 @@ internal sealed partial class AppSettings
         public string TopBarDisplayMode { get; set; } = "Primary";
         public string[]? TopBarMonitorIds { get; set; }
         public bool ShowAppButtonOutline { get; set; } = true;
-        public string LocalSpeechModelId { get; set; } = LocalSpeechModelCatalog.DefaultModelId;
         public bool BackgroundOptimizationEnabled { get; set; } = true;
         public AppShortcutDto?[]? ShortcutButtons { get; set; }
         public int TopBarHeight { get; set; } = 34;

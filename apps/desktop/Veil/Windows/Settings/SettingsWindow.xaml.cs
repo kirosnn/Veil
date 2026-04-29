@@ -23,7 +23,6 @@ public sealed partial class SettingsWindow : Window
     private readonly ScreenBounds _screen;
     private readonly string _preferredMonitorId;
     private readonly AppSettings _settings;
-    private readonly LocalSpeechModelStore _localSpeechModelStore;
     private readonly DispatcherTimer _sessionKeepAliveTimer;
     private IntPtr _hwnd;
     private DesktopAcrylicController? _acrylicController;
@@ -40,12 +39,6 @@ public sealed partial class SettingsWindow : Window
         new ShortcutOption("None", string.Empty)
     ];
     private IReadOnlyList<MonitorSelectionOption> _monitorOptions = [];
-    private CancellationTokenSource? _speechModelDownloadCancellationSource;
-    private string? _activeSpeechModelDownloadId;
-    private string? _speechModelMessageModelId;
-    private string _speechModelMessage = string.Empty;
-    private double _speechModelProgressPercent;
-
     internal event EventHandler? SessionExpired;
 
     internal SettingsWindow(ScreenBounds screen, string preferredMonitorId)
@@ -53,7 +46,6 @@ public sealed partial class SettingsWindow : Window
         _screen = screen;
         _preferredMonitorId = preferredMonitorId;
         _settings = AppSettings.Current;
-        _localSpeechModelStore = new LocalSpeechModelStore();
 
         InitializeComponent();
         Title = "Veil Settings";
@@ -177,7 +169,6 @@ public sealed partial class SettingsWindow : Window
 
         SolidColorTextBox.Text = _settings.SolidColor;
         TopBarForegroundColorTextBox.Text = _settings.TopBarForegroundColor;
-        InitializeAiSpeechModelPicker();
 
         SyncLabels();
         UpdateSectionUi();
@@ -877,7 +868,6 @@ public sealed partial class SettingsWindow : Window
     {
         LoadMonitorOptions();
         TopBarSectionPanel.Visibility = _selectedSection == "TopBar" ? Visibility.Visible : Visibility.Collapsed;
-        AiSectionPanel.Visibility = _selectedSection == "AI" ? Visibility.Visible : Visibility.Collapsed;
         DiscordSectionPanel.Visibility = _selectedSection == "Discord" ? Visibility.Visible : Visibility.Collapsed;
         MusicSectionPanel.Visibility = _selectedSection == "Music" ? Visibility.Visible : Visibility.Collapsed;
         OptimizationSectionPanel.Visibility = _selectedSection == "Optimization" ? Visibility.Visible : Visibility.Collapsed;
@@ -885,7 +875,6 @@ public sealed partial class SettingsWindow : Window
         RunCatSectionPanel.Visibility = _selectedSection == "RunCat" ? Visibility.Visible : Visibility.Collapsed;
 
         UpdateSectionButton(TopBarSectionButton, _selectedSection == "TopBar");
-        UpdateSectionButton(AiSectionButton, _selectedSection == "AI");
         UpdateSectionButton(DiscordSectionButton, _selectedSection == "Discord");
         UpdateSectionButton(MusicSectionButton, _selectedSection == "Music");
         UpdateSectionButton(OptimizationSectionButton, _selectedSection == "Optimization");
@@ -907,7 +896,6 @@ public sealed partial class SettingsWindow : Window
         BlurIntensityPanel.Visibility = _settings.TopBarStyle == "Blur" ? Visibility.Visible : Visibility.Collapsed;
         TopBarOpacityPanel.Visibility = _settings.TopBarStyle is "Solid" or "Blur"
             ? Visibility.Visible : Visibility.Collapsed;
-        InitializeAiSpeechModelPicker();
         SyncSolidColorPreview();
         SyncTopBarForegroundColorPreview();
         RaycastNoticeBorder.Visibility = RaycastService.IsInstalled ? Visibility.Visible : Visibility.Collapsed;
@@ -967,218 +955,6 @@ public sealed partial class SettingsWindow : Window
             };
             TopBarMonitorSelectionPanel.Children.Add(button);
         }
-    }
-
-    private void InitializeAiSpeechModelPicker()
-    {
-        _isInitializing = true;
-        AiSpeechModelComboBox.ItemsSource = LocalSpeechModelCatalog.GetAll();
-        AiSpeechModelComboBox.SelectedItem = LocalSpeechModelCatalog.GetById(_settings.LocalSpeechModelId)
-            ?? LocalSpeechModelCatalog.GetDefault();
-        _isInitializing = false;
-        ApplyAiSpeechModelInputs();
-    }
-
-    private void ApplyAiSpeechModelInputs()
-    {
-        LocalSpeechModelDefinition model = LocalSpeechModelCatalog.GetById(_settings.LocalSpeechModelId)
-            ?? LocalSpeechModelCatalog.GetDefault();
-
-        _isInitializing = true;
-        if (AiSpeechModelComboBox.SelectedItem is not LocalSpeechModelDefinition selectedModel ||
-            !string.Equals(selectedModel.Id, model.Id, StringComparison.Ordinal))
-        {
-            AiSpeechModelComboBox.SelectedItem = model;
-        }
-        _isInitializing = false;
-
-        bool isInstalled = _localSpeechModelStore.IsInstalled(model);
-        bool isDownloadingSelectedModel = string.Equals(_activeSpeechModelDownloadId, model.Id, StringComparison.Ordinal);
-        bool hasActiveDownload = !string.IsNullOrWhiteSpace(_activeSpeechModelDownloadId);
-        bool hasOtherActiveDownload = hasActiveDownload && !isDownloadingSelectedModel;
-
-        AiSpeechModelLibraryBadgeText.Text = model.IsRecommended ? "Recommended" : model.Family;
-        AiSpeechModelTitleText.Text = model.DisplayName;
-        AiSpeechModelDescriptionText.Text = model.Description;
-        AiSpeechModelMetaText.Text = $"Family: {model.Family}  •  Size: ~{model.SizeMb} MB  •  Speed: {model.SpeedLabel}  •  Accuracy: {model.AccuracyLabel}";
-        AiSpeechModelCapabilitiesText.Text = $"Languages: {model.LanguagesLabel}  •  Translation: {(model.SupportsTranslation ? "Yes" : "No")}  •  Language selection: {(model.SupportsLanguageSelection ? "Supported" : "Auto only")}";
-        AiSpeechModelOutputText.Text = model.OutputStyle;
-        AiSpeechModelStoragePathText.Text = $"Storage: {Path.Combine(_localSpeechModelStore.ModelsDirectoryPath, model.StorageName)}";
-        AiSpeechModelStatusText.Text = GetAiSpeechModelStatusText(model, isInstalled, isDownloadingSelectedModel, hasOtherActiveDownload);
-        AiSpeechModelProgressBar.Visibility = isDownloadingSelectedModel ? Visibility.Visible : Visibility.Collapsed;
-        AiSpeechModelProgressBar.Value = isDownloadingSelectedModel ? Math.Clamp(_speechModelProgressPercent, 0, 100) : 0;
-
-        AiSpeechModelPrimaryActionButton.Content = isDownloadingSelectedModel
-            ? "Downloading..."
-            : isInstalled
-                ? "Redownload"
-                : "Download";
-        AiSpeechModelPrimaryActionButton.IsEnabled = !hasActiveDownload;
-
-        AiSpeechModelSecondaryActionButton.Content = isDownloadingSelectedModel ? "Cancel" : "Delete";
-        AiSpeechModelSecondaryActionButton.IsEnabled = isDownloadingSelectedModel || (isInstalled && !hasActiveDownload);
-    }
-
-    private string GetAiSpeechModelStatusText(
-        LocalSpeechModelDefinition model,
-        bool isInstalled,
-        bool isDownloadingSelectedModel,
-        bool hasOtherActiveDownload)
-    {
-        if (string.Equals(_speechModelMessageModelId, model.Id, StringComparison.Ordinal) &&
-            !string.IsNullOrWhiteSpace(_speechModelMessage))
-        {
-            return _speechModelMessage;
-        }
-
-        if (isDownloadingSelectedModel)
-        {
-            return "Downloading model files into Veil's local speech library.";
-        }
-
-        if (hasOtherActiveDownload)
-        {
-            LocalSpeechModelDefinition? activeModel = LocalSpeechModelCatalog.GetById(_activeSpeechModelDownloadId);
-            return $"{activeModel?.DisplayName ?? "Another model"} is downloading right now.";
-        }
-
-        return isInstalled
-            ? "Stored locally and ready for future integration inside Veil."
-            : "Not downloaded yet. Veil will keep this model only in local app data.";
-    }
-
-    private void OnAiSpeechModelSelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_isInitializing || AiSpeechModelComboBox.SelectedItem is not LocalSpeechModelDefinition model)
-        {
-            return;
-        }
-
-        _settings.LocalSpeechModelId = model.Id;
-        ApplyAiSpeechModelInputs();
-    }
-
-    private async void OnAiSpeechModelPrimaryActionClick(object sender, RoutedEventArgs e)
-    {
-        if (AiSpeechModelComboBox.SelectedItem is not LocalSpeechModelDefinition model ||
-            !string.IsNullOrWhiteSpace(_activeSpeechModelDownloadId))
-        {
-            return;
-        }
-
-        try
-        {
-            if (_localSpeechModelStore.IsInstalled(model))
-            {
-                _localSpeechModelStore.DeleteModel(model);
-            }
-
-            _speechModelDownloadCancellationSource?.Dispose();
-            _speechModelDownloadCancellationSource = new CancellationTokenSource();
-            _activeSpeechModelDownloadId = model.Id;
-            _speechModelMessageModelId = model.Id;
-            _speechModelMessage = $"Starting download for {model.DisplayName}.";
-            _speechModelProgressPercent = 0;
-            ApplyAiSpeechModelInputs();
-
-            var progress = new Progress<LocalSpeechModelDownloadProgress>(update =>
-            {
-                if (!string.Equals(update.ModelId, model.Id, StringComparison.Ordinal))
-                {
-                    return;
-                }
-
-                switch (update.Stage)
-                {
-                    case LocalSpeechModelDownloadStage.Downloading:
-                        _speechModelProgressPercent = update.TotalBytes > 0
-                            ? (update.DownloadedBytes * 100d) / update.TotalBytes
-                            : 0;
-                        _speechModelMessage = $"Downloading {model.DisplayName}: {FormatMegabytes(update.DownloadedBytes)} / {(update.TotalBytes > 0 ? FormatMegabytes(update.TotalBytes) : $"~{model.SizeMb} MB")}.";
-                        break;
-                    case LocalSpeechModelDownloadStage.Verifying:
-                        _speechModelProgressPercent = 100;
-                        _speechModelMessage = $"Verifying checksum for {model.DisplayName}.";
-                        break;
-                    case LocalSpeechModelDownloadStage.Extracting:
-                        _speechModelProgressPercent = 100;
-                        _speechModelMessage = $"Extracting {model.DisplayName} into Veil's local speech library.";
-                        break;
-                    case LocalSpeechModelDownloadStage.Completed:
-                        _speechModelProgressPercent = 100;
-                        _speechModelMessage = $"{model.DisplayName} was downloaded and stored locally.";
-                        break;
-                }
-
-                _speechModelMessageModelId = model.Id;
-                ApplyAiSpeechModelInputs();
-            });
-
-            await _localSpeechModelStore.DownloadModelAsync(
-                model,
-                progress,
-                _speechModelDownloadCancellationSource.Token);
-
-            _speechModelMessageModelId = model.Id;
-            _speechModelMessage = $"{model.DisplayName} is ready for future local use in Veil.";
-            _speechModelProgressPercent = 100;
-        }
-        catch (OperationCanceledException)
-        {
-            _speechModelMessageModelId = model.Id;
-            _speechModelMessage = $"{model.DisplayName} download was cancelled.";
-            _speechModelProgressPercent = 0;
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error($"Failed to download speech model {model.Id}.", ex);
-            _speechModelMessageModelId = model.Id;
-            _speechModelMessage = $"Download failed: {ex.Message}";
-            _speechModelProgressPercent = 0;
-        }
-        finally
-        {
-            _activeSpeechModelDownloadId = null;
-            _speechModelDownloadCancellationSource?.Dispose();
-            _speechModelDownloadCancellationSource = null;
-            ApplyAiSpeechModelInputs();
-        }
-    }
-
-    private void OnAiSpeechModelSecondaryActionClick(object sender, RoutedEventArgs e)
-    {
-        if (AiSpeechModelComboBox.SelectedItem is not LocalSpeechModelDefinition model)
-        {
-            return;
-        }
-
-        if (string.Equals(_activeSpeechModelDownloadId, model.Id, StringComparison.Ordinal))
-        {
-            _speechModelDownloadCancellationSource?.Cancel();
-            return;
-        }
-
-        try
-        {
-            _localSpeechModelStore.DeleteModel(model);
-            _speechModelMessageModelId = model.Id;
-            _speechModelMessage = $"{model.DisplayName} was removed from Veil's local storage.";
-            _speechModelProgressPercent = 0;
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Error($"Failed to delete speech model {model.Id}.", ex);
-            _speechModelMessageModelId = model.Id;
-            _speechModelMessage = $"Delete failed: {ex.Message}";
-        }
-
-        ApplyAiSpeechModelInputs();
-    }
-
-    private static string FormatMegabytes(long bytes)
-    {
-        double value = bytes / (1024d * 1024d);
-        return $"{Math.Max(0, value):0} MB";
     }
 
     private static void UpdateToggleButton(Button button, bool isSelected, bool useDarkForeground)

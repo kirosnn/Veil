@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Threading;
 using Veil.Diagnostics;
-using Veil.Services;
 
 namespace Veil.Configuration;
 
@@ -49,7 +48,6 @@ internal sealed partial class AppSettings
     private string _topBarDisplayMode = "Primary";
     private string[] _topBarMonitorIds = [];
     private bool _showAppButtonOutline = true;
-    private string _localSpeechModelId = LocalSpeechModelCatalog.DefaultModelId;
     private AppShortcutSetting?[] _shortcutButtons = new AppShortcutSetting?[MaxShortcutButtons];
     private int _topBarHeight = 34;
 

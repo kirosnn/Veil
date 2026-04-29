@@ -1,5 +1,4 @@
 using Veil.Interop;
-using Veil.Services;
 
 namespace Veil.Configuration;
 
@@ -127,11 +126,6 @@ internal sealed partial class AppSettings
     private static string NormalizeTopBarContentAlignment(string? value)
     {
         return value is "Center" or "Right" ? value : "Center";
-    }
-
-    private static string NormalizeLocalSpeechModelId(string? value)
-    {
-        return LocalSpeechModelCatalog.Normalize(value);
     }
 
     private static string[] NormalizeTopBarMonitorIds(string[]? monitorIds)
