@@ -110,6 +110,7 @@ public sealed partial class TopBarWindow
         AddContentRegion(regions, DiscordButton, useElementBounds: false, paddingX: 1, paddingY: 1);
         AddContentRegion(regions, MusicButton, useElementBounds: false, paddingX: 1, paddingY: 1);
         AddContentRegion(regions, RunCatButton, useElementBounds: false, paddingX: 1, paddingY: 1);
+        AddContentRegion(regions, RightButtonsToggleButton, useElementBounds: true, paddingX: 1, paddingY: 1);
         AddElementRegion(regions, ClockText, paddingX: 1, paddingY: 1);
         AddElementRegion(regions, ShortcutGlass, paddingX: 0, paddingY: 0);
 
@@ -123,7 +124,7 @@ public sealed partial class TopBarWindow
 
     private void AddContentRegion(List<WindowRegionSegment> regions, Button button, bool useElementBounds, double paddingX, double paddingY)
     {
-        if (button.Visibility != Visibility.Visible)
+        if (!IsElementEffectivelyVisible(button))
         {
             return;
         }
@@ -149,7 +150,7 @@ public sealed partial class TopBarWindow
     {
         region = default;
 
-        if (element.Visibility != Visibility.Visible || element.ActualWidth <= 0 || element.ActualHeight <= 0)
+        if (!IsElementEffectivelyVisible(element) || element.ActualWidth <= 0 || element.ActualHeight <= 0)
         {
             return false;
         }
@@ -183,5 +184,18 @@ public sealed partial class TopBarWindow
         {
             return false;
         }
+    }
+
+    private static bool IsElementEffectivelyVisible(FrameworkElement element)
+    {
+        for (DependencyObject? current = element; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is UIElement uiElement && uiElement.Visibility != Visibility.Visible)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
