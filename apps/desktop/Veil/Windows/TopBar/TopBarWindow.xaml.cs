@@ -383,7 +383,7 @@ public sealed partial class TopBarWindow : Window
         UpdateGlassPanels(true);
 
         UpdateVisualRefreshState(boost: true);
-        UpdateWindowRegion();
+        ScheduleWindowRegionUpdate();
 
         ApplyForegroundTheme();
 
@@ -437,11 +437,27 @@ public sealed partial class TopBarWindow : Window
         UpdateTopBarLayout();
     }
 
+    private bool _regionUpdateScheduled;
+
+    private void ScheduleWindowRegionUpdate()
+    {
+        if (_regionUpdateScheduled) return;
+        _regionUpdateScheduled = true;
+        RootPanel.LayoutUpdated += OnLayoutUpdatedForRegion;
+    }
+
+    private void OnLayoutUpdatedForRegion(object? sender, object e)
+    {
+        RootPanel.LayoutUpdated -= OnLayoutUpdatedForRegion;
+        _regionUpdateScheduled = false;
+        UpdateWindowRegion();
+    }
+
     private void UpdateTopBarLayout()
     {
         UpdateCenterContentPlacement();
         UpdateActionButtonLayout();
-        UpdateWindowRegion();
+        ScheduleWindowRegionUpdate();
     }
 
     private void UpdateActionButtonLayout()
