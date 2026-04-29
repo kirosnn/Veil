@@ -23,6 +23,7 @@ public sealed partial class TopBarWindow : Window
     private int BarHeight => _settings.TopBarHeight;
     private const double MinimumClockClearance = 164;
     private const double RightAlignedGap = 6;
+    private const double RightAlignedEdgeGap = 10;
     private const double DefaultRenderedTopBarOpacity = 0.92;
     private const double MinimumRenderedTopBarOpacity = 0.04;
     private const double DefaultRenderedBlurIntensity = 0.55;
@@ -509,9 +510,9 @@ public sealed partial class TopBarWindow : Window
 
         if (_settings.TopBarContentAlignment == "Right")
         {
-            RightButtonsPanel.Margin = new Thickness(0, 0, trailingContentWidth + RightAlignedGap * 2, 0);
+            RightButtonsPanel.Margin = new Thickness(0, 0, trailingContentWidth + RightAlignedGap + RightAlignedEdgeGap, 0);
             ClockText.HorizontalAlignment = HorizontalAlignment.Right;
-            ClockText.Margin = new Thickness(0, 0, RightAlignedGap, 0);
+            ClockText.Margin = new Thickness(0, 0, RightAlignedEdgeGap, 0);
         }
         else
         {
