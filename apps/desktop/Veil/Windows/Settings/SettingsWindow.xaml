@@ -16,7 +16,6 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- ══ Sidebar ══ -->
                 <Border
                     Grid.Column="0"
                     Background="#08FFFFFF"
@@ -47,13 +46,14 @@
                         <Button x:Name="RunCatSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="RunCat" Click="OnSectionButtonClick">
                             <TextBlock Text="RunCat" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
                         </Button>
+                        <Button x:Name="ProfilesSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="Profiles" Click="OnSectionButtonClick">
+                            <TextBlock Text="Profiles" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
+                        </Button>
                     </StackPanel>
                 </Border>
 
-                <!-- ══ Sidebar separator ══ -->
                 <Border Grid.Column="0" HorizontalAlignment="Right" Width="1" Background="#10FFFFFF" />
 
-                <!-- ══ Content ══ -->
                 <ScrollViewer
                     x:Name="ContentScrollViewer"
                     Grid.Column="1"
@@ -64,7 +64,6 @@
                     VerticalScrollMode="Enabled">
 
                     <Grid x:Name="ContentHost" HorizontalAlignment="Stretch">
-                        <!-- ── Topbar ── -->
                         <Grid x:Name="TopBarSectionPanel" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
@@ -72,7 +71,6 @@
                                     <TextBlock Text="Tune the visibility and alignment of the bar pinned at the top of your screen." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
                                 </StackPanel>
 
-                                <!-- Screen Placement -->
                                 <TextBlock Text="Screen Placement" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,0,0,0" CharacterSpacing="40" />
                                 <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
                                     <StackPanel Spacing="14">
@@ -94,7 +92,6 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Bar Appearance -->
                                 <TextBlock Text="Appearance" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
                                 <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
                                     <StackPanel Spacing="14">
@@ -230,20 +227,32 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Raycast detected notice -->
                                 <Border x:Name="RaycastNoticeBorder" Background="#0C4ADE94" CornerRadius="12" Padding="14,10" Visibility="Collapsed">
                                     <StackPanel Orientation="Horizontal" Spacing="10">
                                         <TextBlock Text="✦" FontSize="13" Foreground="#4ADE94" VerticalAlignment="Center" />
                                         <StackPanel Spacing="2">
                                             <TextBlock Text="Raycast detected" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#4ADE94" />
-                                            <TextBlock Text="Finder is delegated to Raycast. The Ctrl+Space hotkey is disabled to avoid conflicts." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" TextWrapping="WrapWholeWords" />
+                                            <TextBlock x:Name="RaycastNoticeSubtext" FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" TextWrapping="WrapWholeWords" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Toggles -->
                                 <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
                                     <StackPanel Spacing="14">
+                                        <Grid x:Name="FinderDelegateRaycastRow">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="Open with Raycast" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock Text="The Finder button opens Raycast instead of Veil Finder." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" />
+                                            </StackPanel>
+                                            <Button x:Name="FinderDelegateRaycastButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnFinderDelegateRaycastButtonClick" Content="Enabled" />
+                                        </Grid>
+
+                                        <Border x:Name="FinderDelegateRaycastDivider" Height="1" Background="#08FFFFFF" />
+
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -282,7 +291,6 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- App Buttons -->
                                 <TextBlock Text="App Buttons" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
                                 <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
                                     <StackPanel Spacing="14">
@@ -366,7 +374,6 @@
                             </StackPanel>
                         </Grid>
 
-                        <!-- ── Discord ── -->
                         <Grid x:Name="DiscordSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
@@ -390,7 +397,6 @@
                             </StackPanel>
                         </Grid>
 
-                        <!-- ── Music ── -->
                         <Grid x:Name="MusicSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
@@ -445,7 +451,6 @@
                             </StackPanel>
                         </Grid>
 
-                        <!-- ── Menu ── -->
                         <Grid x:Name="MenuSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
@@ -465,7 +470,6 @@
                             </StackPanel>
                         </Grid>
 
-                        <!-- ── RunCat ── -->
                         <Grid x:Name="RunCatSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
                             <StackPanel Spacing="16">
                                 <StackPanel Spacing="4" Margin="0,0,0,4">
@@ -505,6 +509,134 @@
                                                 <Button x:Name="RunCatHorseButton" Grid.Column="2" Height="32" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="Horse" Click="OnRunCatRunnerButtonClick" Content="Horse" />
                                             </Grid>
                                         </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid x:Name="ProfilesSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
+                            <StackPanel Spacing="16">
+                                <StackPanel Spacing="4" Margin="0,0,0,4">
+                                    <TextBlock Text="Profiles" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
+                                    <TextBlock Text="Switch between Windows system configurations in one click." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
+                                </StackPanel>
+
+                                <TextBlock Text="DEFAULTS" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,0,0,0" CharacterSpacing="40" />
+                                <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="Restore Previous State" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                            <TextBlock Text="Reset power plan, CPU limit, transparency and animations to Windows defaults." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
+                                        </StackPanel>
+                                        <Button x:Name="RestoreWindowsDefaultsButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnRestoreWindowsDefaultsClick" Content="Restore" />
+                                    </Grid>
+                                </Border>
+
+                                <TextBlock Text="BUILT-IN" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
+                                <StackPanel x:Name="BuiltInProfileCardsPanel" Spacing="8" />
+
+                                <TextBlock x:Name="UserProfilesLabel" Text="MES PROFILS" FontSize="11" FontFamily="{StaticResource SfTextSemibold}" Foreground="#60FFFFFF" Margin="4,8,0,0" CharacterSpacing="40" />
+                                <StackPanel x:Name="UserProfileCardsPanel" Spacing="8" />
+
+                                <Button x:Name="AddProfileButton" HorizontalAlignment="Stretch" Height="38" CornerRadius="10" BorderThickness="1" BorderBrush="#18FFFFFF" Background="Transparent" IsTabStop="False" Click="OnAddProfileClick">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="+" FontSize="15" FontFamily="{StaticResource SfTextMedium}" Foreground="#60FFFFFF" VerticalAlignment="Center" />
+                                        <TextBlock Text="New Profile" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#80FFFFFF" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+
+                                <Border x:Name="NewProfileFormBorder" Visibility="Collapsed" Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
+                                    <StackPanel Spacing="14">
+                                        <TextBox x:Name="NewProfileNameTextBox" Header="Profile name" PlaceholderText="My Profile" FontFamily="{StaticResource SfTextMedium}" />
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Power plan" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                            <Grid ColumnSpacing="6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button x:Name="NewProfilePlanBalancedButton" Grid.Column="0" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="Balanced" Click="OnNewProfilePlanClick" Content="Balanced" />
+                                                <Button x:Name="NewProfilePlanPerformanceButton" Grid.Column="1" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="HighPerformance" Click="OnNewProfilePlanClick" Content="Performance" />
+                                                <Button x:Name="NewProfilePlanSaverButton" Grid.Column="2" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="PowerSaver" Click="OnNewProfilePlanClick" Content="Saver" />
+                                            </Grid>
+                                            <Grid ColumnSpacing="6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button x:Name="NewProfilePlanEfficiencyButton" Grid.Column="0" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="BestEfficiency" Click="OnNewProfilePlanClick" Content="Efficiency" />
+                                                <Button x:Name="NewProfilePlanUltimateButton" Grid.Column="1" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="UltimatePerformance" Click="OnNewProfilePlanClick" Content="Ultimate" />
+                                                <Button x:Name="NewProfilePlanNoneButton" Grid.Column="2" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="" Click="OnNewProfilePlanClick" Content="Keep" />
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="CPU max %" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                            <Grid ColumnSpacing="6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button x:Name="NewProfileCpu60Button" Grid.Column="0" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="60" Click="OnNewProfileCpuClick" Content="60%" />
+                                                <Button x:Name="NewProfileCpu75Button" Grid.Column="1" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="75" Click="OnNewProfileCpuClick" Content="75%" />
+                                                <Button x:Name="NewProfileCpu90Button" Grid.Column="2" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="90" Click="OnNewProfileCpuClick" Content="90%" />
+                                                <Button x:Name="NewProfileCpu100Button" Grid.Column="3" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="100" Click="OnNewProfileCpuClick" Content="100%" />
+                                                <Button x:Name="NewProfileCpuNoneButton" Grid.Column="4" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="" Click="OnNewProfileCpuClick" Content="Keep" />
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Refresh rate" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                            <Grid ColumnSpacing="6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Button x:Name="NewProfileHz60Button" Grid.Column="0" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="60" Click="OnNewProfileHzClick" Content="60 Hz" />
+                                                <Button x:Name="NewProfileHz75Button" Grid.Column="1" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="75" Click="OnNewProfileHzClick" Content="75 Hz" />
+                                                <Button x:Name="NewProfileHz120Button" Grid.Column="2" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="120" Click="OnNewProfileHzClick" Content="120 Hz" />
+                                                <Button x:Name="NewProfileHz144Button" Grid.Column="3" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="144" Click="OnNewProfileHzClick" Content="144 Hz" />
+                                                <Button x:Name="NewProfileHzNoneButton" Grid.Column="4" Height="30" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="" Click="OnNewProfileHzClick" Content="Keep" />
+                                            </Grid>
+                                        </StackPanel>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <Grid>
+                                            <TextBlock Text="Windows transparency" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" VerticalAlignment="Center" />
+                                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                                                <Button x:Name="NewProfileTransparencyOnButton" Height="30" Width="50" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="on" Click="OnNewProfileTransparencyClick" Content="On" />
+                                                <Button x:Name="NewProfileTransparencyOffButton" Height="30" Width="50" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="off" Click="OnNewProfileTransparencyClick" Content="Off" />
+                                                <Button x:Name="NewProfileTransparencyKeepButton" Height="30" Width="54" CornerRadius="8" BorderThickness="0" Background="#20FFFFFF" Foreground="White" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="" Click="OnNewProfileTransparencyClick" Content="Keep" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid>
+                                            <TextBlock Text="Windows animations" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" VerticalAlignment="Center" />
+                                            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                                                <Button x:Name="NewProfileAnimationsOnButton" Height="30" Width="50" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="on" Click="OnNewProfileAnimationsClick" Content="On" />
+                                                <Button x:Name="NewProfileAnimationsOffButton" Height="30" Width="50" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#B0FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="off" Click="OnNewProfileAnimationsClick" Content="Off" />
+                                                <Button x:Name="NewProfileAnimationsKeepButton" Height="30" Width="54" CornerRadius="8" BorderThickness="0" Background="#20FFFFFF" Foreground="White" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Tag="" Click="OnNewProfileAnimationsClick" Content="Keep" />
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <Grid ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="SaveNewProfileButton" Grid.Column="0" Height="34" HorizontalAlignment="Stretch" CornerRadius="8" BorderThickness="0" Background="#20FFFFFF" Foreground="White" FontFamily="{StaticResource SfTextMedium}" FontSize="13" IsTabStop="False" Click="OnSaveNewProfileClick" Content="Create Profile" />
+                                            <Button x:Name="CancelNewProfileButton" Grid.Column="1" Height="34" HorizontalAlignment="Stretch" CornerRadius="8" BorderThickness="0" Background="Transparent" Foreground="#80FFFFFF" FontFamily="{StaticResource SfTextMedium}" FontSize="13" IsTabStop="False" Click="OnCancelNewProfileClick" Content="Cancel" />
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
