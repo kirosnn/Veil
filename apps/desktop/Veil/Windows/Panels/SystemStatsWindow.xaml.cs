@@ -17,7 +17,7 @@ public sealed partial class SystemStatsWindow : Window
 {
     private const int PanelWidth = 250;
     private const int MinimumPanelHeight = 160;
-    private const int PanelCornerRadius = 14;
+    private const int PanelCornerRadius = 8;
     private const int ScreenMargin = 8;
     private const int HorizontalContentInset = 28;
 
