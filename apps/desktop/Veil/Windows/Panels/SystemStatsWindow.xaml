@@ -8,7 +8,7 @@
             x:Name="PanelBorder"
             Padding="0"
             Background="Transparent"
-            CornerRadius="14">
+            CornerRadius="8">
             <ScrollViewer
                 x:Name="StatsScrollViewer"
                 HorizontalScrollMode="Disabled"
