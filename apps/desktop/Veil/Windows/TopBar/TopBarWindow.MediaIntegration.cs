@@ -42,6 +42,7 @@ public sealed partial class TopBarWindow
             _musicControlWindow.Hide();
         }
 
+        ApplyRightButtonsToggleState();
         _ = UpdateMusicAlbumArtAsync();
     }
 
@@ -64,10 +65,6 @@ public sealed partial class TopBarWindow
                     : YouTubeLightIconSource;
                 MusicAlbumArt.Visibility = Visibility.Visible;
                 MusicIcon.Visibility = Visibility.Collapsed;
-                MusicButton.Resources["ButtonBackgroundPointerOver"] =
-                    new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
-                MusicButton.Resources["ButtonBackgroundPressed"] =
-                    new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
                 return;
             }
 
@@ -90,10 +87,6 @@ public sealed partial class TopBarWindow
                     MusicAlbumArt.Source = imageSource;
                     MusicAlbumArt.Visibility = Visibility.Visible;
                     MusicIcon.Visibility = Visibility.Collapsed;
-                    MusicButton.Resources["ButtonBackgroundPointerOver"] =
-                        new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
-                    MusicButton.Resources["ButtonBackgroundPressed"] =
-                        new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
                     return;
                 }
             }
@@ -109,11 +102,6 @@ public sealed partial class TopBarWindow
             MusicAlbumArt.Source = null;
             MusicAlbumArt.Visibility = Visibility.Collapsed;
             MusicIcon.Visibility = Visibility.Visible;
-            var foregroundColor = GetTopBarForegroundColor();
-            MusicButton.Resources["ButtonBackgroundPointerOver"] =
-                new SolidColorBrush(global::Windows.UI.Color.FromArgb(12, foregroundColor.R, foregroundColor.G, foregroundColor.B));
-            MusicButton.Resources["ButtonBackgroundPressed"] =
-                new SolidColorBrush(global::Windows.UI.Color.FromArgb(8, foregroundColor.R, foregroundColor.G, foregroundColor.B));
         }
         finally
         {
@@ -183,6 +171,8 @@ public sealed partial class TopBarWindow
         {
             _discordNotificationWindow.Hide();
         }
+
+        ApplyRightButtonsToggleState();
     }
 
     private void UpdateDiscordDemand(bool boost = false)
@@ -237,6 +227,7 @@ public sealed partial class TopBarWindow
 
             RunCatButton.Visibility = Visibility.Collapsed;
             RunCatImage.Source = null;
+            ApplyRightButtonsToggleState();
             return;
         }
 
@@ -249,7 +240,6 @@ public sealed partial class TopBarWindow
             return;
         }
 
-        // Load new frames while keeping the current animation running to avoid freeze.
         var newService = new RunCatService();
         newService.Start(runner);
 
@@ -267,7 +257,6 @@ public sealed partial class TopBarWindow
             return;
         }
 
-        // Frames ready — atomically swap out the old service.
         if (_runCatService != null)
         {
             _runCatService.FrameChanged -= OnRunCatFrameChanged;
@@ -281,6 +270,7 @@ public sealed partial class TopBarWindow
         RunCatImage.Source = _runCatFrames[0];
         RunCatButton.Visibility = Visibility.Visible;
         _runCatService.FrameChanged += OnRunCatFrameChanged;
+        ApplyRightButtonsToggleState();
     }
 
     private void OnRunCatFrameChanged(int frame)
