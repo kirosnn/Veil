@@ -52,6 +52,7 @@ internal sealed partial class AppSettings
     private bool _showAppButtonOutline = true;
     private AppShortcutSetting?[] _shortcutButtons = new AppShortcutSetting?[MaxShortcutButtons];
     private int _topBarHeight = 34;
+    private bool _hideOnFullscreen = true;
 
     public static AppSettings Current => _current.Value;
 
