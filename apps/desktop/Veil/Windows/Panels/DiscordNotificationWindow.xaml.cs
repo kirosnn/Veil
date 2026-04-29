@@ -17,7 +17,7 @@ public sealed partial class DiscordNotificationWindow : Window
 {
     private const int PanelWidth = 320;
     private const int MinimumPanelWidth = 280;
-    private const int PanelCornerRadius = 14;
+    private const int PanelCornerRadius = 8;
     private const int ContentInset = 16;
     private const int MinimumPanelHeight = 200;
     private const int PanelWidthPadding = 16;
