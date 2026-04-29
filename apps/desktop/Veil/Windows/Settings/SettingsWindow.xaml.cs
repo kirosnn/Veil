@@ -457,6 +457,17 @@ public sealed partial class SettingsWindow : Window
         UpdateSectionUi();
     }
 
+    private void OnFinderDelegateRaycastButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _settings.FinderDelegateToRaycast = !_settings.FinderDelegateToRaycast;
+        UpdateSectionUi();
+    }
+
     private void OnDiscordButtonEnabledButtonClick(object sender, RoutedEventArgs e)
     {
         if (_isInitializing)
@@ -870,6 +881,7 @@ public sealed partial class SettingsWindow : Window
         OptimizationSectionPanel.Visibility = _selectedSection == "Optimization" ? Visibility.Visible : Visibility.Collapsed;
         MenuSectionPanel.Visibility = _selectedSection == "Menu" ? Visibility.Visible : Visibility.Collapsed;
         RunCatSectionPanel.Visibility = _selectedSection == "RunCat" ? Visibility.Visible : Visibility.Collapsed;
+        ProfilesSectionPanel.Visibility = _selectedSection == "Profiles" ? Visibility.Visible : Visibility.Collapsed;
 
         UpdateSectionButton(TopBarSectionButton, _selectedSection == "TopBar");
         UpdateSectionButton(DiscordSectionButton, _selectedSection == "Discord");
@@ -877,6 +889,7 @@ public sealed partial class SettingsWindow : Window
         UpdateSectionButton(OptimizationSectionButton, _selectedSection == "Optimization");
         UpdateSectionButton(MenuSectionButton, _selectedSection == "Menu");
         UpdateSectionButton(RunCatSectionButton, _selectedSection == "RunCat");
+        UpdateSectionButton(ProfilesSectionButton, _selectedSection == "Profiles");
 
         UpdateTopBarStyleButton(TopBarStyleSolidButton, _settings.TopBarStyle == "Solid");
         UpdateTopBarStyleButton(TopBarStyleBlurButton, _settings.TopBarStyle == "Blur");
@@ -895,7 +908,18 @@ public sealed partial class SettingsWindow : Window
             ? Visibility.Visible : Visibility.Collapsed;
         SyncSolidColorPreview();
         SyncTopBarForegroundColorPreview();
-        RaycastNoticeBorder.Visibility = RaycastService.IsInstalled ? Visibility.Visible : Visibility.Collapsed;
+        bool raycastInstalled = RaycastService.IsInstalled;
+        RaycastNoticeBorder.Visibility = raycastInstalled ? Visibility.Visible : Visibility.Collapsed;
+        FinderDelegateRaycastRow.Visibility = raycastInstalled ? Visibility.Visible : Visibility.Collapsed;
+        FinderDelegateRaycastDivider.Visibility = raycastInstalled ? Visibility.Visible : Visibility.Collapsed;
+        if (raycastInstalled)
+        {
+            bool delegating = _settings.FinderDelegateToRaycast;
+            RaycastNoticeSubtext.Text = delegating
+                ? "Finder button opens Raycast. The Ctrl+Space hotkey is disabled to avoid conflicts."
+                : "Raycast is installed but the Finder button uses Veil Finder.";
+            UpdateFinderDelegateRaycastButton();
+        }
         UpdateFinderBubbleButton();
         UpdateFinderHotkeyButton();
         UpdateAppButtonOutlineButton();
@@ -903,6 +927,7 @@ public sealed partial class SettingsWindow : Window
         UpdateMusicButtons();
         UpdateOptimizationButtons();
         UpdateRunCatButtons();
+        if (_selectedSection == "Profiles") RebuildProfileCards();
     }
 
     private void UpdateSectionButton(Button button, bool isSelected)
@@ -976,6 +1001,14 @@ public sealed partial class SettingsWindow : Window
         FinderHotkeyButton.Content = isEnabled ? "Enabled" : "Disabled";
         FinderHotkeyButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isEnabled ? (byte)48 : (byte)0, 255, 255, 255));
         FinderHotkeyButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isEnabled ? (byte)255 : (byte)214);
+    }
+
+    private void UpdateFinderDelegateRaycastButton()
+    {
+        bool isEnabled = _settings.FinderDelegateToRaycast;
+        FinderDelegateRaycastButton.Content = isEnabled ? "Enabled" : "Disabled";
+        FinderDelegateRaycastButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isEnabled ? (byte)48 : (byte)0, 255, 255, 255));
+        FinderDelegateRaycastButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isEnabled ? (byte)255 : (byte)214);
     }
 
     private void UpdateAppButtonOutlineButton()
