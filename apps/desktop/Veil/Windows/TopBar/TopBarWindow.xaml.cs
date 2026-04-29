@@ -28,6 +28,9 @@ public sealed partial class TopBarWindow : Window
     private const double MinimumRenderedTopBarOpacity = 0.04;
     private const double DefaultRenderedBlurIntensity = 0.55;
     private const double MinimumRenderedBlurIntensity = 0.20;
+    private static readonly TimeSpan AppBarMaintenanceFastInterval = TimeSpan.FromMilliseconds(16);
+    private static readonly TimeSpan AppBarMaintenanceIdleInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan AppBarMaintenanceBoostDuration = TimeSpan.FromMilliseconds(900);
     private static readonly TimeSpan AdaptiveVisualWarmRefreshInterval = TimeSpan.FromMilliseconds(700);
     private static readonly TimeSpan AdaptiveVisualRefreshInterval = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan AdaptiveVisualDeepSampleInterval = TimeSpan.FromMilliseconds(900);
@@ -48,6 +51,7 @@ public sealed partial class TopBarWindow : Window
     private static readonly DiscordNotificationService SharedDiscordNotificationService = new();
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _visualTimer;
+    private readonly DispatcherTimer _appBarMaintenanceTimer;
     private readonly DemandDrivenModule _adaptiveVisualModule;
     private readonly DemandDrivenModule _discordModule;
     private readonly DemandDrivenModule _backgroundMaintenanceModule;
@@ -59,6 +63,7 @@ public sealed partial class TopBarWindow : Window
     private bool _ownsGlobalHotkeys;
     private bool _appBarRegistered;
     private IntPtr _hwnd;
+    private global::Windows.Graphics.RectInt32 _appBarBounds;
     private global::Windows.UI.Color? _lastAdaptiveColor;
     private global::Windows.UI.Color? _lastAdaptiveProbeColor;
     private global::Windows.UI.Color? _adaptiveForegroundOverride;
@@ -82,12 +87,13 @@ public sealed partial class TopBarWindow : Window
     private readonly DispatcherTimer _backgroundMaintenanceTimer;
     private int _backgroundMaintenanceInFlight;
     private string _lastWindowRegionSignature = string.Empty;
-    private int _lastAppliedBarHeight = 32;
+    private int _lastAppliedBarHeight;
     private DispatcherTimer? _heightPlacementDebounce;
     private double _lastKnownClockWidth = MinimumClockClearance;
     private string _lastClockText = string.Empty;
     private string _lastSettingsSignature = string.Empty;
     private string _lastShortcutGlassBlurRegionSignature = string.Empty;
+    private DateTime _appBarMaintenanceBoostUntilUtc = DateTime.MinValue;
     private bool _rightButtonsExpanded = true;
     private bool _isAdaptiveClearModeActive;
     private bool _hasAdaptiveModeState;
@@ -106,6 +112,7 @@ public sealed partial class TopBarWindow : Window
         _screen = screen;
         _veilOptimizationService = veilOptimizationService;
         _settings = AppSettings.Current;
+        _lastAppliedBarHeight = _settings.TopBarHeight;
         _startHiddenUntilReady = startHiddenUntilReady;
         _ownsGlobalHotkeys = ownsGlobalHotkeys;
         _discordDemandOwnerId = $"topbar:{monitorId}";
@@ -113,10 +120,7 @@ public sealed partial class TopBarWindow : Window
 
         InitializeComponent();
         Title = "Veil TopBar";
-        if (_startHiddenUntilReady)
-        {
-            RootPanel.Opacity = 0;
-        }
+        RootPanel.Opacity = 0;
 
         _clockTimer = new DispatcherTimer
         {
@@ -131,6 +135,12 @@ public sealed partial class TopBarWindow : Window
             Interval = AdaptiveVisualRefreshInterval
         };
         _visualTimer.Tick += OnVisualTick;
+
+        _appBarMaintenanceTimer = new DispatcherTimer
+        {
+            Interval = AppBarMaintenanceIdleInterval
+        };
+        _appBarMaintenanceTimer.Tick += OnAppBarMaintenanceTick;
 
         _backgroundMaintenanceTimer = new DispatcherTimer
         {
@@ -166,17 +176,14 @@ public sealed partial class TopBarWindow : Window
         Activated -= OnActivated;
 
         _hwnd = WindowHelper.GetHwnd(this);
-        bool revealAfterSetup = _startHiddenUntilReady;
 
+        ShowWindowNative(_hwnd, SW_HIDE);
         WindowHelper.RemoveTitleBar(this);
         WindowHelper.ExtendFrameIntoClientArea(this);
         WindowHelper.MakeOverlay(this);
-        if (revealAfterSetup)
-        {
-            ShowWindowNative(_hwnd, SW_HIDE);
-        }
 
         ApplyTopBarPlacement(true);
+        BoostAppBarMaintenance();
         ApplySettings();
 
         RebuildShortcutButtons();
@@ -185,16 +192,14 @@ public sealed partial class TopBarWindow : Window
         _ = InitMediaControlAsync();
         _ = InitDiscordNotificationsAsync();
         ApplyHotkeyOwnership();
+        ApplyTopBarRole();
         UpdateVisualRefreshState(boost: true);
         UpdateDiscordDemand(boost: true);
         UpdateBackgroundMaintenanceState(boost: true);
         DispatcherQueue.TryEnqueue(PrewarmTransientWindows);
-        if (revealAfterSetup)
-        {
-            RootPanel.Opacity = 1;
-            ShowWindowNative(_hwnd, SW_SHOWNOACTIVATE);
-            _startHiddenUntilReady = false;
-        }
+        RootPanel.Opacity = 1;
+        ShowWindowNative(_hwnd, SW_SHOWNOACTIVATE);
+        _startHiddenUntilReady = false;
     }
 
     private void OnClosed(object sender, WindowEventArgs args)
@@ -202,6 +207,7 @@ public sealed partial class TopBarWindow : Window
         AppLogger.Info($"TopBarWindow closed for {_monitorId}.");
         _clockTimer.Stop();
         _visualTimer.Stop();
+        _appBarMaintenanceTimer.Stop();
         _backgroundMaintenanceTimer.Stop();
         _settings.Changed -= OnSettingsChanged;
         _mediaControlService.StateChanged -= OnMediaStateChanged;
@@ -225,6 +231,11 @@ public sealed partial class TopBarWindow : Window
 
     internal ScreenBounds ScreenBounds => _screen;
 
+    internal void PrepareForActivation()
+    {
+        WindowHelper.PositionOnMonitor(this, -32000, -32000, 1, 1);
+    }
+
     internal void UpdateScreenBounds(ScreenBounds screen)
     {
         if (_screen == screen)
@@ -243,11 +254,46 @@ public sealed partial class TopBarWindow : Window
         UpdateTopBarLayout();
     }
 
+    private void ApplyTopBarRole()
+    {
+        ClockText.Visibility = _ownsGlobalHotkeys
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        RightControlsPanel.Visibility = _ownsGlobalHotkeys
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        if (!_ownsGlobalHotkeys)
+        {
+            DiscordButton.Visibility = Visibility.Collapsed;
+            MusicButton.Visibility = Visibility.Collapsed;
+            RunCatButton.Visibility = Visibility.Collapsed;
+            RightButtonsToggleButton.Visibility = Visibility.Collapsed;
+            RightButtonsPanel.Visibility = Visibility.Collapsed;
+            _discordNotificationWindow?.Hide();
+            _musicControlWindow?.Hide();
+            _systemStatsWindow?.Hide();
+        }
+
+        UpdateMusicButtonVisibility();
+        UpdateDiscordButtonVisibility();
+        _ = ApplyRunCatSettingsAsync();
+        ApplyRightButtonsToggleState();
+        UpdateTopBarLayout();
+        UpdateDiscordDemand();
+        BoostAppBarMaintenance();
+    }
+
     private int GetBarHeightInPhysicalPixels()
-        => Math.Max(1, WindowHelper.ViewPixelsToPhysical(this, BarHeight));
+        => Math.Max(1, WindowHelper.ViewPixelsToPhysical(_screen, BarHeight));
 
     private double GetScreenWidthInViewPixels()
-        => WindowHelper.PhysicalPixelsToView(this, _screen.Right - _screen.Left);
+        => WindowHelper.PhysicalPixelsToView(_screen, _screen.Right - _screen.Left);
+
+    private double GetTopBarWidthInViewPixels()
+        => RootPanel.ActualWidth > 0
+            ? RootPanel.ActualWidth
+            : GetScreenWidthInViewPixels();
 
     private void ApplyTopBarPlacement(bool refreshAppBar)
     {
@@ -262,7 +308,44 @@ public sealed partial class TopBarWindow : Window
         WindowHelper.SetAlwaysOnTop(this);
         global::Windows.Graphics.RectInt32 bounds = WindowHelper.RegisterAppBar(this, _screen, ABE_TOP, height);
         WindowHelper.PositionOnMonitor(this, bounds.X, bounds.Y, bounds.Width, bounds.Height);
+        _appBarBounds = bounds;
         _appBarRegistered = true;
+        MaintainAppBarNow();
+    }
+
+    private void BoostAppBarMaintenance()
+    {
+        _appBarMaintenanceBoostUntilUtc = DateTime.UtcNow + AppBarMaintenanceBoostDuration;
+        _appBarMaintenanceTimer.Interval = AppBarMaintenanceFastInterval;
+
+        if (!_appBarMaintenanceTimer.IsEnabled)
+        {
+            _appBarMaintenanceTimer.Start();
+        }
+
+        MaintainAppBarNow();
+    }
+
+    private void OnAppBarMaintenanceTick(object? sender, object e)
+    {
+        MaintainAppBarNow();
+
+        if (DateTime.UtcNow >= _appBarMaintenanceBoostUntilUtc
+            && _appBarMaintenanceTimer.Interval != AppBarMaintenanceIdleInterval)
+        {
+            _appBarMaintenanceTimer.Interval = AppBarMaintenanceIdleInterval;
+        }
+    }
+
+    private void MaintainAppBarNow()
+    {
+        if (_hwnd == IntPtr.Zero || !_appBarRegistered)
+        {
+            return;
+        }
+
+        WindowHelper.EnsureWindowBounds(_hwnd, _appBarBounds);
+        WindowHelper.MaintainAppBarOcclusion(_hwnd);
     }
 
     private void ScheduleHeightPlacement()
@@ -296,7 +379,12 @@ public sealed partial class TopBarWindow : Window
 
     private void UpdateClock()
     {
-            var now = DateTime.Now;
+        if (!_ownsGlobalHotkeys)
+        {
+            return;
+        }
+
+        var now = DateTime.Now;
         string dayName = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(now.DayOfWeek);
         dayName = string.IsNullOrWhiteSpace(dayName) ? now.ToString("ddd", CultureInfo.CurrentCulture) : dayName;
         dayName = dayName.TrimEnd('.');
@@ -334,6 +422,7 @@ public sealed partial class TopBarWindow : Window
             ApplySettings();
             RebuildShortcutButtons();
             ApplyHotkeyOwnership();
+            ApplyTopBarRole();
             _musicControlWindow?.RefreshLayout();
             _discordNotificationWindow?.RefreshLayout();
             _systemStatsWindow?.RefreshAppearance();
@@ -424,6 +513,11 @@ public sealed partial class TopBarWindow : Window
 
     private void OnTopBarSizeChanged(object sender, WindowSizeChangedEventArgs args)
     {
+        if (_hwnd != IntPtr.Zero && _appBarRegistered)
+        {
+            WindowHelper.EnsureWindowBounds(_hwnd, _appBarBounds);
+        }
+
         UpdateTopBarLayout();
     }
 
@@ -462,10 +556,12 @@ public sealed partial class TopBarWindow : Window
 
     private void UpdateActionButtonLayout()
     {
-        double screenWidth = GetScreenWidthInViewPixels();
+        double screenWidth = GetTopBarWidthInViewPixels();
         double leftMargin = LeftButtonsPanel.Margin.Left + LeftButtonsPanel.Margin.Right;
-        double rightWidth = RightControlsPanel.ActualWidth + RightControlsPanel.Margin.Left + RightControlsPanel.Margin.Right;
-        double centerClearance = _settings.TopBarContentAlignment == "Center"
+        double rightWidth = _ownsGlobalHotkeys
+            ? RightControlsPanel.ActualWidth + RightControlsPanel.Margin.Left + RightControlsPanel.Margin.Right
+            : 0;
+        double centerClearance = _ownsGlobalHotkeys && _settings.TopBarContentAlignment == "Center"
             ? GetCenterReservedWidth()
             : 0;
         double maxLeftWidth = Math.Max(0, screenWidth - rightWidth - centerClearance - leftMargin);
@@ -506,6 +602,13 @@ public sealed partial class TopBarWindow : Window
 
     private void UpdateCenterContentPlacement()
     {
+        if (!_ownsGlobalHotkeys)
+        {
+            RightControlsPanel.Margin = new Thickness(0);
+            ClockText.Margin = new Thickness(0);
+            return;
+        }
+
         double trailingContentWidth = GetTrailingContentWidth();
 
         if (_settings.TopBarContentAlignment == "Right")
