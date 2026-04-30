@@ -105,6 +105,7 @@ public sealed partial class TopBarWindow
     {
         List<WindowRegionSegment> regions = [];
 
+        AddElementRegion(regions, RootPanel, paddingX: 0, paddingY: 0);
         AddContentRegion(regions, MenuButton, useElementBounds: true, paddingX: 1, paddingY: 1);
         AddContentRegion(regions, FinderButton, useElementBounds: true, paddingX: 8, paddingY: 5);
         AddContentRegion(regions, DiscordButton, useElementBounds: false, paddingX: 1, paddingY: 1);
