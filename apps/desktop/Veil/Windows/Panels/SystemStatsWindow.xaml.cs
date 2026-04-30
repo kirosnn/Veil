@@ -140,6 +140,8 @@ public sealed partial class SystemStatsWindow : Window
 
     public void Initialize()
     {
+        var appWindow = WindowHelper.GetAppWindow(this);
+        appWindow.MoveAndResize(new global::Windows.Graphics.RectInt32(-9999, -9999, 1, 1));
         Activate();
         var hwnd = WindowHelper.GetHwnd(this);
         if (hwnd != IntPtr.Zero)
