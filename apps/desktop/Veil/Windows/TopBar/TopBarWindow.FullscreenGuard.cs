@@ -51,7 +51,8 @@ public sealed partial class TopBarWindow
         _discordNotificationWindow?.Hide();
         _systemStatsWindow?.Hide();
 
-        _runCatService?.Stop();
+        _runCatLoadVersion++;
+        StopRunCat();
 
         if (_appBarRegistered)
         {

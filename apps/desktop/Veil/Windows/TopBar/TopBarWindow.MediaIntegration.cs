@@ -211,23 +211,14 @@ public sealed partial class TopBarWindow
 
     private async Task ApplyRunCatSettingsAsync()
     {
-        bool shouldRun = _ownsGlobalHotkeys && _settings.RunCatEnabled;
+        bool shouldRun = !_isHiddenForFullscreen && _ownsGlobalHotkeys && _settings.RunCatEnabled;
         string runner = _settings.RunCatRunner;
         int loadVersion = ++_runCatLoadVersion;
 
         if (!shouldRun)
         {
-            if (_runCatService != null)
-            {
-                _runCatService.FrameChanged -= OnRunCatFrameChanged;
-                _runCatService.Stop();
-                _runCatService.Dispose();
-                _runCatService = null;
-                _runCatFrames = null;
-            }
-
+            StopRunCat();
             RunCatButton.Visibility = Visibility.Collapsed;
-            RunCatImage.Source = null;
             ApplyRightButtonsToggleState();
             return;
         }
@@ -272,6 +263,22 @@ public sealed partial class TopBarWindow
         RunCatButton.Visibility = Visibility.Visible;
         _runCatService.FrameChanged += OnRunCatFrameChanged;
         ApplyRightButtonsToggleState();
+    }
+
+    private void StopRunCat()
+    {
+        if (_runCatService == null)
+        {
+            return;
+        }
+
+        _runCatService.FrameChanged -= OnRunCatFrameChanged;
+        _runCatService.Stop();
+        _runCatService.Dispose();
+        _runCatService = null;
+        _runCatFrames = null;
+        _lastRunCatTintHex = null;
+        RunCatImage.Source = null;
     }
 
     private void OnRunCatFrameChanged(int frame)

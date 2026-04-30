@@ -220,9 +220,8 @@ public sealed partial class TopBarWindow : Window
         _finderWindow?.Destroy();
         _finderWindow = null;
         DisposeFinderHotkey();
-        _runCatService?.Dispose();
+        StopRunCat();
         _veilOptimizationService.RestoreNormalOptimizations();
-        _runCatService = null;
         if (_appBarRegistered)
         {
             WindowHelper.UnregisterAppBar(this);

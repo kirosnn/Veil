@@ -15,7 +15,7 @@ namespace Veil.Windows;
 
 public sealed partial class SystemStatsWindow : Window
 {
-    private const int PanelWidth = 250;
+    private const int PanelWidth = 300;
     private const int MinimumPanelHeight = 160;
     private const int PanelCornerRadius = 8;
     private const int ScreenMargin = 8;
@@ -140,9 +140,12 @@ public sealed partial class SystemStatsWindow : Window
 
     public void Initialize()
     {
-        var appWindow = WindowHelper.GetAppWindow(this);
-        appWindow.MoveAndResize(new global::Windows.Graphics.RectInt32(-9999, -9999, 1, 1));
         Activate();
+        var hwnd = WindowHelper.GetHwnd(this);
+        if (hwnd != IntPtr.Zero)
+        {
+            ShowWindowNative(hwnd, SW_HIDE);
+        }
     }
 
     public void ShowAt(int x, int y)
