@@ -70,7 +70,9 @@ public sealed partial class MenuWindow : Window
             TintColor = global::Windows.UI.Color.FromArgb(238, 26, 26, 30),
             TintOpacity = (float)_settings.MenuTintOpacity,
             LuminosityOpacity = 0.09f,
-            FallbackColor = global::Windows.UI.Color.FromArgb(194, 20, 20, 24)
+            FallbackColor = WindowHelper.IsWindowsTransparencyEnabled()
+                ? global::Windows.UI.Color.FromArgb(194, 20, 20, 24)
+                : WindowHelper.GetOpaqueThemeBackgroundColor()
         };
 
         _backdropConfig = new SystemBackdropConfiguration
@@ -88,6 +90,7 @@ public sealed partial class MenuWindow : Window
         Activated -= OnFirstActivated;
 
         _hwnd = WindowHelper.GetHwnd(this);
+        ShowWindowNative(_hwnd, SW_HIDE);
 
         WindowHelper.RemoveTitleBar(this);
 
@@ -103,7 +106,6 @@ public sealed partial class MenuWindow : Window
 
         SetupAcrylic();
         ApplySettings();
-        ShowWindowNative(_hwnd, SW_HIDE);
     }
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
@@ -154,9 +156,15 @@ public sealed partial class MenuWindow : Window
 
     public void Initialize()
     {
-        var appWindow = WindowHelper.GetAppWindow(this);
-        appWindow.MoveAndResize(new global::Windows.Graphics.RectInt32(-9999, -9999, 1, 1));
+        var hwnd = WindowHelper.GetHwnd(this);
+        int cloak = 1;
+        DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
+
         Activate();
+
+        ShowWindowNative(hwnd, SW_HIDE);
+        cloak = 0;
+        DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
     }
 
     public void ShowAt(int x, int y)
@@ -199,13 +207,17 @@ public sealed partial class MenuWindow : Window
         if (_acrylicController != null)
         {
             _acrylicController.TintOpacity = (float)_settings.MenuTintOpacity;
-            _acrylicController.FallbackColor = global::Windows.UI.Color.FromArgb(
-                (byte)Math.Round(120 + (_settings.MenuTintOpacity * 200)),
-                20, 20, 24);
+            _acrylicController.FallbackColor = WindowHelper.IsWindowsTransparencyEnabled()
+                ? global::Windows.UI.Color.FromArgb(
+                    (byte)Math.Round(120 + (_settings.MenuTintOpacity * 200)),
+                    20, 20, 24)
+                : WindowHelper.GetOpaqueThemeBackgroundColor();
         }
 
-        PanelBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(
-            (byte)Math.Round(_settings.MenuTintOpacity * 255), 255, 255, 255));
+        PanelBorder.Background = WindowHelper.IsWindowsTransparencyEnabled()
+            ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(
+                (byte)Math.Round(_settings.MenuTintOpacity * 255), 255, 255, 255))
+            : new SolidColorBrush(WindowHelper.GetOpaqueThemeBackgroundColor());
     }
 
     private int CalculateMenuHeight()
