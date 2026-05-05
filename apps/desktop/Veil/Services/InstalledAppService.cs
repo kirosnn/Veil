@@ -143,20 +143,36 @@ internal static class InstalledAppService
         {
             if (bestWindow == foregroundWindow)
             {
-                Launch(app);
                 return;
             }
 
-            if (IsIconic(bestWindow))
-            {
-                ShowWindowNative(bestWindow, SW_RESTORE);
-            }
-
-            SetForegroundWindow(bestWindow);
+            FocusExistingWindow(bestWindow);
             return;
         }
 
         Launch(app);
+    }
+
+    private static void FocusExistingWindow(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        if (IsIconic(hwnd))
+        {
+            ShowWindowNative(hwnd, SW_RESTORE);
+        }
+        else
+        {
+            SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        }
+
+        if (!SetForegroundWindow(hwnd))
+        {
+            BringWindowToTop(hwnd);
+        }
     }
 
     private static void AddApp(ICollection<InstalledApp> apps, JsonElement item)
