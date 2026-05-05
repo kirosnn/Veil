@@ -110,6 +110,7 @@ public sealed partial class MusicControlWindow : Window
         Activated -= OnFirstActivated;
 
         _hwnd = WindowHelper.GetHwnd(this);
+        ShowWindowNative(_hwnd, SW_HIDE);
         WindowHelper.RemoveTitleBar(this);
 
         int exStyle = GetWindowLongW(_hwnd, GWL_EXSTYLE);
@@ -123,7 +124,6 @@ public sealed partial class MusicControlWindow : Window
         WindowHelper.PrepareForSystemBackdrop(this);
         SetupAcrylic();
         BuildUI(0, 0);
-        ShowWindowNative(_hwnd, SW_HIDE);
     }
 
     private void SetupAcrylic()
@@ -135,7 +135,7 @@ public sealed partial class MusicControlWindow : Window
             TintColor = PanelGlassPalette.GetAcrylicTintColor(UseLightTheme),
             TintOpacity = PanelGlassPalette.GetAcrylicTintOpacity(UseLightTheme),
             LuminosityOpacity = PanelGlassPalette.GetAcrylicLuminosityOpacity(UseLightTheme),
-            FallbackColor = PanelGlassPalette.GetAcrylicFallbackColor(UseLightTheme)
+            FallbackColor = PanelGlassPalette.GetEffectiveFallbackColor(UseLightTheme)
         };
 
         _backdropConfig = new SystemBackdropConfiguration
@@ -146,7 +146,7 @@ public sealed partial class MusicControlWindow : Window
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
-        PanelBorder.Background = PanelGlassPalette.CreateFrameBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 10);
+        PanelBorder.Background = PanelGlassPalette.CreateEffectiveFrameBrush(UseLightTheme, lightAlpha: 24, darkAlpha: 10);
     }
 
     private PanelWindowMetrics BuildUI(int anchorRight, int anchorY)
@@ -158,7 +158,9 @@ public sealed partial class MusicControlWindow : Window
             CornerRadius = new CornerRadius(PanelCornerRadius),
             BorderThickness = new Thickness(0),
             Padding = new Thickness(0),
-            Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+            Background = WindowHelper.IsWindowsTransparencyEnabled()
+                ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0))
+                : new SolidColorBrush(WindowHelper.GetOpaqueThemeBackgroundColor()),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Stretch
         };
@@ -960,9 +962,15 @@ public sealed partial class MusicControlWindow : Window
 
     public void Initialize()
     {
-        var appWindow = WindowHelper.GetAppWindow(this);
-        appWindow.MoveAndResize(new global::Windows.Graphics.RectInt32(-9999, -9999, 1, 1));
+        var hwnd = WindowHelper.GetHwnd(this);
+        int cloak = 1;
+        DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
+
         Activate();
+
+        ShowWindowNative(hwnd, SW_HIDE);
+        cloak = 0;
+        DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
     }
 
     public void ShowAt(int x, int y)
