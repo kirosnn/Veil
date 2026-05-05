@@ -121,7 +121,15 @@ public sealed partial class FinderWindow : Window
 
     internal void Prewarm()
     {
+        var hwnd = WindowHelper.GetHwnd(this);
+        int cloak = 1;
+        DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
+
         Activate();
+
+        ShowWindowNative(hwnd, SW_HIDE);
+        cloak = 0;
+        DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
     }
 
     private void OnFirstActivated(object sender, WindowActivatedEventArgs args)
@@ -129,6 +137,7 @@ public sealed partial class FinderWindow : Window
         Activated -= OnFirstActivated;
 
         _hwnd = WindowHelper.GetHwnd(this);
+        ShowWindowNative(_hwnd, SW_HIDE);
         ConfigureWindowChrome();
         SetupAcrylic();
 
@@ -167,7 +176,9 @@ public sealed partial class FinderWindow : Window
             TintColor = global::Windows.UI.Color.FromArgb(255, 34, 40, 50),
             TintOpacity = 0.18f,
             LuminosityOpacity = 0.58f,
-            FallbackColor = global::Windows.UI.Color.FromArgb(216, 22, 27, 34)
+            FallbackColor = WindowHelper.IsWindowsTransparencyEnabled()
+                ? global::Windows.UI.Color.FromArgb(216, 22, 27, 34)
+                : WindowHelper.GetOpaqueThemeBackgroundColor()
         };
 
         _backdropConfig = new SystemBackdropConfiguration
@@ -178,8 +189,12 @@ public sealed partial class FinderWindow : Window
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
-        PanelBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, 255, 255, 255));
-        PanelBorder.BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, 255, 255, 255));
+        PanelBorder.Background = WindowHelper.IsWindowsTransparencyEnabled()
+            ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, 255, 255, 255))
+            : new SolidColorBrush(WindowHelper.GetOpaqueThemeBackgroundColor());
+        PanelBorder.BorderBrush = WindowHelper.IsWindowsTransparencyEnabled()
+            ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, 255, 255, 255))
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
     }
 
     internal void ShowCentered()
