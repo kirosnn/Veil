@@ -297,6 +297,11 @@ public sealed partial class TopBarWindow : Window
 
     private void ApplyTopBarPlacement(bool refreshAppBar)
     {
+        if (_isHiddenForFullscreen)
+        {
+            return;
+        }
+
         int height = GetBarHeightInPhysicalPixels();
 
         if (refreshAppBar && _appBarRegistered)
@@ -339,7 +344,7 @@ public sealed partial class TopBarWindow : Window
 
     private void MaintainAppBarNow()
     {
-        if (_hwnd == IntPtr.Zero || !_appBarRegistered)
+        if (_hwnd == IntPtr.Zero || !_appBarRegistered || _isHiddenForFullscreen)
         {
             return;
         }
