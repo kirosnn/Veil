@@ -17,8 +17,8 @@
                 VerticalScrollBarVisibility="Auto">
                 <StackPanel
                     x:Name="StatsPanel"
-                    Margin="14,12,14,12"
-                    Spacing="10" />
+                    Margin="10,8,10,8"
+                    Spacing="7" />
             </ScrollViewer>
         </Border>
     </Grid>
