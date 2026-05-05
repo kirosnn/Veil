@@ -9,6 +9,32 @@ internal sealed record AppShortcutSetting(string AppName, string AppId, string D
 internal sealed partial class AppSettings
 {
     internal const int MaxShortcutButtons = 6;
+    internal static readonly string[] DefaultSmartWindowFitExclusions =
+    [
+        "Veil",
+        "VeilTerminal",
+        "explorer",
+        "Shell_TrayWnd",
+        "Shell_SecondaryTrayWnd",
+        "Progman",
+        "WorkerW",
+        "DV2ControlHost",
+        "Windows.UI.Core.CoreWindow",
+        "ApplicationFrameWindow",
+        "#32768",
+        "#32770",
+        "Steam",
+        "steamwebhelper",
+        "EpicGamesLauncher",
+        "RiotClientServices",
+        "Battle.net",
+        "DiscordOverlayHost",
+        "GameOverlayUI",
+        "NVIDIA Share",
+        "setup",
+        "installer",
+        "msiexec"
+    ];
     private const double DefaultTopBarOpacity = 0.92;
     private const double MinimumVisibleTopBarOpacity = 0.04;
     private const double DefaultBlurIntensity = 0.15;
@@ -53,6 +79,11 @@ internal sealed partial class AppSettings
     private AppShortcutSetting?[] _shortcutButtons = new AppShortcutSetting?[MaxShortcutButtons];
     private int _topBarHeight = 34;
     private bool _hideOnFullscreen = true;
+    private bool _smartWindowFitEnabled;
+    private int _smartWindowFitMargin = 12;
+    private int _smartWindowFitDelayMilliseconds = 200;
+    private bool _smartWindowFitRespectManualResize = true;
+    private string[] _smartWindowFitExclusions = [.. DefaultSmartWindowFitExclusions];
 
     public static AppSettings Current => _current.Value;
 
