@@ -48,6 +48,11 @@ internal sealed partial class AppSettings
                 .ToArray(),
             TopBarHeight = _topBarHeight,
             HideOnFullscreen = _hideOnFullscreen,
+            SmartWindowFitEnabled = _smartWindowFitEnabled,
+            SmartWindowFitMargin = _smartWindowFitMargin,
+            SmartWindowFitDelayMilliseconds = _smartWindowFitDelayMilliseconds,
+            SmartWindowFitRespectManualResize = _smartWindowFitRespectManualResize,
+            SmartWindowFitExclusions = _smartWindowFitExclusions,
         };
 
         File.WriteAllText(_settingsPath, JsonSerializer.Serialize(payload, _jsonOptions));
@@ -111,6 +116,11 @@ internal sealed partial class AppSettings
                 settings._shortcutButtons = NormalizeShortcutButtons(dto.ShortcutButtons);
                 settings._topBarHeight = Math.Clamp(dto.TopBarHeight, 28, 60);
                 settings._hideOnFullscreen = dto.HideOnFullscreen;
+                settings._smartWindowFitEnabled = dto.SmartWindowFitEnabled;
+                settings._smartWindowFitMargin = Math.Clamp(dto.SmartWindowFitMargin, 0, 64);
+                settings._smartWindowFitDelayMilliseconds = Math.Clamp(dto.SmartWindowFitDelayMilliseconds, 50, 1000);
+                settings._smartWindowFitRespectManualResize = dto.SmartWindowFitRespectManualResize;
+                settings._smartWindowFitExclusions = NormalizeSmartWindowFitExclusions(dto.SmartWindowFitExclusions);
                 if (requiresSave)
                 {
                     settings.Save();
@@ -156,6 +166,11 @@ internal sealed partial class AppSettings
         public AppShortcutDto?[]? ShortcutButtons { get; set; }
         public int TopBarHeight { get; set; } = 34;
         public bool HideOnFullscreen { get; set; } = true;
+        public bool SmartWindowFitEnabled { get; set; }
+        public int SmartWindowFitMargin { get; set; } = 12;
+        public int SmartWindowFitDelayMilliseconds { get; set; } = 200;
+        public bool SmartWindowFitRespectManualResize { get; set; } = true;
+        public string[]? SmartWindowFitExclusions { get; set; }
     }
 
     private sealed class AppShortcutDto
