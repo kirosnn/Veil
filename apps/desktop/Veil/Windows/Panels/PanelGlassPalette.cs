@@ -1,5 +1,6 @@
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml.Media;
+using Veil.Interop;
 
 namespace Veil.Windows;
 
@@ -27,6 +28,20 @@ internal static class PanelGlassPalette
         return useLightTheme
             ? global::Windows.UI.Color.FromArgb(216, 255, 255, 255)
             : global::Windows.UI.Color.FromArgb(214, 22, 27, 34);
+    }
+
+    internal static global::Windows.UI.Color GetEffectiveFallbackColor(bool useLightTheme)
+    {
+        return WindowHelper.IsWindowsTransparencyEnabled()
+            ? GetAcrylicFallbackColor(useLightTheme)
+            : WindowHelper.GetOpaqueThemeBackgroundColor();
+    }
+
+    internal static SolidColorBrush CreateEffectiveFrameBrush(bool useLightTheme, byte lightAlpha = 38, byte darkAlpha = 16)
+    {
+        return WindowHelper.IsWindowsTransparencyEnabled()
+            ? CreateFrameBrush(useLightTheme, lightAlpha, darkAlpha)
+            : new SolidColorBrush(WindowHelper.GetOpaqueThemeBackgroundColor());
     }
 
     internal static SystemBackdropTheme GetBackdropTheme(bool useLightTheme)
