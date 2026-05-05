@@ -11,6 +11,9 @@ internal static partial class NativeMethods
     internal const uint GA_ROOT = 2;
     internal const uint GA_ROOTOWNER = 3;
 
+    internal const int WS_DISABLED = 0x08000000;
+    internal const int WS_VISIBLE = 0x10000000;
+    internal const int WS_CHILD = 0x40000000;
     internal const int WS_THICKFRAME = 0x00040000;
     internal const int WS_BORDER = 0x00800000;
     internal const int WS_CAPTION = 0x00C00000;
@@ -36,7 +39,13 @@ internal static partial class NativeMethods
     internal const uint SWP_SHOWWINDOW = 0x0040;
     internal const uint SWP_FRAMECHANGED = 0x0020;
 
+    internal const uint EVENT_OBJECT_SHOW = 0x8002;
+    internal const int OBJID_WINDOW = 0;
+    internal const uint WINEVENT_OUTOFCONTEXT = 0x0000;
+    internal const uint WINEVENT_SKIPOWNPROCESS = 0x0002;
+
     internal static readonly IntPtr HWND_BOTTOM = new(1);
+    internal static readonly IntPtr HWND_TOP = new(0);
     internal static readonly IntPtr HWND_TOPMOST = new(-1);
 
     internal const uint ABM_NEW = 0x00000000;
@@ -64,6 +73,14 @@ internal static partial class NativeMethods
 
     internal delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref Rect lprcMonitor, IntPtr dwData);
     internal delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+    internal delegate void WinEventProc(
+        IntPtr hWinEventHook,
+        uint eventType,
+        IntPtr hwnd,
+        int idObject,
+        int idChild,
+        uint dwEventThread,
+        uint dwmsEventTime);
 
     [LibraryImport("user32.dll")]
     internal static partial IntPtr GetForegroundWindow();
@@ -107,6 +124,20 @@ internal static partial class NativeMethods
         IntPtr hWndInsertAfter,
         int x, int y, int cx, int cy,
         uint uFlags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern IntPtr SetWinEventHook(
+        uint eventMin,
+        uint eventMax,
+        IntPtr hmodWinEventProc,
+        WinEventProc lpfnWinEventProc,
+        uint idProcess,
+        uint idThread,
+        uint dwFlags);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool UnhookWinEvent(IntPtr hWinEventHook);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
