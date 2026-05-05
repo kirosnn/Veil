@@ -43,6 +43,9 @@
                         <Button x:Name="OptimizationSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="Optimization" Click="OnSectionButtonClick">
                             <TextBlock Text="Optimization" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
                         </Button>
+                        <Button x:Name="WindowManagementSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="WindowManagement" Click="OnSectionButtonClick">
+                            <TextBlock Text="Windows" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
+                        </Button>
                         <Button x:Name="RunCatSectionButton" Height="34" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Padding="12,0" CornerRadius="8" BorderThickness="0" Background="Transparent" IsTabStop="False" Tag="RunCat" Click="OnSectionButtonClick">
                             <TextBlock Text="RunCat" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="#B0FFFFFF" VerticalAlignment="Center" />
                         </Button>
@@ -369,6 +372,71 @@
                                             </StackPanel>
                                             <Button x:Name="BackgroundOptimizationEnabledButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnBackgroundOptimizationEnabledButtonClick" Content="Enabled" />
                                         </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid x:Name="WindowManagementSectionPanel" Visibility="Collapsed" HorizontalAlignment="Stretch">
+                            <StackPanel Spacing="16">
+                                <StackPanel Spacing="4" Margin="0,0,0,4">
+                                    <TextBlock Text="Window Management" FontSize="20" FontFamily="{StaticResource SfDisplaySemibold}" Foreground="White" />
+                                    <TextBlock Text="Shape newly opened app windows around Veil and the current monitor work area." TextWrapping="WrapWholeWords" FontSize="12" FontFamily="{StaticResource SfTextRegular}" Foreground="#90FFFFFF" />
+                                </StackPanel>
+
+                                <Border Background="#0CFFFFFF" CornerRadius="12" Padding="16,14">
+                                    <StackPanel Spacing="14">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="Smart Window Fit" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock Text="Automatically open supported windows in a large centered restored size." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
+                                            </StackPanel>
+                                            <Button x:Name="SmartWindowFitEnabledButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnSmartWindowFitEnabledButtonClick" Content="Disabled" />
+                                        </Grid>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <TextBlock Text="Margin" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock x:Name="SmartWindowFitMarginValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
+                                            </Grid>
+                                            <Slider x:Name="SmartWindowFitMarginSlider" IsTabStop="False" ValueChanged="OnSmartWindowFitMarginChanged" />
+                                        </StackPanel>
+
+                                        <StackPanel Spacing="6">
+                                            <Grid>
+                                                <TextBlock Text="Apply Delay" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock x:Name="SmartWindowFitDelayValueText" HorizontalAlignment="Right" FontSize="13" FontFamily="{StaticResource SfTextRegular}" Foreground="#80FFFFFF" />
+                                            </Grid>
+                                            <Slider x:Name="SmartWindowFitDelaySlider" IsTabStop="False" ValueChanged="OnSmartWindowFitDelayChanged" />
+                                        </StackPanel>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="Respect manually resized windows" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                                <TextBlock Text="Avoid applying the fit repeatedly to a window after it has already been handled." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
+                                            </StackPanel>
+                                            <Button x:Name="SmartWindowFitRespectManualResizeButton" Grid.Column="1" Width="80" Height="30" VerticalAlignment="Center" CornerRadius="8" BorderThickness="0" FontFamily="{StaticResource SfTextMedium}" FontSize="12" IsTabStop="False" Click="OnSmartWindowFitRespectManualResizeButtonClick" Content="Enabled" />
+                                        </Grid>
+
+                                        <Border Height="1" Background="#08FFFFFF" />
+
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Excluded processes and classes" FontSize="13" FontFamily="{StaticResource SfTextMedium}" Foreground="White" />
+                                            <TextBox x:Name="SmartWindowFitExclusionsTextBox" AcceptsReturn="True" TextWrapping="NoWrap" MinHeight="120" FontFamily="{StaticResource SfTextRegular}" FontSize="12" LostFocus="OnSmartWindowFitExclusionsLostFocus" />
+                                            <TextBlock Text="Fixed-size windows, games, fullscreen apps, popups and dialogs are ignored." FontSize="11" FontFamily="{StaticResource SfTextRegular}" Foreground="#70FFFFFF" TextWrapping="WrapWholeWords" />
+                                        </StackPanel>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
