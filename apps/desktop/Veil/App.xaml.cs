@@ -12,6 +12,7 @@ public partial class App : Application
 {
     private readonly AppSettings _settings;
     private readonly VeilOptimizationService _veilOptimizationService = new();
+    private readonly SmartWindowFitService _smartWindowFitService;
     private readonly Dictionary<string, TopBarWindow> _topBarWindows = new(StringComparer.OrdinalIgnoreCase);
     private DesktopIconVisibilityService? _desktopIconVisibilityService;
     private DesktopContextMenuService? _desktopContextMenu;
@@ -30,6 +31,7 @@ public partial class App : Application
     {
         InitializeComponent();
         _settings = AppSettings.Current;
+        _smartWindowFitService = new SmartWindowFitService(_settings);
         UnhandledException += OnUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnCurrentDomainUnhandledException;
         _settings.Changed += OnSettingsChanged;
@@ -53,20 +55,12 @@ public partial class App : Application
                 AppLogger.Error("Failed to persist settings during launch.", ex);
             }
 
-            if (!StartupService.IsEnabled())
-            {
-                try
-                {
-                    StartupService.Enable();
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Error("Failed to enable startup registration.", ex);
-                }
-            }
-
             _desktopIconVisibilityService = new DesktopIconVisibilityService(new WindowsDesktopIconVisibilityBridge());
             _desktopIconVisibilityService.ApplyLaunchState();
+
+            SyncTopBarWindows(true);
+            StartMonitorRefresh();
+            _ = EnsureStartupRegistrationAsync();
 
             _trayIcon = new TrayIconService();
             _trayIcon.ShowRequested += OnTrayShowRequested;
@@ -75,9 +69,8 @@ public partial class App : Application
             _trayIcon.Initialize();
 
             InitializeAltTabSwitcher();
+            _smartWindowFitService.Start();
             _ = InstalledAppService.PreloadAsync();
-            SyncTopBarWindows(true);
-            StartMonitorRefresh();
 
             if (_settings.IsFirstLaunch)
             {
@@ -99,6 +92,24 @@ public partial class App : Application
             AppLogger.Error("Fatal error during launch.", ex);
             throw;
         }
+    }
+
+    private static Task EnsureStartupRegistrationAsync()
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                if (!StartupService.IsEnabled())
+                {
+                    StartupService.Enable();
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("Failed to enable startup registration.", ex);
+            }
+        });
     }
 
     private static void EnsureWorkingDirectory()
@@ -211,6 +222,7 @@ public partial class App : Application
         _monitorRefreshTimer?.Stop();
         _monitorRefreshTimer = null;
         DisposeAltTabSwitcher();
+        _smartWindowFitService.Dispose();
         _desktopContextMenu?.Dispose();
         _desktopContextMenu = null;
         _trayIcon?.Dispose();
@@ -226,6 +238,7 @@ public partial class App : Application
 
     private void OnSettingsChanged()
     {
+        _smartWindowFitService.ApplySettings();
         SyncTopBarWindows();
     }
 
