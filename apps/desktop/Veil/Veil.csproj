@@ -19,7 +19,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260101001" />
-<PackageReference Include="System.Diagnostics.PerformanceCounter" Version="9.0.4" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="9.0.4" />
   </ItemGroup>
 
   <ItemGroup>
