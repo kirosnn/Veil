@@ -183,11 +183,53 @@ public sealed partial class TopBarWindow
             DeleteObject(region);
         }
 
-        var compositor = new global::Windows.UI.Composition.Compositor();
-        var transparentBrush = compositor.CreateColorBrush(
-            global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
-        var target = this.As<ICompositionSupportsSystemBackdrop>();
-        target.SystemBackdrop = transparentBrush;
+        try
+        {
+            var compositor = new Compositor();
+            var transparentBrush = compositor.CreateColorBrush(
+                global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
+            var target = this.As<ICompositionSupportsSystemBackdrop>();
+            target.SystemBackdrop = transparentBrush;
+            _transparentBackdropRetryTimer?.Stop();
+            _transparentBackdropRetryTimer = null;
+            _transparentBackdropRetryCount = 0;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            AppLogger.Info($"Transparent backdrop skipped during early activation for {_monitorId}: {ex.Message}");
+            ScheduleTransparentBackdropRetry();
+        }
+    }
+
+    private void ScheduleTransparentBackdropRetry()
+    {
+        if (_hwnd == IntPtr.Zero || _transparentBackdropRetryTimer is not null || _transparentBackdropRetryCount >= 12)
+        {
+            return;
+        }
+
+        _transparentBackdropRetryCount++;
+        _transparentBackdropRetryTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(Math.Min(1000, 120 + (_transparentBackdropRetryCount * 120)))
+        };
+        _transparentBackdropRetryTimer.Tick += OnTransparentBackdropRetryTick;
+        _transparentBackdropRetryTimer.Start();
+    }
+
+    private void OnTransparentBackdropRetryTick(object? sender, object e)
+    {
+        _transparentBackdropRetryTimer?.Stop();
+        _transparentBackdropRetryTimer = null;
+
+        if (_settings.TopBarStyle != "Transparent"
+            && !(_settings.TopBarStyle == "Adaptive" && _isAdaptiveClearModeActive))
+        {
+            return;
+        }
+
+        EnsureTransparentBackdrop();
+        RootPanel.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
     }
 
     private SolidColorBrush CreateBlurBackgroundBrush()
