@@ -36,6 +36,7 @@ internal static partial class NativeMethods
     internal const uint SWP_SHOWWINDOW = 0x0040;
     internal const uint SWP_FRAMECHANGED = 0x0020;
 
+    internal static readonly IntPtr HWND_BOTTOM = new(1);
     internal static readonly IntPtr HWND_TOPMOST = new(-1);
 
     internal const uint ABM_NEW = 0x00000000;
@@ -318,6 +319,7 @@ internal static partial class NativeMethods
     [LibraryImport("gdi32.dll")]
     internal static partial IntPtr CreateSolidBrush(uint crColor);
 
+    internal const int DWMWA_CLOAK = 13;
     internal const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     internal const int DWMWCP_DONOTROUND = 1;
     internal const int DWMWCP_ROUND = 2;
@@ -593,6 +595,11 @@ internal static partial class NativeMethods
     internal const uint NIM_ADD = 0x00000000;
     internal const uint NIM_MODIFY = 0x00000001;
     internal const uint NIM_DELETE = 0x00000002;
+    internal const uint NIM_SETVERSION = 0x00000004;
+    internal const uint NOTIFYICON_VERSION_4 = 4;
+    internal const uint IMAGE_ICON = 1;
+    internal const uint LR_DEFAULTSIZE = 0x00000040;
+    internal const uint LR_LOADFROMFILE = 0x00000010;
 
     internal const uint MF_STRING = 0x00000000;
     internal const uint MF_SEPARATOR = 0x00000800;
@@ -634,6 +641,16 @@ internal static partial class NativeMethods
         public IntPtr hIcon;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
         public string szTip;
+        public uint dwState;
+        public uint dwStateMask;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public string szInfo;
+        public uint uVersion;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        public string szInfoTitle;
+        public uint dwInfoFlags;
+        public Guid guidItem;
+        public IntPtr hBalloonIcon;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -751,6 +768,18 @@ internal static partial class NativeMethods
         [Out] IntPtr[]? phiconLarge,
         [Out] IntPtr[]? phiconSmall,
         uint nIcons);
+
+    [DllImport("user32.dll", EntryPoint = "LoadImageW", CharSet = CharSet.Unicode)]
+    internal static extern IntPtr LoadImageW(
+        IntPtr hinst,
+        string lpszName,
+        uint uType,
+        int cxDesired,
+        int cyDesired,
+        uint fuLoad);
+
+    [LibraryImport("user32.dll", EntryPoint = "RegisterWindowMessageW", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial uint RegisterWindowMessageW(string lpString);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
