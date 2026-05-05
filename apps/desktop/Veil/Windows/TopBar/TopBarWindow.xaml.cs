@@ -89,11 +89,14 @@ public sealed partial class TopBarWindow : Window
     private string _lastWindowRegionSignature = string.Empty;
     private int _lastAppliedBarHeight;
     private DispatcherTimer? _heightPlacementDebounce;
+    private DispatcherTimer? _transparentBackdropRetryTimer;
     private double _lastKnownClockWidth = MinimumClockClearance;
     private string _lastClockText = string.Empty;
     private string _lastSettingsSignature = string.Empty;
     private string _lastShortcutGlassBlurRegionSignature = string.Empty;
     private DateTime _appBarMaintenanceBoostUntilUtc = DateTime.MinValue;
+    private int _transparentBackdropRetryCount;
+    private bool _deferredFeaturesInitialized;
     private bool _rightButtonsExpanded = true;
     private bool _isAdaptiveClearModeActive;
     private bool _hasAdaptiveModeState;
@@ -177,7 +180,6 @@ public sealed partial class TopBarWindow : Window
 
         _hwnd = WindowHelper.GetHwnd(this);
 
-        ShowWindowNative(_hwnd, SW_HIDE);
         WindowHelper.RemoveTitleBar(this);
         WindowHelper.ExtendFrameIntoClientArea(this);
         WindowHelper.MakeOverlay(this);
@@ -185,21 +187,27 @@ public sealed partial class TopBarWindow : Window
         ApplyTopBarPlacement(true);
         BoostAppBarMaintenance();
         ApplySettings();
-
         RebuildShortcutButtons();
+        ApplyTopBarRole();
+        RootPanel.Opacity = 1;
+        ShowWindowNative(_hwnd, SW_SHOWNOACTIVATE);
+        _startHiddenUntilReady = false;
+
+        DispatcherQueue.TryEnqueue(InitializeDeferredFeatures);
+    }
+
+    private void InitializeDeferredFeatures()
+    {
+        _deferredFeaturesInitialized = true;
         _ = InstalledAppService.PreloadAsync();
         _ = ApplyRunCatSettingsAsync();
         _ = InitMediaControlAsync();
         _ = InitDiscordNotificationsAsync();
         ApplyHotkeyOwnership();
-        ApplyTopBarRole();
         UpdateVisualRefreshState(boost: true);
         UpdateDiscordDemand(boost: true);
         UpdateBackgroundMaintenanceState(boost: true);
-        DispatcherQueue.TryEnqueue(PrewarmTransientWindows);
-        RootPanel.Opacity = 1;
-        ShowWindowNative(_hwnd, SW_SHOWNOACTIVATE);
-        _startHiddenUntilReady = false;
+        PrewarmTransientWindows();
     }
 
     private void OnClosed(object sender, WindowEventArgs args)
@@ -209,6 +217,8 @@ public sealed partial class TopBarWindow : Window
         _visualTimer.Stop();
         _appBarMaintenanceTimer.Stop();
         _backgroundMaintenanceTimer.Stop();
+        _transparentBackdropRetryTimer?.Stop();
+        _transparentBackdropRetryTimer = null;
         _settings.Changed -= OnSettingsChanged;
         _mediaControlService.StateChanged -= OnMediaStateChanged;
         _discordNotificationService.NotificationsChanged -= OnDiscordNotificationsChanged;
