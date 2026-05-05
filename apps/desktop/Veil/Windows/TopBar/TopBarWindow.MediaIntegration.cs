@@ -211,6 +211,13 @@ public sealed partial class TopBarWindow
 
     private async Task ApplyRunCatSettingsAsync()
     {
+        if (!_deferredFeaturesInitialized)
+        {
+            RunCatButton.Visibility = Visibility.Collapsed;
+            ApplyRightButtonsToggleState();
+            return;
+        }
+
         bool shouldRun = !_isHiddenForFullscreen && _ownsGlobalHotkeys && _settings.RunCatEnabled;
         string runner = _settings.RunCatRunner;
         int loadVersion = ++_runCatLoadVersion;
