@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
 namespace Veil.Services;
 
@@ -9,9 +10,12 @@ internal static partial class GraphicsMemoryMonitor
     private const uint DXGI_ERROR_NOT_FOUND = 0x887A0002;
     private const uint DXGI_ADAPTER_FLAG_SOFTWARE = 0x2;
     private const ulong MinimumMeaningfulSegmentBudgetBytes = 256UL * 1024 * 1024;
+    private const ulong MinimumFallbackAdapterUsageBytes = 16UL * 1024 * 1024;
     private static readonly TimeSpan AdapterCacheDuration = TimeSpan.FromMilliseconds(900);
     private static readonly TimeSpan EngineUsageCacheDuration = TimeSpan.FromMilliseconds(1200);
     private static readonly TimeSpan EngineCounterRefreshInterval = TimeSpan.FromSeconds(15);
+    private static readonly ulong FallbackAdapterBudgetBytes = 1024UL * 1024 * 1024;
+    private static readonly ulong FallbackAdapterBudgetStepBytes = 1024UL * 1024 * 1024;
     private static readonly object SyncRoot = new();
     private static DateTime _lastAdapterCacheUtc = DateTime.MinValue;
     private static List<AdapterTelemetry>? _cachedAdapters;
@@ -26,34 +30,91 @@ internal static partial class GraphicsMemoryMonitor
         ulong TotalBytes,
         double MemoryUsagePercent,
         double EngineUsagePercent,
-        bool IsIntegrated);
+        bool IsIntegrated,
+        double? TemperatureCelsius);
 
     internal static List<GpuInfo> GetAllGpuInfo()
     {
         List<AdapterTelemetry> adapters = EnumerateAdapters();
         if (adapters.Count == 0)
         {
-            return [];
+            adapters = GetFallbackAdapterTelemetryFromCounters();
+            if (adapters.Count == 0)
+            {
+                return GetSensorOnlyGpuInfo();
+            }
         }
 
+        HardwareSensorMonitor.HardwareSnapshot sensorSnapshot = HardwareSensorMonitor.GetSnapshot();
         IReadOnlyDictionary<long, double> engineUsageByLuid = GetEngineUsageByLuid();
         var results = new List<GpuInfo>(adapters.Count);
 
         foreach (AdapterTelemetry adapter in adapters)
         {
-            double memoryUsagePercent = adapter.TotalBytes > 0
-                ? (double)adapter.UsedBytes / adapter.TotalBytes * 100
+            HardwareSensorMonitor.GpuSensorInfo? sensorInfo = FindMatchingGpuSensor(adapter.Name, sensorSnapshot.Gpus);
+            ulong usedBytes = sensorInfo?.UsedMemoryBytes ?? adapter.UsedBytes;
+            ulong totalBytes = sensorInfo?.TotalMemoryBytes ?? adapter.TotalBytes;
+            if (totalBytes < usedBytes)
+            {
+                totalBytes = adapter.TotalBytes >= usedBytes
+                    ? adapter.TotalBytes
+                    : EstimateFallbackAdapterBudget(usedBytes);
+            }
+
+            double memoryUsagePercent = totalBytes > 0
+                ? (double)usedBytes / totalBytes * 100
                 : 0;
 
             engineUsageByLuid.TryGetValue(adapter.Luid, out double engineUsagePercent);
+            if (sensorInfo?.LoadPercent is double sensorLoadPercent)
+            {
+                engineUsagePercent = sensorLoadPercent;
+            }
 
             results.Add(new GpuInfo(
                 adapter.Name,
-                adapter.UsedBytes,
-                adapter.TotalBytes,
+                usedBytes,
+                totalBytes,
                 Math.Clamp(memoryUsagePercent, 0, 100),
                 Math.Clamp(engineUsagePercent, 0, 100),
-                adapter.IsIntegrated));
+                sensorInfo?.IsIntegrated ?? adapter.IsIntegrated,
+                sensorInfo?.TemperatureCelsius));
+        }
+
+        return results
+            .OrderBy(static gpu => gpu.IsIntegrated)
+            .ThenByDescending(static gpu => gpu.EngineUsagePercent)
+            .ThenByDescending(static gpu => gpu.MemoryUsagePercent)
+            .ThenBy(static gpu => gpu.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static List<GpuInfo> GetSensorOnlyGpuInfo()
+    {
+        HardwareSensorMonitor.HardwareSnapshot snapshot = HardwareSensorMonitor.GetSnapshot();
+        var results = new List<GpuInfo>(snapshot.Gpus.Count);
+
+        foreach (HardwareSensorMonitor.GpuSensorInfo gpu in snapshot.Gpus)
+        {
+            ulong usedBytes = gpu.UsedMemoryBytes ?? 0;
+            ulong totalBytes = gpu.TotalMemoryBytes ?? 0;
+            if (totalBytes < usedBytes)
+            {
+                totalBytes = EstimateFallbackAdapterBudget(usedBytes);
+            }
+
+            double memoryUsagePercent = totalBytes > 0
+                ? (double)usedBytes / totalBytes * 100
+                : 0;
+
+            results.Add(new GpuInfo(
+                gpu.Name,
+                usedBytes,
+                totalBytes,
+                Math.Clamp(memoryUsagePercent, 0, 100),
+                Math.Clamp(gpu.LoadPercent ?? 0, 0, 100),
+                gpu.IsIntegrated ?? IsIntegratedGpuName(gpu.Name),
+                gpu.TemperatureCelsius));
         }
 
         return results
@@ -70,7 +131,11 @@ internal static partial class GraphicsMemoryMonitor
         List<AdapterTelemetry> adapters = EnumerateAdapters();
         if (adapters.Count == 0)
         {
-            return false;
+            adapters = GetFallbackAdapterTelemetryFromCounters();
+            if (adapters.Count == 0)
+            {
+                return false;
+            }
         }
 
         double worstRatio = double.PositiveInfinity;
@@ -187,8 +252,8 @@ internal static partial class GraphicsMemoryMonitor
 
     private static bool TryCreateAdapterTelemetry(IDXGIAdapter1 adapter, DXGI_ADAPTER_DESC1 desc, out AdapterTelemetry telemetry)
     {
-        bool isIntegrated = desc.DedicatedVideoMemory == 0;
         string name = desc.Description?.Trim('\0').Trim() ?? "GPU";
+        bool isIntegrated = IsIntegratedAdapter(desc, name);
 
         if (!TryGetAdapterMemorySnapshot(adapter, desc, out AdapterMemorySnapshot snapshot))
         {
@@ -454,7 +519,8 @@ internal static partial class GraphicsMemoryMonitor
             }
         }
 
-        bool isIntegratedAdapter = desc.DedicatedVideoMemory == 0;
+        string adapterName = desc.Description?.Trim('\0').Trim() ?? string.Empty;
+        bool isIntegratedAdapter = IsIntegratedAdapter(desc, adapterName);
         ulong totalBudget;
         ulong totalUsage;
 
@@ -510,6 +576,302 @@ internal static partial class GraphicsMemoryMonitor
     }
 
     private readonly record struct AdapterMemorySnapshot(ulong UsedBytes, ulong TotalBytes, double FreeRatio);
+
+    private readonly record struct AdapterCounterSnapshot(string Name)
+    {
+        public ulong DedicatedUsageBytes { get; init; }
+        public ulong SharedUsageBytes { get; init; }
+        public ulong TotalCommittedBytes { get; init; }
+    }
+
+    private static bool IsIntegratedAdapter(DXGI_ADAPTER_DESC1 desc, string name)
+    {
+        if (desc.DedicatedVideoMemory == 0)
+        {
+            return true;
+        }
+
+        return IsIntegratedGpuName(name);
+    }
+
+    private static bool IsIntegratedGpuName(string name)
+    {
+        string normalizedName = name.Trim();
+        if (normalizedName.Contains("Intel", StringComparison.OrdinalIgnoreCase)
+            && (normalizedName.Contains("UHD", StringComparison.OrdinalIgnoreCase)
+                || normalizedName.Contains("Iris", StringComparison.OrdinalIgnoreCase)
+                || normalizedName.Contains("Xe", StringComparison.OrdinalIgnoreCase)
+                || normalizedName.Contains("Graphics", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        if (normalizedName.Contains("AMD Radeon", StringComparison.OrdinalIgnoreCase)
+            && normalizedName.Contains("Graphics", StringComparison.OrdinalIgnoreCase)
+            && !normalizedName.Contains("RX", StringComparison.OrdinalIgnoreCase)
+            && !normalizedName.Contains("Pro", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (normalizedName.Contains("Radeon 780M", StringComparison.OrdinalIgnoreCase)
+            || normalizedName.Contains("Radeon 760M", StringComparison.OrdinalIgnoreCase)
+            || normalizedName.Contains("Radeon 740M", StringComparison.OrdinalIgnoreCase)
+            || normalizedName.Contains("Radeon 680M", StringComparison.OrdinalIgnoreCase)
+            || normalizedName.Contains("Radeon 660M", StringComparison.OrdinalIgnoreCase)
+            || normalizedName.Contains("Radeon Vega", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static HardwareSensorMonitor.GpuSensorInfo? FindMatchingGpuSensor(
+        string adapterName,
+        IReadOnlyList<HardwareSensorMonitor.GpuSensorInfo> sensorGpus)
+    {
+        if (sensorGpus.Count == 0)
+        {
+            return null;
+        }
+
+        string normalizedAdapterName = NormalizeGpuNameForMatching(adapterName);
+        HardwareSensorMonitor.GpuSensorInfo? exactMatch = sensorGpus.FirstOrDefault(gpu =>
+            NormalizeGpuNameForMatching(gpu.Name) == normalizedAdapterName);
+        if (exactMatch != null)
+        {
+            return exactMatch;
+        }
+
+        return sensorGpus.FirstOrDefault(gpu =>
+        {
+            string normalizedSensorName = NormalizeGpuNameForMatching(gpu.Name);
+            return normalizedAdapterName.Contains(normalizedSensorName, StringComparison.OrdinalIgnoreCase) ||
+                normalizedSensorName.Contains(normalizedAdapterName, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    private static string NormalizeGpuNameForMatching(string name)
+    {
+        return name
+            .Replace("(R)", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("(TM)", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("GPU", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("Graphics", "Graphics", StringComparison.OrdinalIgnoreCase)
+            .Replace("  ", " ")
+            .Replace("  ", " ")
+            .Trim()
+            .ToUpperInvariant();
+    }
+
+    private static List<AdapterTelemetry> GetFallbackAdapterTelemetryFromCounters()
+    {
+        var snapshotsByLuid = new Dictionary<long, AdapterCounterSnapshot>();
+
+        AddAdapterCounterSamples("Dedicated Usage", snapshotsByLuid);
+        AddAdapterCounterSamples("Shared Usage", snapshotsByLuid);
+        AddAdapterCounterSamples("Total Committed", snapshotsByLuid);
+
+        string[] adapterNames = GetFallbackAdapterNames();
+        int adapterNameIndex = 0;
+        var results = new List<AdapterTelemetry>(snapshotsByLuid.Count);
+
+        foreach ((long luid, AdapterCounterSnapshot snapshot) in snapshotsByLuid
+            .OrderByDescending(static pair => Math.Max(
+                pair.Value.TotalCommittedBytes,
+                pair.Value.DedicatedUsageBytes + pair.Value.SharedUsageBytes)))
+        {
+            ulong usedBytes = snapshot.TotalCommittedBytes > 0
+                ? snapshot.TotalCommittedBytes
+                : snapshot.DedicatedUsageBytes + snapshot.SharedUsageBytes;
+
+            if (usedBytes < MinimumFallbackAdapterUsageBytes)
+            {
+                continue;
+            }
+
+            string name = adapterNameIndex < adapterNames.Length
+                ? adapterNames[adapterNameIndex++]
+                : snapshot.Name;
+
+            ulong totalBytes = EstimateFallbackAdapterBudget(usedBytes);
+            double freeRatio = totalBytes > usedBytes
+                ? (double)(totalBytes - usedBytes) / totalBytes
+                : 0;
+
+            results.Add(new AdapterTelemetry(
+                luid,
+                name,
+                usedBytes,
+                totalBytes,
+                Math.Clamp(freeRatio, 0.0, 1.0),
+                true,
+                1));
+        }
+
+        return results;
+    }
+
+    private static ulong EstimateFallbackAdapterBudget(ulong usedBytes)
+    {
+        if (usedBytes <= FallbackAdapterBudgetBytes)
+        {
+            return FallbackAdapterBudgetBytes;
+        }
+
+        ulong steps = (usedBytes + FallbackAdapterBudgetStepBytes - 1) / FallbackAdapterBudgetStepBytes;
+        return Math.Max(FallbackAdapterBudgetBytes, steps * FallbackAdapterBudgetStepBytes);
+    }
+
+    private static string[] GetFallbackAdapterNames()
+    {
+        var names = new List<string>();
+
+        try
+        {
+            using RegistryKey? pciKey = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Enum\PCI");
+            if (pciKey == null)
+            {
+                return [];
+            }
+
+            foreach (string deviceKeyName in pciKey.GetSubKeyNames())
+            {
+                using RegistryKey? deviceKey = pciKey.OpenSubKey(deviceKeyName);
+                if (deviceKey == null)
+                {
+                    continue;
+                }
+
+                foreach (string instanceKeyName in deviceKey.GetSubKeyNames())
+                {
+                    using RegistryKey? instanceKey = deviceKey.OpenSubKey(instanceKeyName);
+                    if (instanceKey == null)
+                    {
+                        continue;
+                    }
+
+                    if (!IsDisplayRegistryDevice(instanceKey))
+                    {
+                        continue;
+                    }
+
+                    string name = NormalizeRegistryDeviceName(
+                        instanceKey.GetValue("FriendlyName") as string
+                        ?? instanceKey.GetValue("DeviceDesc") as string);
+
+                    if (string.IsNullOrWhiteSpace(name) ||
+                        names.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    names.Add(name);
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return names.ToArray();
+    }
+
+    private static bool IsDisplayRegistryDevice(RegistryKey instanceKey)
+    {
+        string? className = instanceKey.GetValue("Class") as string;
+        if (string.Equals(className, "Display", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        string? classGuid = instanceKey.GetValue("ClassGUID") as string;
+        if (string.Equals(classGuid, "{4d36e968-e325-11ce-bfc1-08002be10318}", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (instanceKey.GetValue("HardwareID") is string[] hardwareIds)
+        {
+            return hardwareIds.Any(static hardwareId =>
+                hardwareId.Contains("&CC_0300", StringComparison.OrdinalIgnoreCase) ||
+                hardwareId.Contains("&CC_0302", StringComparison.OrdinalIgnoreCase));
+        }
+
+        return false;
+    }
+
+    private static string NormalizeRegistryDeviceName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string name = value.Trim();
+        int separatorIndex = name.LastIndexOf(';');
+        if (separatorIndex >= 0 && separatorIndex + 1 < name.Length)
+        {
+            name = name[(separatorIndex + 1)..].Trim();
+        }
+
+        return name.Replace(" (TM)", "(TM)", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void AddAdapterCounterSamples(string counterName, Dictionary<long, AdapterCounterSnapshot> snapshotsByLuid)
+    {
+        try
+        {
+            var category = new PerformanceCounterCategory("GPU Adapter Memory");
+            foreach (string instanceName in category.GetInstanceNames())
+            {
+                if (!TryParseLuidFromGpuEngineInstance(instanceName, out long luid))
+                {
+                    continue;
+                }
+
+                ulong value;
+                try
+                {
+                    using var counter = new PerformanceCounter("GPU Adapter Memory", counterName, instanceName, readOnly: true);
+                    long rawValue = counter.RawValue;
+                    value = rawValue > 0 ? (ulong)rawValue : 0;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                snapshotsByLuid.TryGetValue(luid, out AdapterCounterSnapshot snapshot);
+                snapshot = string.IsNullOrWhiteSpace(snapshot.Name)
+                    ? new AdapterCounterSnapshot($"GPU Adapter {FormatLuid(luid)}")
+                    : snapshot;
+
+                snapshot = counterName switch
+                {
+                    "Dedicated Usage" => snapshot with { DedicatedUsageBytes = value },
+                    "Shared Usage" => snapshot with { SharedUsageBytes = value },
+                    "Total Committed" => snapshot with { TotalCommittedBytes = value },
+                    _ => snapshot
+                };
+
+                snapshotsByLuid[luid] = snapshot;
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static string FormatLuid(long luid)
+    {
+        ulong value = unchecked((ulong)luid);
+        uint high = (uint)(value >> 32);
+        uint low = (uint)(value & 0xffffffff);
+        return $"0x{high:x8}:0x{low:x8}";
+    }
+
     private readonly record struct AdapterTelemetry(
         long Luid,
         string Name,
@@ -542,6 +904,24 @@ internal static partial class GraphicsMemoryMonitor
         public nuint SharedSystemMemory;
         public long AdapterLuid;
         public uint Flags;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DXGI_ADAPTER_DESC2
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string Description;
+        public uint VendorId;
+        public uint DeviceId;
+        public uint SubSysId;
+        public uint Revision;
+        public nuint DedicatedVideoMemory;
+        public nuint DedicatedSystemMemory;
+        public nuint SharedSystemMemory;
+        public long AdapterLuid;
+        public uint Flags;
+        public int GraphicsPreemptionGranularity;
+        public int ComputePreemptionGranularity;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -599,6 +979,7 @@ internal static partial class GraphicsMemoryMonitor
         new int GetDesc(out IntPtr pDesc);
         new int CheckInterfaceSupport();
         new int GetDesc1(out DXGI_ADAPTER_DESC1 pDesc);
+        int GetDesc2(out DXGI_ADAPTER_DESC2 pDesc);
         int RegisterHardwareContentProtectionTeardownStatusEvent();
         void UnregisterHardwareContentProtectionTeardownStatus();
         int QueryVideoMemoryInfo(uint nodeIndex, DXGI_MEMORY_SEGMENT_GROUP memorySegmentGroup, out DXGI_QUERY_VIDEO_MEMORY_INFO pVideoMemoryInfo);
