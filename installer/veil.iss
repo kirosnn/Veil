@@ -1,5 +1,5 @@
 #define AppName        "Veil"
-#define AppVersion     "0.0.2"
+#define AppVersion     "0.0.43"
 #define AppPublisher   "Veil"
 #define AppURL         "https://github.com/kirosnn/veil"
 #define VeilExe        "Veil.exe"
