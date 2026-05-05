@@ -221,6 +221,7 @@ public partial class App : Application
         _desktopIconVisibilityService?.RestoreLaunchState();
         _desktopIconVisibilityService = null;
         PerformanceLogger.Stop();
+        Exit();
     }
 
     private void OnSettingsChanged()
