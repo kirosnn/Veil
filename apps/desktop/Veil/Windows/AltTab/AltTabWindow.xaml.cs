@@ -41,11 +41,11 @@ public sealed partial class AltTabWindow : Window
         Activated -= OnFirstActivated;
 
         _hwnd = WindowHelper.GetHwnd(this);
+        ShowWindowNative(_hwnd, SW_HIDE);
         WindowHelper.RemoveTitleBar(this);
         WindowHelper.MakeOverlay(this);
         WindowHelper.PrepareForSystemBackdrop(this);
         SetupAcrylic(global::Windows.UI.Color.FromArgb(255, 24, 28, 36));
-        ShowWindowNative(_hwnd, SW_HIDE);
     }
 
     private void SetupAcrylic(global::Windows.UI.Color accentColor)
@@ -77,9 +77,15 @@ public sealed partial class AltTabWindow : Window
 
     internal void Initialize()
     {
-        var appWindow = WindowHelper.GetAppWindow(this);
-        appWindow.MoveAndResize(new global::Windows.Graphics.RectInt32(-9999, -9999, 1, 1));
+        var hwnd = WindowHelper.GetHwnd(this);
+        int cloak = 1;
+        DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
+
         Activate();
+
+        ShowWindowNative(hwnd, SW_HIDE);
+        cloak = 0;
+        DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, ref cloak, sizeof(int));
     }
 
     internal void ShowSwitcher(IReadOnlyList<WindowSwitchEntry> entries, int selectedIndex, ScreenBounds displayBounds)
