@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Diagnostics;
 using System.IO;
+using Microsoft.Win32;
 using Microsoft.UI;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Windowing;
@@ -19,6 +20,7 @@ internal static class WindowHelper
     private static readonly Lock _explorerPidCacheLock = new();
     private const uint DesktopSpawnWorkerMessage = 0x052C;
     private const uint SendMessageTimeoutNormal = 0x0000;
+    private const string PersonalizeKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
 
     internal static IntPtr GetHwnd(Window window)
     {
@@ -108,6 +110,40 @@ internal static class WindowHelper
     internal static void PrepareForSystemBackdrop(Window window)
     {
         DisableLayeredTransparency(window);
+        ExtendFrameIntoClientArea(window);
+    }
+
+    internal static bool IsWindowsTransparencyEnabled()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(PersonalizeKeyPath, writable: false);
+            return key?.GetValue("EnableTransparency") is not int value || value != 0;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    internal static bool IsWindowsLightTheme()
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(PersonalizeKeyPath, writable: false);
+            return key?.GetValue("AppsUseLightTheme") is not int value || value != 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal static global::Windows.UI.Color GetOpaqueThemeBackgroundColor()
+    {
+        return IsWindowsLightTheme()
+            ? global::Windows.UI.Color.FromArgb(255, 238, 238, 238)
+            : global::Windows.UI.Color.FromArgb(255, 28, 28, 28);
     }
 
     internal static void UseTransparentBackdrop(Window window)
