@@ -7,13 +7,7 @@ internal static class FullscreenDetectionService
 {
     internal static bool IsFullscreenWindowOnMonitor(ScreenBounds screen, IntPtr excludeHwnd)
     {
-        IntPtr hwnd = GetForegroundWindow();
-        if (hwnd == IntPtr.Zero || hwnd == excludeHwnd)
-        {
-            return false;
-        }
-
-        if (IsIconic(hwnd) || !IsWindowVisible(hwnd))
+        if (!WindowHelper.TryGetForegroundContentWindow(screen, excludeHwnd, out IntPtr hwnd, out Rect rect))
         {
             return false;
         }
@@ -24,11 +18,6 @@ internal static class FullscreenDetectionService
         }
 
         if (DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, out uint cloaked, sizeof(uint)) == 0 && cloaked != 0)
-        {
-            return false;
-        }
-
-        if (!TryGetVisibleWindowRect(hwnd, out Rect rect))
         {
             return false;
         }
