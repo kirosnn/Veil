@@ -17,6 +17,7 @@ $global:lastRelevantChangeAt = [DateTime]::MinValue
 $global:lastQueuedPath = $null
 $global:devMutex = $null
 $global:stopRequested = $false
+$global:interactiveConsole = $true
 
 Add-Type -TypeDefinition @"
 using System;
@@ -97,7 +98,7 @@ public static class VeilDevJobNative
 
     public static void UnregisterConsoleKillHandler()
     {
-        if (_consoleHandler is null)
+        if (_consoleHandler == null)
         {
             return;
         }
@@ -120,7 +121,7 @@ public static class VeilDevJobNative
             {
                 if (!process.HasExited)
                 {
-                    process.Kill(true);
+                    process.Kill();
                     process.WaitForExit(2000);
                 }
             }
@@ -446,7 +447,12 @@ function Enter-SingleInstanceMode {
 
     Stop-WorkspaceProcesses
 
-    $acquired = $global:devMutex.WaitOne(2000)
+    try {
+        $acquired = $global:devMutex.WaitOne(2000)
+    }
+    catch [System.Threading.AbandonedMutexException] {
+        $acquired = $true
+    }
     if (-not $acquired) {
         throw "Another Veil dev instance is still active."
     }
@@ -498,8 +504,15 @@ function Invoke-VeilBuild {
     Write-Separator
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $output = & dotnet build $projectPath -c $configuration -p:Platform=$platform --nologo 2>&1
-    $exitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & dotnet build $projectPath -c $configuration -p:Platform=$platform --nologo 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     $stopwatch.Stop()
     $elapsed = $stopwatch.Elapsed.TotalSeconds.ToString("F1")
 
@@ -576,6 +589,16 @@ function Invoke-VeilBuild {
             }
             Write-Host ""
         }
+        else {
+            Write-Host ""
+            foreach ($line in $output | Select-Object -Last 30) {
+                $text = "$line"
+                if (-not [string]::IsNullOrWhiteSpace($text)) {
+                    Write-Host "       $text" -ForegroundColor DarkRed
+                }
+            }
+            Write-Host ""
+        }
 
         $ePlural = if ($errorCount -ne 1) { "s" } else { "" }
         $summary = "$errorCount error$ePlural"
@@ -645,6 +668,7 @@ function Restart-Veil {
         $executablePath = Invoke-VeilBuild
     }
     catch {
+        Write-Err "$_"
         Write-Warn "Build failed, nothing to run"
         return
     }
@@ -725,8 +749,13 @@ $cancelHandler = [ConsoleCancelEventHandler]{
     $global:stopRequested = $true
     Stop-Veil
 }
-[Console]::TreatControlCAsInput = $false
-[Console]::add_CancelKeyPress($cancelHandler)
+try {
+    [Console]::TreatControlCAsInput = $false
+    [Console]::add_CancelKeyPress($cancelHandler)
+}
+catch {
+    $global:interactiveConsole = $false
+}
 
 try {
     Enter-SingleInstanceMode
@@ -745,7 +774,7 @@ try {
             break
         }
 
-        while ([Console]::KeyAvailable) {
+        while ($global:interactiveConsole -and [Console]::KeyAvailable) {
             $keyInfo = [Console]::ReadKey($true)
             Handle-DevKey -KeyInfo $keyInfo
         }
@@ -795,7 +824,7 @@ finally {
         }
     }
 
-    if ($null -ne $cancelHandler) {
+    if ($global:interactiveConsole -and $null -ne $cancelHandler) {
         [Console]::remove_CancelKeyPress($cancelHandler)
     }
     [VeilDevJobNative]::UnregisterConsoleKillHandler()
