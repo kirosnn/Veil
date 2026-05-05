@@ -206,7 +206,7 @@ public sealed partial class MusicControlWindow : Window
             layout.Children.Add(BuildVolumeSection());
         }
 
-        if (_settings.MusicShowSourceToggle)
+        if (_settings.MusicShowSourceToggle && !_mediaService.IsBrowserApp)
         {
             var sourceSection = BuildSourceWindowSection();
             sourceSection.Margin = new Thickness(0, 0, 0, 0);
@@ -827,7 +827,7 @@ public sealed partial class MusicControlWindow : Window
             _playPauseButton.Content = CreatePlayPauseGlyph(_mediaService.IsPlaying);
 
         UpdateTransportVisuals();
-        if (_settings.MusicShowSourceToggle)
+        if (_settings.MusicShowSourceToggle && !_mediaService.IsBrowserApp)
         {
             UpdateSourceWindowVisuals();
         }

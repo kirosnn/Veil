@@ -17,6 +17,7 @@ internal readonly record struct WindowFitNativeSnapshot(
     Rect WindowRect,
     Rect MonitorRect,
     int ProcessId,
+    string ProcessPath,
     string ProcessName,
     string ClassName,
     string Title);
@@ -39,6 +40,55 @@ internal static class WindowFitCandidateEvaluator
         "Windows.UI.Core.CoreWindow",
         "ApplicationFrameInputSinkWindow"
     };
+
+    private static readonly HashSet<string> GameProcessNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Battle.net",
+        "BethesdaNetLauncher",
+        "DiscordOverlayHost",
+        "EpicGamesLauncher",
+        "EADesktop",
+        "GameBar",
+        "GameOverlayUI",
+        "GalaxyClient",
+        "GOG Galaxy",
+        "NVIDIA Share",
+        "Playnite",
+        "RiotClientServices",
+        "RobloxPlayerBeta",
+        "steam",
+        "steamwebhelper",
+        "UbisoftConnect",
+        "UnityCrashHandler64",
+        "XboxPcApp"
+    };
+
+    private static readonly HashSet<string> GameWindowClassNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CryENGINE",
+        "FNA",
+        "GLFW30",
+        "LaunchUnrealUWindowsClient",
+        "SDL_app",
+        "UnityWndClass",
+        "UnrealWindow",
+        "Valve001"
+    };
+
+    private static readonly string[] GamePathSegments =
+    [
+        "\\Battle.net\\",
+        "\\Bethesda.net Launcher\\",
+        "\\EA Games\\",
+        "\\Epic Games\\",
+        "\\GOG Galaxy\\Games\\",
+        "\\Riot Games\\",
+        "\\Roblox\\",
+        "\\SteamLibrary\\",
+        "\\Ubisoft\\",
+        "\\XboxGames\\",
+        "\\steamapps\\"
+    ];
 
     internal static bool ShouldFit(WindowFitNativeSnapshot window, WindowFitSettings settings, int ownProcessId)
     {
@@ -88,7 +138,10 @@ internal static class WindowFitCandidateEvaluator
             return false;
         }
 
-        if (window.ProcessId == ownProcessId || IsOwnProcessName(window.ProcessName) || IsExcluded(window, settings.ExclusionSet))
+        if (window.ProcessId == ownProcessId
+            || IsOwnProcessName(window.ProcessName)
+            || IsGameWindow(window)
+            || IsExcluded(window, settings.ExclusionSet))
         {
             return false;
         }
@@ -119,6 +172,16 @@ internal static class WindowFitCandidateEvaluator
     {
         return string.Equals(processName, "Veil", StringComparison.OrdinalIgnoreCase)
             || string.Equals(processName, OwnProcessName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsGameWindow(WindowFitNativeSnapshot window)
+    {
+        if (GameProcessNames.Contains(window.ProcessName) || GameWindowClassNames.Contains(window.ClassName))
+        {
+            return true;
+        }
+
+        return GamePathSegments.Any(segment => window.ProcessPath.Contains(segment, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool IsExcluded(WindowFitNativeSnapshot window, IReadOnlySet<string> exclusions)

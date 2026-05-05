@@ -29,7 +29,8 @@ internal sealed class MediaControlService
         "msedge",
         "firefox",
         "opera",
-        "brave"
+        "brave",
+        "zen"
     ];
 
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
@@ -42,6 +43,7 @@ internal sealed class MediaControlService
     internal string? Subtitle { get; private set; }
     internal bool IsPlaying { get; private set; }
     internal bool IsMusicApp { get; private set; }
+    internal bool IsBrowserApp { get; private set; }
     internal bool IsYouTubeSource { get; private set; }
     internal string? SourceAppId { get; private set; }
     internal string SourceLabel => ResolveSourceLabel(SourceAppId, TrackTitle, TrackArtist, AlbumTitle, Subtitle);
@@ -288,6 +290,7 @@ internal sealed class MediaControlService
             Subtitle = null;
             IsPlaying = false;
             IsMusicApp = false;
+            IsBrowserApp = false;
             IsYouTubeSource = false;
             SourceAppId = null;
             ThumbnailRef = null;
@@ -311,6 +314,7 @@ internal sealed class MediaControlService
 
         SourceAppId = _session.SourceAppUserModelId;
         IsYouTubeSource = IsYouTubeMediaSource(SourceAppId, null, null, null, null);
+        IsBrowserApp = IsBrowserSource(SourceAppId);
         IsMusicApp = IsSupportedMediaSource(SourceAppId, null, null, null, null);
 
         UpdatePlaybackInfo();
@@ -351,6 +355,7 @@ internal sealed class MediaControlService
             Subtitle = string.IsNullOrWhiteSpace(props?.Subtitle) ? null : props.Subtitle;
             ThumbnailRef = props?.Thumbnail;
             IsYouTubeSource = IsYouTubeMediaSource(SourceAppId, TrackTitle, TrackArtist, AlbumTitle, Subtitle);
+            IsBrowserApp = IsBrowserSource(SourceAppId);
             IsMusicApp = IsSupportedMediaSource(SourceAppId, TrackTitle, TrackArtist, AlbumTitle, Subtitle);
         }
         catch
@@ -361,6 +366,7 @@ internal sealed class MediaControlService
             Subtitle = null;
             ThumbnailRef = null;
             IsYouTubeSource = false;
+            IsBrowserApp = IsBrowserSource(SourceAppId);
             IsMusicApp = IsSupportedMediaSource(SourceAppId, null, null, null, null);
         }
 
@@ -489,8 +495,35 @@ internal sealed class MediaControlService
 
     private static bool IsBrowserSource(string? sourceAppId)
     {
-        return !string.IsNullOrWhiteSpace(sourceAppId) &&
-            BrowserAppMarkers.Any(marker => sourceAppId.Contains(marker, StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(sourceAppId))
+        {
+            return false;
+        }
+
+        if (BrowserAppMarkers.Any(marker => sourceAppId.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return IsHexOnlyId(sourceAppId);
+    }
+
+    private static bool IsHexOnlyId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length < 4)
+        {
+            return false;
+        }
+
+        foreach (char c in value)
+        {
+            if (c is not (>= '0' and <= '9') and not (>= 'A' and <= 'F') and not (>= 'a' and <= 'f'))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsBrowserMediaSource(
@@ -529,8 +562,10 @@ internal sealed class MediaControlService
 
     private static bool HasYouTubeBrowserWindow(string sourceAppId)
     {
-        string[] matchTokens = BuildWindowMatchTokens(sourceAppId);
-        if (matchTokens.Length == 0)
+        bool useAnyBrowser = IsHexOnlyId(sourceAppId);
+        string[] matchTokens = useAnyBrowser ? [] : BuildWindowMatchTokens(sourceAppId);
+
+        if (!useAnyBrowser && matchTokens.Length == 0)
         {
             return false;
         }
@@ -560,13 +595,20 @@ internal sealed class MediaControlService
                 using var process = Process.GetProcessById((int)processId);
                 string processName = NormalizeWindowValue(process.ProcessName);
                 string fileDescription = NormalizeWindowValue(process.MainModule?.FileVersionInfo?.FileDescription);
-                if (matchTokens.Any(token =>
-                    processName == token ||
-                    processName.Contains(token, StringComparison.Ordinal) ||
-                    token.Contains(processName, StringComparison.Ordinal) ||
-                    (!string.IsNullOrWhiteSpace(fileDescription) &&
-                     (fileDescription.Contains(token, StringComparison.Ordinal) ||
-                      token.Contains(fileDescription, StringComparison.Ordinal)))))
+
+                bool matches = useAnyBrowser
+                    ? BrowserAppMarkers.Any(marker =>
+                        processName.Contains(marker, StringComparison.OrdinalIgnoreCase) ||
+                        fileDescription.Contains(marker, StringComparison.OrdinalIgnoreCase))
+                    : matchTokens.Any(token =>
+                        processName == token ||
+                        processName.Contains(token, StringComparison.Ordinal) ||
+                        token.Contains(processName, StringComparison.Ordinal) ||
+                        (!string.IsNullOrWhiteSpace(fileDescription) &&
+                         (fileDescription.Contains(token, StringComparison.Ordinal) ||
+                          token.Contains(fileDescription, StringComparison.Ordinal))));
+
+                if (matches)
                 {
                     hasMatch = true;
                     return false;
@@ -760,6 +802,32 @@ internal sealed class MediaControlService
         if (ContainsMarker(sourceAppId, "opera"))
         {
             return "Opera";
+        }
+
+        if (ContainsMarker(sourceAppId, "zen"))
+        {
+            return "Zen";
+        }
+
+        if (IsHexOnlyId(sourceAppId))
+        {
+            if (ContainsMarker(trackTitle, "youtube music") ||
+                ContainsMarker(trackArtist, "youtube music") ||
+                ContainsMarker(albumTitle, "youtube music") ||
+                ContainsMarker(subtitle, "youtube music"))
+            {
+                return "YouTube Music";
+            }
+
+            if (ContainsMarker(trackTitle, "youtube") ||
+                ContainsMarker(trackArtist, "youtube") ||
+                ContainsMarker(albumTitle, "youtube") ||
+                ContainsMarker(subtitle, "youtube"))
+            {
+                return "YouTube";
+            }
+
+            return "Browser";
         }
 
         return "App";

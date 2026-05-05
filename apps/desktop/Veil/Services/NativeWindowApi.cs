@@ -9,7 +9,7 @@ internal sealed class NativeWindowApi
 {
     private static readonly TimeSpan ProcessNameCacheDuration = TimeSpan.FromSeconds(10);
     private readonly object _processNameCacheGate = new();
-    private readonly Dictionary<int, CachedProcessName> _processNameCache = [];
+    private readonly Dictionary<int, CachedProcessInfo> _processNameCache = [];
 
     internal bool TryCreateSnapshot(IntPtr hwnd, out WindowFitNativeSnapshot snapshot)
     {
@@ -49,6 +49,7 @@ internal sealed class NativeWindowApi
             windowRect,
             monitorInfo.Monitor,
             unchecked((int)processId),
+            GetProcessPath(processId),
             GetProcessName(processId),
             GetClassName(hwnd),
             GetWindowTitle(hwnd));
@@ -104,36 +105,37 @@ internal sealed class NativeWindowApi
 
     private string GetProcessName(uint processId)
     {
+        return GetCachedProcessInfo(processId).Name;
+    }
+
+    private string GetProcessPath(uint processId)
+    {
+        return GetCachedProcessInfo(processId).Path;
+    }
+
+    private CachedProcessInfo GetCachedProcessInfo(uint processId)
+    {
         if (processId == 0)
         {
-            return string.Empty;
+            return new CachedProcessInfo(string.Empty, string.Empty, DateTime.UtcNow);
         }
 
         int id = unchecked((int)processId);
         DateTime now = DateTime.UtcNow;
         lock (_processNameCacheGate)
         {
-            if (_processNameCache.TryGetValue(id, out CachedProcessName cached)
+            if (_processNameCache.TryGetValue(id, out CachedProcessInfo cached)
                 && now - cached.CachedAtUtc <= ProcessNameCacheDuration)
             {
-                return cached.Name;
+                return cached;
             }
         }
 
-        string processName;
-        try
-        {
-            using Process process = Process.GetProcessById(id);
-            processName = process.ProcessName;
-        }
-        catch
-        {
-            processName = string.Empty;
-        }
+        CachedProcessInfo processInfo = ReadProcessInfo(id, now);
 
         lock (_processNameCacheGate)
         {
-            _processNameCache[id] = new CachedProcessName(processName, now);
+            _processNameCache[id] = processInfo;
             if (_processNameCache.Count > 256)
             {
                 foreach (int staleProcessId in _processNameCache
@@ -146,7 +148,30 @@ internal sealed class NativeWindowApi
             }
         }
 
-        return processName;
+        return processInfo;
+    }
+
+    private static CachedProcessInfo ReadProcessInfo(int processId, DateTime cachedAtUtc)
+    {
+        try
+        {
+            using Process process = Process.GetProcessById(processId);
+            string path;
+            try
+            {
+                path = process.MainModule?.FileName ?? string.Empty;
+            }
+            catch
+            {
+                path = string.Empty;
+            }
+
+            return new CachedProcessInfo(process.ProcessName, path, cachedAtUtc);
+        }
+        catch
+        {
+            return new CachedProcessInfo(string.Empty, string.Empty, cachedAtUtc);
+        }
     }
 
     private static bool IsCloaked(IntPtr hwnd)
@@ -156,7 +181,7 @@ internal sealed class NativeWindowApi
     }
 }
 
-internal readonly record struct CachedProcessName(string Name, DateTime CachedAtUtc);
+internal readonly record struct CachedProcessInfo(string Name, string Path, DateTime CachedAtUtc);
 
 internal readonly record struct MonitorWindowFitLayout(
     IntPtr Handle,

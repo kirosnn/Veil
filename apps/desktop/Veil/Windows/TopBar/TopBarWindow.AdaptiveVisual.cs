@@ -185,7 +185,7 @@ public sealed partial class TopBarWindow
 
         try
         {
-            var compositor = new Compositor();
+            var compositor = new global::Windows.UI.Composition.Compositor();
             var transparentBrush = compositor.CreateColorBrush(
                 global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
             var target = this.As<ICompositionSupportsSystemBackdrop>();
