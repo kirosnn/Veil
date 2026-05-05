@@ -100,7 +100,9 @@ public sealed partial class SettingsWindow : Window
             TintColor = global::Windows.UI.Color.FromArgb(255, 34, 40, 50),
             TintOpacity = 0.16f,
             LuminosityOpacity = 0.58f,
-            FallbackColor = global::Windows.UI.Color.FromArgb(216, 22, 27, 34)
+            FallbackColor = WindowHelper.IsWindowsTransparencyEnabled()
+                ? global::Windows.UI.Color.FromArgb(216, 22, 27, 34)
+                : WindowHelper.GetOpaqueThemeBackgroundColor()
         };
 
         _backdropConfig = new SystemBackdropConfiguration
@@ -111,8 +113,12 @@ public sealed partial class SettingsWindow : Window
 
         _acrylicController.AddSystemBackdropTarget(this.As<ICompositionSupportsSystemBackdrop>());
         _acrylicController.SetSystemBackdropConfiguration(_backdropConfig);
-        PanelBorder.Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, 255, 255, 255));
-        PanelBorder.BorderBrush = new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, 255, 255, 255));
+        PanelBorder.Background = WindowHelper.IsWindowsTransparencyEnabled()
+            ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, 255, 255, 255))
+            : new SolidColorBrush(WindowHelper.GetOpaqueThemeBackgroundColor());
+        PanelBorder.BorderBrush = WindowHelper.IsWindowsTransparencyEnabled()
+            ? new SolidColorBrush(global::Windows.UI.Color.FromArgb(24, 255, 255, 255))
+            : new SolidColorBrush(global::Windows.UI.Color.FromArgb(0, 0, 0, 0));
         PanelBorder.BorderThickness = new Thickness(1);
     }
 
@@ -120,6 +126,7 @@ public sealed partial class SettingsWindow : Window
     {
         WindowHelper.ApplyAppIcon(this);
         WindowHelper.RemoveTitleBar(this);
+        WindowHelper.PrepareForSystemBackdrop(this);
 
         int rounded = DWMWCP_ROUND;
         DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref rounded, sizeof(int));
