@@ -142,6 +142,20 @@ internal sealed partial class AppSettings
             .ToArray();
     }
 
+    private static string[] NormalizeSmartWindowFitExclusions(IEnumerable<string>? exclusions)
+    {
+        string[] normalized = exclusions?
+            .Select(static exclusion => exclusion.Trim())
+            .Where(static exclusion => !string.IsNullOrWhiteSpace(exclusion))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+            ?? [];
+
+        return normalized.Length == 0
+            ? [.. DefaultSmartWindowFitExclusions]
+            : normalized;
+    }
+
     private static string GetPrimaryMonitorId(IReadOnlyList<MonitorInfo2> monitors)
     {
         return monitors.FirstOrDefault(static monitor => monitor.IsPrimary)?.Id
