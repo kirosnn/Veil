@@ -456,6 +456,66 @@ internal sealed partial class AppSettings
         }
     }
 
+    public bool SmartWindowFitEnabled
+    {
+        get => _smartWindowFitEnabled;
+        set
+        {
+            if (_smartWindowFitEnabled == value) return;
+            _smartWindowFitEnabled = value;
+            PersistAndNotify();
+        }
+    }
+
+    public int SmartWindowFitMargin
+    {
+        get => _smartWindowFitMargin;
+        set
+        {
+            int v = Math.Clamp(value, 0, 64);
+            if (_smartWindowFitMargin == v) return;
+            _smartWindowFitMargin = v;
+            PersistAndNotify();
+        }
+    }
+
+    public int SmartWindowFitDelayMilliseconds
+    {
+        get => _smartWindowFitDelayMilliseconds;
+        set
+        {
+            int v = Math.Clamp(value, 50, 1000);
+            if (_smartWindowFitDelayMilliseconds == v) return;
+            _smartWindowFitDelayMilliseconds = v;
+            PersistAndNotify();
+        }
+    }
+
+    public bool SmartWindowFitRespectManualResize
+    {
+        get => _smartWindowFitRespectManualResize;
+        set
+        {
+            if (_smartWindowFitRespectManualResize == value) return;
+            _smartWindowFitRespectManualResize = value;
+            PersistAndNotify();
+        }
+    }
+
+    public IReadOnlyList<string> SmartWindowFitExclusions => _smartWindowFitExclusions;
+
+    public void SetSmartWindowFitExclusions(IEnumerable<string> exclusions)
+    {
+        string[] normalized = NormalizeSmartWindowFitExclusions(exclusions);
+        if (_smartWindowFitExclusions.SequenceEqual(normalized, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _smartWindowFitExclusions = normalized;
+        PersistAndNotify();
+    }
+
     public void SetShortcutButton(int index, AppShortcutSetting? setting)
     {
         if (index < 0 || index >= MaxShortcutButtons)
