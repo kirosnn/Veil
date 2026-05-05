@@ -177,8 +177,19 @@ public sealed partial class SettingsWindow : Window
             TopBarHeightSlider.StepFrequency = 1;
             TopBarHeightSlider.Value = _settings.TopBarHeight;
 
+            SmartWindowFitMarginSlider.Minimum = 0;
+            SmartWindowFitMarginSlider.Maximum = 64;
+            SmartWindowFitMarginSlider.StepFrequency = 1;
+            SmartWindowFitMarginSlider.Value = _settings.SmartWindowFitMargin;
+
+            SmartWindowFitDelaySlider.Minimum = 50;
+            SmartWindowFitDelaySlider.Maximum = 1000;
+            SmartWindowFitDelaySlider.StepFrequency = 50;
+            SmartWindowFitDelaySlider.Value = _settings.SmartWindowFitDelayMilliseconds;
+
             SolidColorTextBox.Text = _settings.SolidColor;
             TopBarForegroundColorTextBox.Text = _settings.TopBarForegroundColor;
+            SmartWindowFitExclusionsTextBox.Text = string.Join(Environment.NewLine, _settings.SmartWindowFitExclusions);
 
             SyncLabels();
             UpdateSectionUi();
@@ -543,6 +554,62 @@ public sealed partial class SettingsWindow : Window
         UpdateSectionUi();
     }
 
+    private void OnSmartWindowFitEnabledButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _settings.SmartWindowFitEnabled = !_settings.SmartWindowFitEnabled;
+        UpdateSectionUi();
+    }
+
+    private void OnSmartWindowFitMarginChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_isInitializing || !_settingsLoaded)
+        {
+            return;
+        }
+
+        _settings.SmartWindowFitMargin = (int)Math.Round(e.NewValue);
+        SyncLabels();
+    }
+
+    private void OnSmartWindowFitDelayChanged(object sender, RangeBaseValueChangedEventArgs e)
+    {
+        if (_isInitializing || !_settingsLoaded)
+        {
+            return;
+        }
+
+        _settings.SmartWindowFitDelayMilliseconds = (int)Math.Round(e.NewValue / 50) * 50;
+        SyncLabels();
+    }
+
+    private void OnSmartWindowFitRespectManualResizeButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _settings.SmartWindowFitRespectManualResize = !_settings.SmartWindowFitRespectManualResize;
+        UpdateSectionUi();
+    }
+
+    private void OnSmartWindowFitExclusionsLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        string[] exclusions = SmartWindowFitExclusionsTextBox.Text
+            .Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        _settings.SetSmartWindowFitExclusions(exclusions);
+    }
+
     private void OnAppButtonOutlineButtonClick(object sender, RoutedEventArgs e)
     {
         if (_isInitializing)
@@ -615,6 +682,8 @@ public sealed partial class SettingsWindow : Window
         FinderBubbleValueText.Text = $"{Math.Round(_settings.FinderBubbleOpacity * 100):0}%";
         BlurIntensityValueText.Text = $"{Math.Round(_settings.BlurIntensity * 100):0}%";
         RunCatRunnerValueText.Text = _settings.RunCatRunner;
+        SmartWindowFitMarginValueText.Text = $"{_settings.SmartWindowFitMargin}px";
+        SmartWindowFitDelayValueText.Text = $"{_settings.SmartWindowFitDelayMilliseconds}ms";
     }
 
     private void LoadMonitorOptions()
@@ -899,6 +968,7 @@ public sealed partial class SettingsWindow : Window
         DiscordSectionPanel.Visibility = _selectedSection == "Discord" ? Visibility.Visible : Visibility.Collapsed;
         MusicSectionPanel.Visibility = _selectedSection == "Music" ? Visibility.Visible : Visibility.Collapsed;
         OptimizationSectionPanel.Visibility = _selectedSection == "Optimization" ? Visibility.Visible : Visibility.Collapsed;
+        WindowManagementSectionPanel.Visibility = _selectedSection == "WindowManagement" ? Visibility.Visible : Visibility.Collapsed;
         MenuSectionPanel.Visibility = _selectedSection == "Menu" ? Visibility.Visible : Visibility.Collapsed;
         RunCatSectionPanel.Visibility = _selectedSection == "RunCat" ? Visibility.Visible : Visibility.Collapsed;
         ProfilesSectionPanel.Visibility = _selectedSection == "Profiles" ? Visibility.Visible : Visibility.Collapsed;
@@ -907,6 +977,7 @@ public sealed partial class SettingsWindow : Window
         UpdateSectionButton(DiscordSectionButton, _selectedSection == "Discord");
         UpdateSectionButton(MusicSectionButton, _selectedSection == "Music");
         UpdateSectionButton(OptimizationSectionButton, _selectedSection == "Optimization");
+        UpdateSectionButton(WindowManagementSectionButton, _selectedSection == "WindowManagement");
         UpdateSectionButton(MenuSectionButton, _selectedSection == "Menu");
         UpdateSectionButton(RunCatSectionButton, _selectedSection == "RunCat");
         UpdateSectionButton(ProfilesSectionButton, _selectedSection == "Profiles");
@@ -946,6 +1017,7 @@ public sealed partial class SettingsWindow : Window
         UpdateDiscordButtons();
         UpdateMusicButtons();
         UpdateOptimizationButtons();
+        UpdateWindowManagementButtons();
         UpdateRunCatButtons();
         if (_selectedSection == "Profiles") RebuildProfileCards();
     }
@@ -1084,6 +1156,19 @@ public sealed partial class SettingsWindow : Window
         BackgroundOptimizationEnabledButton.Content = isBackgroundOptimizationEnabled ? "Enabled" : "Disabled";
         BackgroundOptimizationEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isBackgroundOptimizationEnabled ? (byte)48 : (byte)0, 255, 255, 255));
         BackgroundOptimizationEnabledButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isBackgroundOptimizationEnabled ? (byte)255 : (byte)214);
+    }
+
+    private void UpdateWindowManagementButtons()
+    {
+        bool isSmartFitEnabled = _settings.SmartWindowFitEnabled;
+        SmartWindowFitEnabledButton.Content = isSmartFitEnabled ? "Enabled" : "Disabled";
+        SmartWindowFitEnabledButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(isSmartFitEnabled ? (byte)48 : (byte)0, 255, 255, 255));
+        SmartWindowFitEnabledButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, isSmartFitEnabled ? (byte)255 : (byte)214);
+
+        bool respectManualResize = _settings.SmartWindowFitRespectManualResize;
+        SmartWindowFitRespectManualResizeButton.Content = respectManualResize ? "Enabled" : "Disabled";
+        SmartWindowFitRespectManualResizeButton.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(respectManualResize ? (byte)48 : (byte)0, 255, 255, 255));
+        SmartWindowFitRespectManualResizeButton.Foreground = ReadableSurfaceHelper.CreateTextBrush(_useDarkForeground, respectManualResize ? (byte)255 : (byte)214);
     }
 
     private void ApplyReadableContrast()
