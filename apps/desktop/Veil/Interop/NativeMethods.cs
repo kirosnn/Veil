@@ -52,6 +52,8 @@ internal static partial class NativeMethods
     internal const uint ABM_REMOVE = 0x00000001;
     internal const uint ABM_QUERYPOS = 0x00000002;
     internal const uint ABM_SETPOS = 0x00000003;
+    internal const uint ABM_ACTIVATE = 0x00000006;
+    internal const uint ABM_WINDOWPOSCHANGED = 0x00000009;
 
     internal const int ABE_TOP = 1;
     internal const int ABE_BOTTOM = 3;
