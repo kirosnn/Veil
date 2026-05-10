@@ -21,6 +21,7 @@ internal static class WindowHelper
     private const uint DesktopSpawnWorkerMessage = 0x052C;
     private const uint SendMessageTimeoutNormal = 0x0000;
     private const string PersonalizeKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize";
+    private static readonly uint AppBarCallbackMessage = RegisterWindowMessageW("Veil_AppBarMessage");
 
     internal static IntPtr GetHwnd(Window window)
     {
@@ -243,6 +244,16 @@ internal static class WindowHelper
 
         SetWindowPos(appBarHwnd, HWND_TOPMOST, 0, 0, 0, 0,
             SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
+        var abd = new AppBarData
+        {
+            cbSize = Marshal.SizeOf<AppBarData>(),
+            hWnd = appBarHwnd,
+            uCallbackMessage = AppBarCallbackMessage,
+            lParam = 1
+        };
+        SHAppBarMessage(ABM_ACTIVATE, ref abd);
+        SHAppBarMessage(ABM_WINDOWPOSCHANGED, ref abd);
     }
 
     internal static void AttachToDesktop(Window window)
@@ -318,6 +329,7 @@ internal static class WindowHelper
         {
             cbSize = Marshal.SizeOf<AppBarData>(),
             hWnd = hwnd,
+            uCallbackMessage = AppBarCallbackMessage,
             uEdge = edge,
             rc = new Rect
             {
@@ -341,6 +353,7 @@ internal static class WindowHelper
         SHAppBarMessage(ABM_QUERYPOS, ref abd);
         ApplyAppBarThickness(ref abd, edge, barSize);
         SHAppBarMessage(ABM_SETPOS, ref abd);
+        SHAppBarMessage(ABM_WINDOWPOSCHANGED, ref abd);
 
         return new global::Windows.Graphics.RectInt32(
             abd.rc.Left,
